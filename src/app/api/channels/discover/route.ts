@@ -15,6 +15,7 @@ import {
   type RecentVideo,
 } from "@/services/youtube"
 import { evaluateLead } from "@/services/lead-quality"
+import { expandKeywords, computeSemanticRelevance } from "@/services/keyword-expansion"
 import type { DiscoveredLead, ServiceType } from "@/types"
 
 // Deep analysis is quota-heavy (2 units/channel), so cap how many we inspect.
@@ -59,14 +60,36 @@ export async function POST(req: NextRequest) {
 
     const nicheSelected = !!niche && niche !== "Any Niche"
 
-    // 1) Broad search
-    const searchResults = await searchYouTubeChannels({
-      keywords,
-      maxResults: 35,
-      relevanceLanguage: english_only ? "en" : undefined,
-    })
-    const channelIds = [...new Set(searchResults.map((r) => r.channelId).filter(Boolean))]
-    if (channelIds.length === 0) return NextResponse.json({ channels: [], count: 0, analyzed: 0 })
+    // 1) Expand keywords semantically via AI, then search with all concepts
+    const expansion = await expandKeywords(keywords, service_type)
+    const allConcepts = expansion.all   // original + AI-generated
+
+    // Search in parallel using original keywords + expanded concepts (batched into groups of 3)
+    const searchGroups: string[][] = []
+    // Always search original keywords as one query
+    searchGroups.push(keywords)
+    // Add expanded concepts in pairs to avoid quota waste
+    for (let i = 0; i < expansion.expanded.length; i += 2) {
+      searchGroups.push(expansion.expanded.slice(i, i + 2))
+    }
+    // Cap to 5 search queries total
+    const cappedGroups = searchGroups.slice(0, 5)
+
+    const searchResultArrays = await Promise.allSettled(
+      cappedGroups.map((group) =>
+        searchYouTubeChannels({
+          keywords: group,
+          maxResults: 15,
+          relevanceLanguage: english_only ? "en" : undefined,
+        })
+      )
+    )
+
+    const allSearchResults = searchResultArrays
+      .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
+
+    const channelIds = [...new Set(allSearchResults.map((r) => r.channelId).filter(Boolean))]
+    if (channelIds.length === 0) return NextResponse.json({ channels: [], count: 0, analyzed: 0, expanded_concepts: allConcepts })
 
     // 2) Channel details (batched)
     const details = await fetchChannelDetails(channelIds)
@@ -124,7 +147,15 @@ export async function POST(req: NextRequest) {
           minRecentViews: min_recent_views,
         })
 
-        return { channel: c, metrics, businessEmail, links, sponsorship, detectedNiche, result }
+        // Semantic relevance: scored against AI-expanded concepts, NOT channel name
+        const relevance = computeSemanticRelevance(
+          allConcepts,
+          c.description,
+          metrics.recent_titles,
+          recentDescriptions,
+        )
+
+        return { channel: c, metrics, businessEmail, links, sponsorship, detectedNiche, result, relevance }
       })
     )
 
@@ -202,6 +233,9 @@ export async function POST(req: NextRequest) {
         badges: e.result.badges,
         warnings: e.result.warnings,
         reasoning: e.result.reasoning,
+        relevance_score: e.relevance.score,
+        relevance_explanation: e.relevance.explanation,
+        expanded_concepts: allConcepts,
       })
     }
 
@@ -213,6 +247,8 @@ export async function POST(req: NextRequest) {
       count: leads.length,
       analyzed: evaluated.length,
       excluded: evaluated.filter((e) => e.result.excluded).length,
+      expanded_concepts: allConcepts,
+      original_keywords: keywords,
     })
   } catch (err) {
     console.error("Discovery error:", err)

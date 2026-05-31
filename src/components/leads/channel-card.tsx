@@ -2,7 +2,7 @@
 import Image from "next/image"
 import {
   Users, Eye, PlayCircle, Plus, Check, CalendarClock,
-  Clapperboard, Repeat, Mail, AlertTriangle,
+  Clapperboard, Repeat, Mail, AlertTriangle, Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -108,6 +108,22 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
               {w}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* Semantic relevance */}
+      {lead.relevance_explanation && (
+        <div className="mt-3 rounded-lg bg-violet-50 px-2.5 py-2">
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700">
+              <Sparkles className="h-3 w-3" /> Content Relevance
+            </span>
+            <span className={`text-[11px] font-bold ${
+              lead.relevance_score >= 60 ? "text-violet-700" :
+              lead.relevance_score >= 35 ? "text-amber-600" : "text-red-500"
+            }`}>{lead.relevance_score}/100</span>
+          </div>
+          <p className="text-[11px] text-violet-600 leading-relaxed">{lead.relevance_explanation}</p>
         </div>
       )}
 

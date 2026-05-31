@@ -51,6 +51,10 @@ export interface DiscoveredLead {
   badges: string[]
   warnings: string[]
   reasoning: string
+  // semantic relevance
+  relevance_score: number        // 0-100, content-based
+  relevance_explanation: string
+  expanded_concepts?: string[]   // concepts used for this search
 }
 
 export type CRMStage =

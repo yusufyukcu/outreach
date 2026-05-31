@@ -1,6 +1,6 @@
 "use client"
 import { useState, useMemo } from "react"
-import { Search, Loader2, SlidersHorizontal, ArrowUpDown } from "lucide-react"
+import { Search, Loader2, SlidersHorizontal, ArrowUpDown, Sparkles } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,7 +17,7 @@ const NICHES = [
   "Music", "Comedy", "News & Politics", "Sports", "Real Estate", "Lifestyle",
 ]
 
-type SortKey = "score" | "activity" | "views" | "consistency"
+type SortKey = "score" | "relevance" | "activity" | "views" | "consistency"
 
 export default function DiscoverPage() {
   const [keywords, setKeywords] = useState("")
@@ -32,6 +32,7 @@ export default function DiscoverPage() {
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<DiscoveredLead[]>([])
   const [meta, setMeta] = useState<{ analyzed: number; excluded: number } | null>(null)
+  const [expandedConcepts, setExpandedConcepts] = useState<string[]>([])
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
   const [addingId, setAddingId] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
@@ -64,6 +65,7 @@ export default function DiscoverPage() {
 
       setResults(data.channels ?? [])
       setMeta({ analyzed: data.analyzed ?? 0, excluded: data.excluded ?? 0 })
+      setExpandedConcepts(data.expanded_concepts ?? [])
 
       if ((data.channels?.length ?? 0) === 0) {
         toast({
@@ -110,6 +112,9 @@ export default function DiscoverPage() {
   const sortedResults = useMemo(() => {
     const arr = [...results]
     switch (sortKey) {
+      case "relevance":
+        arr.sort((a, b) => b.relevance_score - a.relevance_score)
+        break
       case "activity":
         arr.sort((a, b) => (a.metrics.days_since_upload ?? 9999) - (b.metrics.days_since_upload ?? 9999))
         break
@@ -197,6 +202,23 @@ export default function DiscoverPage() {
           </CardContent>
         </Card>
 
+        {/* Expanded concepts banner */}
+        {!loading && expandedConcepts.length > 0 && (
+          <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4 text-violet-600" />
+              <span className="text-sm font-semibold text-violet-800">AI-expanded search concepts</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {expandedConcepts.map((c) => (
+                <span key={c} className="inline-block rounded-full bg-violet-100 px-2.5 py-0.5 text-xs text-violet-700 font-medium">
+                  {c}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Loading */}
         {loading && (
           <div className="flex items-center justify-center py-16">
@@ -233,6 +255,7 @@ export default function DiscoverPage() {
                   <SelectTrigger className="w-44 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="score">Lead Score</SelectItem>
+                    <SelectItem value="relevance">Content Relevance</SelectItem>
                     <SelectItem value="activity">Recent Activity</SelectItem>
                     <SelectItem value="views">Avg Views</SelectItem>
                     <SelectItem value="consistency">Upload Consistency</SelectItem>

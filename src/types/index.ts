@@ -1,5 +1,58 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
+// ─── Lead Finder / Quality Analysis ─────────────────────────────────────────────
+
+export interface RecentVideoMetrics {
+  last_upload_at: string | null
+  days_since_upload: number | null
+  avg_recent_views: number
+  median_recent_views: number
+  upload_frequency_per_week: number
+  avg_video_length_sec: number
+  long_form_pct: number          // % of recent videos longer than 8 min
+  shorts_pct: number             // % of recent videos that are Shorts (<= 60s)
+  engagement_ratio: number       // avg_recent_views / subscriber_count
+  recent_video_count: number     // how many recent videos we actually analyzed
+  recent_titles: string[]
+}
+
+export interface QualityBreakdown {
+  activity: number               // 0-25
+  recent_views: number           // 0-20
+  long_form: number              // 0-15
+  niche_match: number            // 0-15
+  business_potential: number     // 0-15
+  contact_availability: number   // 0-10
+  total: number                  // 0-100
+}
+
+export interface DiscoveredLead {
+  // identity (post-upsert id is filled in)
+  id?: string
+  youtube_channel_id: string
+  name: string
+  handle: string | null
+  description: string | null
+  thumbnail_url: string | null
+  country: string | null
+  language: string | null
+  niche_primary: string | null
+  subscriber_count: number
+  total_view_count: number
+  video_count: number
+  // analysis
+  metrics: RecentVideoMetrics
+  business_email: string | null
+  has_links: boolean
+  sponsorship_detected: boolean
+  // scoring
+  score: number
+  quality_breakdown: QualityBreakdown
+  badges: string[]
+  warnings: string[]
+  reasoning: string
+}
+
 export type CRMStage =
   | "new"
   | "analyzed"

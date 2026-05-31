@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { searchYouTubeChannels, fetchChannelDetails, detectNiche } from "@/services/youtube"
-import { scoreChannel } from "@/services/scoring"
-import type { ServiceType } from "@/types"
+import {
+  searchYouTubeChannels,
+  fetchChannelDetails,
+  fetchRecentVideos,
+  computeRecentMetrics,
+  extractBusinessEmail,
+  hasExternalLinks,
+  detectSponsorship,
+  looksEnglish,
+  nicheRelevanceRatio,
+  detectOffTargetCategory,
+  detectNiche,
+  type RecentVideo,
+} from "@/services/youtube"
+import { evaluateLead } from "@/services/lead-quality"
+import type { DiscoveredLead, ServiceType } from "@/types"
+
+// Deep analysis is quota-heavy (2 units/channel), so cap how many we inspect.
+const MAX_DEEP_ANALYZE = 20
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,67 +35,185 @@ export async function POST(req: NextRequest) {
     if (!profile?.org_id) return NextResponse.json({ error: "No organization" }, { status: 400 })
 
     const body = await req.json()
-    const { keywords, niche, min_subscribers, max_subscribers, service_type } = body as {
+    const {
+      keywords,
+      niche,
+      min_subscribers,
+      max_subscribers,
+      service_type,
+      min_score = 75,
+      include_low_quality = false,
+      english_only = true,
+      min_recent_views = 2000,
+    } = body as {
       keywords: string[]
       niche: string
       min_subscribers: number
       max_subscribers: number
       service_type: ServiceType
+      min_score?: number
+      include_low_quality?: boolean
+      english_only?: boolean
+      min_recent_views?: number
     }
 
-    // Search YouTube
-    const searchResults = await searchYouTubeChannels({ keywords, maxResults: 25 })
-    const channelIds = searchResults.map(r => r.channelId).filter(Boolean)
+    const nicheSelected = !!niche && niche !== "Any Niche"
 
-    if (channelIds.length === 0) {
-      return NextResponse.json({ channels: [], count: 0 })
-    }
+    // 1) Broad search
+    const searchResults = await searchYouTubeChannels({
+      keywords,
+      maxResults: 35,
+      relevanceLanguage: english_only ? "en" : undefined,
+    })
+    const channelIds = [...new Set(searchResults.map((r) => r.channelId).filter(Boolean))]
+    if (channelIds.length === 0) return NextResponse.json({ channels: [], count: 0, analyzed: 0 })
 
-    // Fetch detailed channel data
-    const channelDetails = await fetchChannelDetails(channelIds)
+    // 2) Channel details (batched)
+    const details = await fetchChannelDetails(channelIds)
 
-    // Filter by subscriber range
-    const filtered = channelDetails.filter(ch =>
-      (ch.subscriber_count ?? 0) >= min_subscribers &&
-      (ch.subscriber_count ?? 0) <= max_subscribers
+    // 3) Subscriber-range pre-filter, then cap deep analysis
+    const candidates = details
+      .filter((c) => c.subscriber_count >= min_subscribers && c.subscriber_count <= max_subscribers)
+      .sort((a, b) => b.subscriber_count - a.subscriber_count)
+      .slice(0, MAX_DEEP_ANALYZE)
+
+    // 4) Deep-analyze each candidate (recent videos -> metrics -> score)
+    const evaluated = await Promise.all(
+      candidates.map(async (c) => {
+        let videos: RecentVideo[] = []
+        try {
+          videos = await fetchRecentVideos(c.uploads_playlist_id, c.youtube_channel_id, 15)
+        } catch {
+          videos = []
+        }
+
+        const metrics = computeRecentMetrics(videos, c.subscriber_count)
+        const recentDescriptions = videos.map((v) => v.description)
+
+        const detectedNiche = nicheSelected
+          ? niche
+          : detectNiche(c.description ?? "", c.name)
+
+        const businessEmail = extractBusinessEmail(
+          c.description,
+          ...recentDescriptions
+        )
+        const links = hasExternalLinks(c.description, ...recentDescriptions)
+        const sponsorship = detectSponsorship(c.description, ...recentDescriptions, ...metrics.recent_titles)
+        const isEnglish = looksEnglish(c.name, c.description, ...metrics.recent_titles)
+
+        const nicheRatio = nicheRelevanceRatio(
+          nicheSelected ? niche : detectedNiche,
+          c.description,
+          metrics.recent_titles,
+          recentDescriptions
+        )
+        const offTarget = detectOffTargetCategory(c.name, c.description, metrics.recent_titles)
+
+        const result = evaluateLead({
+          metrics,
+          subscriberCount: c.subscriber_count,
+          nicheSelected,
+          nicheRatio,
+          offTargetCategory: offTarget,
+          isEnglish,
+          englishOnly: english_only,
+          businessEmail,
+          hasLinks: links,
+          sponsorshipDetected: sponsorship,
+          minRecentViews: min_recent_views,
+        })
+
+        return { channel: c, metrics, businessEmail, links, sponsorship, detectedNiche, result }
+      })
     )
 
-    // Upsert channels + score them
-    const results = []
-    for (const ch of filtered) {
-      if (!ch.youtube_channel_id) continue
+    // 5) Drop hard-excluded, then persist survivors + score floor
+    const threshold = include_low_quality ? 0 : min_score
+    const leads: DiscoveredLead[] = []
 
-      // Detect niche
-      const detectedNiche = niche || detectNiche(ch.description ?? "", ch.name ?? "")
+    for (const e of evaluated) {
+      if (e.result.excluded) continue
+      if (e.result.score < threshold) continue
 
-      const channelData = {
-        ...ch,
-        niche_primary: detectedNiche,
-        outsourcing_likelihood_score: Math.floor(Math.random() * 60) + 20, // Placeholder
-        editing_quality_score: Math.floor(Math.random() * 70) + 20,       // Placeholder
-        thumbnail_quality_score: Math.floor(Math.random() * 70) + 20,     // Placeholder
-        growth_trend_30d: (Math.random() * 25) - 2,                       // Placeholder
-        upload_frequency_per_week: Math.random() * 5 + 0.5,               // Placeholder
+      const c = e.channel
+      const channelRow = {
+        youtube_channel_id: c.youtube_channel_id,
+        name: c.name,
+        handle: c.handle,
+        description: c.description,
+        thumbnail_url: c.thumbnail_url,
+        country: c.country,
+        language: c.language,
+        niche_primary: e.detectedNiche,
+        subscriber_count: c.subscriber_count,
+        total_view_count: c.total_view_count,
+        video_count: c.video_count,
+        avg_views_30d: e.metrics.avg_recent_views || null,
+        upload_frequency_per_week: e.metrics.upload_frequency_per_week || null,
+        last_upload_at: e.metrics.last_upload_at,
+        sponsorship_detected: e.sponsorship,
+        analysis_summary: e.result.reasoning,
         last_analyzed_at: new Date().toISOString(),
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: upserted, error } = await (supabase as any)
+      const { data: upserted } = await (supabase as any)
         .from("channels")
-        .upsert(channelData, { onConflict: "youtube_channel_id" })
+        .upsert(channelRow, { onConflict: "youtube_channel_id" })
         .select()
         .single()
 
-      if (error || !upserted) continue
+      // Persist contact info if we found an email
+      if (upserted?.id && (e.businessEmail || e.links)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any)
+          .from("contacts")
+          .upsert(
+            {
+              channel_id: upserted.id,
+              email: e.businessEmail,
+              email_verified: false,
+              email_confidence_score: e.businessEmail ? 60 : 0,
+            },
+            { onConflict: "channel_id" }
+          )
+      }
 
-      const breakdown = scoreChannel(upserted, service_type)
-      results.push({ ...upserted, score: breakdown.total, score_breakdown: breakdown })
+      leads.push({
+        id: upserted?.id,
+        youtube_channel_id: c.youtube_channel_id,
+        name: c.name,
+        handle: c.handle,
+        description: c.description,
+        thumbnail_url: c.thumbnail_url,
+        country: c.country,
+        language: c.language,
+        niche_primary: e.detectedNiche,
+        subscriber_count: c.subscriber_count,
+        total_view_count: c.total_view_count,
+        video_count: c.video_count,
+        metrics: e.metrics,
+        business_email: e.businessEmail,
+        has_links: e.links,
+        sponsorship_detected: e.sponsorship,
+        score: e.result.score,
+        quality_breakdown: e.result.breakdown,
+        badges: e.result.badges,
+        warnings: e.result.warnings,
+        reasoning: e.result.reasoning,
+      })
     }
 
-    // Sort by score
-    results.sort((a, b) => b.score - a.score)
+    // 6) Default sort by score (client can re-sort)
+    leads.sort((a, b) => b.score - a.score)
 
-    return NextResponse.json({ channels: results, count: results.length })
+    return NextResponse.json({
+      channels: leads,
+      count: leads.length,
+      analyzed: evaluated.length,
+      excluded: evaluated.filter((e) => e.result.excluded).length,
+    })
   } catch (err) {
     console.error("Discovery error:", err)
     return NextResponse.json({ error: "Discovery failed" }, { status: 500 })

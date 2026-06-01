@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 import type { CRMStage } from "@/types"
 
@@ -77,6 +78,9 @@ export async function POST(req: NextRequest) {
       type: "lead_created",
       metadata: {},
     })
+
+    revalidatePath("/app/leads")
+    revalidatePath("/app/dashboard")
 
     return NextResponse.json(data, { status: 201 })
   } catch (err) {

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChannelCard } from "@/components/leads/channel-card"
 import { toast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 import type { DiscoveredLead, ServiceType } from "@/types"
 
 const NICHES = [
@@ -37,6 +38,7 @@ const KEYWORD_PRESETS: { label: string; keywords: string; faceless?: boolean }[]
 ]
 
 export default function DiscoverPage() {
+  const router = useRouter()
   const [keywords, setKeywords] = useState("")
   const [niche, setNiche] = useState("Any Niche")
   const [minSubs, setMinSubs] = useState("5000")
@@ -142,6 +144,7 @@ export default function DiscoverPage() {
       if (!res.ok) throw new Error(data.error)
       setAddedIds((prev) => new Set([...prev, lead.id!]))
       toast({ title: "Added to leads!", description: `${lead.name} is now in your pipeline` })
+      router.refresh()
     } catch {
       toast({ title: "Failed to add lead", variant: "destructive" })
     } finally {

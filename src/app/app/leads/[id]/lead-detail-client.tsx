@@ -1,6 +1,5 @@
 "use client"
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import {
@@ -8,16 +7,11 @@ import {
   Globe, DollarSign, BarChart3, MessageSquare,
   Clock,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { LeadScoreBadge } from "@/components/leads/lead-score-badge"
 import { ScoreBreakdownPanel } from "@/components/leads/score-breakdown-panel"
 import { OutreachGenerator } from "@/components/outreach/outreach-generator"
-import { formatNumber, formatCurrency, timeAgo, getScoreLabel } from "@/lib/utils"
+import { formatNumber, formatCurrency, timeAgo } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import type { Lead, Activity, CRMStage, ScoreBreakdown, ServiceType, OutreachMessage } from "@/types"
 
@@ -63,7 +57,6 @@ interface LeadDetailClientProps {
 }
 
 export function LeadDetailClient({ lead: initialLead, activities: initialActivities, messages, serviceType, orgId }: LeadDetailClientProps) {
-  const router = useRouter()
   const [lead, setLead] = useState(initialLead)
   const [activities, setActivities] = useState(initialActivities)
   const [note, setNote] = useState(lead.notes ?? "")
@@ -107,16 +100,48 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
     }
   }
 
+  const [activeTab, setActiveTab] = useState("outreach")
+
+  const scoreColor = lead.lead_score >= 80
+    ? "from-emerald-500 to-teal-400"
+    : lead.lead_score >= 60
+    ? "from-indigo-500 to-violet-400"
+    : "from-amber-500 to-orange-400"
+
+  function statusPill(status: string) {
+    if (status === "replied") return "bg-emerald-50 text-emerald-700 border-emerald-200"
+    if (status === "opened") return "bg-violet-50 text-violet-700 border-violet-200"
+    if (status === "sent" || status === "delivered") return "bg-blue-50 text-blue-700 border-blue-200"
+    return "bg-muted text-muted-foreground border-border"
+  }
+
+  const ACTIVITY_GRADIENTS: Record<string, string> = {
+    lead_created: "from-indigo-500 to-violet-500",
+    stage_changed: "from-amber-500 to-orange-400",
+    email_sent: "from-blue-500 to-cyan-400",
+    note_added: "from-emerald-500 to-teal-400",
+    score_updated: "from-rose-500 to-orange-400",
+    default: "from-slate-400 to-slate-500",
+  }
+
+  const tabs = [
+    { value: "outreach", label: "Outreach" },
+    { value: "messages", label: `Messages (${messages.length})` },
+    { value: "notes", label: "Notes" },
+    { value: "activity", label: "Activity" },
+    { value: "analysis", label: "AI Analysis" },
+  ]
+
   return (
     <div className="flex flex-col overflow-auto">
-      {/* Header */}
-      <div className="flex items-center gap-4 border-b bg-white px-6 py-4">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 flex items-center gap-4 border-b bg-white/80 backdrop-blur-sm px-6 py-4">
         <Link href="/app/leads">
-          <Button variant="ghost" size="icon">
+          <button className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-muted transition-colors">
             <ArrowLeft className="h-4 w-4" />
-          </Button>
+          </button>
         </Link>
-        <div className="relative h-10 w-10 overflow-hidden rounded-full border bg-muted shrink-0">
+        <div className="relative h-10 w-10 overflow-hidden rounded-2xl border bg-muted shrink-0">
           {channel.thumbnail_url ? (
             <Image src={channel.thumbnail_url} alt={channel.name} fill className="object-cover" unoptimized />
           ) : (
@@ -127,17 +152,23 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold truncate">{channel.name}</h1>
-            {channel.niche_primary && <Badge variant="secondary">{channel.niche_primary}</Badge>}
+            <h1 className="text-xl font-bold truncate">{channel.name}</h1>
+            {channel.niche_primary && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent text-accent-foreground border border-accent">
+                {channel.niche_primary}
+              </span>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             {channel.handle} · {formatNumber(channel.subscriber_count)} subscribers
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <LeadScoreBadge score={lead.lead_score} showLabel size="lg" />
+          <div className={`text-2xl font-bold bg-gradient-to-br ${scoreColor} bg-clip-text text-transparent`}>
+            {lead.lead_score}
+          </div>
           <Select value={lead.crm_stage} onValueChange={v => handleStageChange(v as CRMStage)} disabled={updatingStage}>
-            <SelectTrigger className="w-44">
+            <SelectTrigger className="w-44 rounded-xl">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -151,46 +182,50 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
 
       <div className="flex-1 overflow-auto p-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Channel Analysis */}
+          {/* Left column */}
           <div className="space-y-4">
-            {/* Stats */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Channel Stats</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            {/* Channel Stats */}
+            <div className="rounded-2xl border bg-white p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Channel Stats</p>
+              <div className="space-y-3">
                 {[
-                  { icon: Users, label: "Subscribers", value: formatNumber(channel.subscriber_count) },
-                  { icon: Eye, label: "Avg Views/Video", value: channel.avg_views_30d ? formatNumber(channel.avg_views_30d) : "—" },
-                  { icon: TrendingUp, label: "30d Growth", value: channel.growth_trend_30d ? `${channel.growth_trend_30d > 0 ? "+" : ""}${channel.growth_trend_30d.toFixed(1)}%` : "—" },
-                  { icon: DollarSign, label: "Est. Monthly Revenue", value: channel.estimated_monthly_revenue_max ? `~${formatCurrency(channel.estimated_monthly_revenue_max)}` : "—" },
-                ].map(({ icon: Icon, label, value }) => (
+                  { icon: Users, label: "Subscribers", value: formatNumber(channel.subscriber_count), gradient: "from-indigo-500 to-violet-500" },
+                  { icon: Eye, label: "Avg Views/Video", value: channel.avg_views_30d ? formatNumber(channel.avg_views_30d) : "—", gradient: "from-blue-500 to-cyan-400" },
+                  { icon: TrendingUp, label: "30d Growth", value: channel.growth_trend_30d ? `${channel.growth_trend_30d > 0 ? "+" : ""}${channel.growth_trend_30d.toFixed(1)}%` : "—", gradient: "from-emerald-500 to-teal-400" },
+                  { icon: DollarSign, label: "Est. Monthly Revenue", value: channel.estimated_monthly_revenue_max ? `~${formatCurrency(channel.estimated_monthly_revenue_max)}` : "—", gradient: "from-amber-500 to-orange-400" },
+                ].map(({ icon: Icon, label, value, gradient }) => (
                   <div key={label} className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Icon className="h-3.5 w-3.5" />
+                      <div className={`h-6 w-6 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center`}>
+                        <Icon className="h-3 w-3 text-white" />
+                      </div>
                       {label}
                     </div>
-                    <span className="text-sm font-medium">{value}</span>
+                    <span className="text-sm font-semibold">{value}</span>
                   </div>
                 ))}
                 <div className="flex flex-wrap gap-1 pt-1">
-                  {channel.monetization_enabled && <Badge variant="success" className="text-xs">Monetized</Badge>}
-                  {channel.sponsorship_detected && <Badge variant="info" className="text-xs">Has Sponsors</Badge>}
+                  {channel.monetization_enabled && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">Monetized</span>
+                  )}
+                  {channel.sponsorship_detected && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium">Has Sponsors</span>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
             {/* Contact Info */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Contact Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
+            <div className="rounded-2xl border bg-white p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Contact Information</p>
+              <div className="space-y-2">
                 {contact?.email ? (
                   <div className="flex items-center gap-2 text-sm">
-                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <a href={`mailto:${contact.email}`} className="text-primary hover:underline truncate">{contact.email}</a>
-                    {contact.email_verified && <Badge variant="success" className="text-xs ml-auto">Verified</Badge>}
+                    {contact.email_verified && (
+                      <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">Verified</span>
+                    )}
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground">No email found yet</p>
@@ -207,147 +242,153 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                     <a href={contact.website_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">{contact.website_url}</a>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
 
-            {/* Lead Score Breakdown */}
+            {/* Score Breakdown */}
             {lead.score_breakdown && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Score Breakdown</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ScoreBreakdownPanel breakdown={lead.score_breakdown as ScoreBreakdown} />
-                </CardContent>
-              </Card>
+              <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">Score Breakdown</p>
+                <ScoreBreakdownPanel breakdown={lead.score_breakdown as ScoreBreakdown} />
+              </div>
             )}
           </div>
 
-          {/* Right: Tabs */}
+          {/* Right: Custom Tabs */}
           <div className="lg:col-span-2">
-            <Tabs defaultValue="outreach">
-              <TabsList>
-                <TabsTrigger value="outreach">Outreach</TabsTrigger>
-                <TabsTrigger value="messages">Messages ({messages.length})</TabsTrigger>
-                <TabsTrigger value="notes">Notes</TabsTrigger>
-                <TabsTrigger value="activity">Activity</TabsTrigger>
-                <TabsTrigger value="analysis">AI Analysis</TabsTrigger>
-              </TabsList>
+            {/* Tab buttons */}
+            <div className="flex gap-1 border-b mb-4 overflow-x-auto">
+              {tabs.map(tab => (
+                <button
+                  key={tab.value}
+                  onClick={() => setActiveTab(tab.value)}
+                  className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+                    activeTab === tab.value
+                      ? "border-primary gradient-text"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
+            <div className="animate-fade-in">
               {/* Outreach Tab */}
-              <TabsContent value="outreach" className="mt-4">
+              {activeTab === "outreach" && (
                 <OutreachGenerator lead={lead} serviceType={serviceType} orgId={orgId} />
-              </TabsContent>
+              )}
 
               {/* Messages Tab */}
-              <TabsContent value="messages" className="mt-4 space-y-3">
-                {messages.length === 0 ? (
-                  <Card>
-                    <CardContent className="py-8 text-center text-muted-foreground">
-                      <Mail className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">No messages sent yet</p>
-                    </CardContent>
-                  </Card>
-                ) : messages.map(msg => (
-                  <Card key={msg.id}>
-                    <CardContent className="pt-4">
+              {activeTab === "messages" && (
+                <div className="space-y-3">
+                  {messages.length === 0 ? (
+                    <div className="rounded-2xl border bg-white p-8 text-center">
+                      <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center mx-auto mb-3 opacity-80">
+                        <Mail className="h-6 w-6 text-white" />
+                      </div>
+                      <p className="text-sm text-muted-foreground">No messages sent yet</p>
+                    </div>
+                  ) : messages.map(msg => (
+                    <div key={msg.id} className="rounded-2xl border bg-white p-4 shadow-sm">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{msg.channel}</span>
+                        <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{msg.channel}</span>
                         <div className="flex items-center gap-2">
-                          <Badge variant={msg.status === "replied" ? "success" : msg.status === "opened" ? "info" : "secondary"} className="text-xs">
+                          <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${statusPill(msg.status)}`}>
                             {msg.status}
-                          </Badge>
+                          </span>
                           <span className="text-xs text-muted-foreground">{timeAgo(msg.created_at)}</span>
                         </div>
                       </div>
                       {msg.subject && <p className="text-sm font-semibold mb-1">{msg.subject}</p>}
                       <p className="text-sm text-muted-foreground whitespace-pre-wrap">{msg.body}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </TabsContent>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Notes Tab */}
-              <TabsContent value="notes" className="mt-4">
-                <Card>
-                  <CardContent className="pt-4">
-                    <Textarea
-                      placeholder="Add internal notes about this lead..."
-                      value={note}
-                      onChange={e => setNote(e.target.value)}
-                      rows={8}
-                      className="mb-3"
-                    />
-                    <Button onClick={handleSaveNote} disabled={savingNote} size="sm">
-                      {savingNote ? "Saving..." : "Save Notes"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+              {activeTab === "notes" && (
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                  <Textarea
+                    placeholder="Add internal notes about this lead..."
+                    value={note}
+                    onChange={e => setNote(e.target.value)}
+                    rows={8}
+                    className="mb-3 rounded-xl"
+                  />
+                  <button
+                    onClick={handleSaveNote}
+                    disabled={savingNote}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white text-sm font-semibold btn-glow disabled:opacity-60 transition-all"
+                  >
+                    {savingNote ? "Saving..." : "Save Notes"}
+                  </button>
+                </div>
+              )}
 
               {/* Activity Tab */}
-              <TabsContent value="activity" className="mt-4">
-                <Card>
-                  <CardContent className="pt-4">
-                    {activities.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">No activity yet</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {activities.map(activity => (
-                          <div key={activity.id} className="flex items-start gap-3">
-                            <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                              {ACTIVITY_ICONS[activity.type] ?? ACTIVITY_ICONS.default}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm">{activityLabel(activity)}</p>
-                              <p className="text-xs text-muted-foreground">{timeAgo(activity.created_at)}</p>
-                            </div>
+              {activeTab === "activity" && (
+                <div className="rounded-2xl border bg-white p-5 shadow-sm">
+                  {activities.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No activity yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {activities.map(activity => (
+                        <div key={activity.id} className="flex items-start gap-3">
+                          <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${ACTIVITY_GRADIENTS[activity.type] ?? ACTIVITY_GRADIENTS.default} text-white`}>
+                            {ACTIVITY_ICONS[activity.type] ?? ACTIVITY_ICONS.default}
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Analysis Tab */}
-              <TabsContent value="analysis" className="mt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">AI Channel Analysis</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {channel.analysis_summary ? (
-                      <div className="rounded-lg bg-blue-50 border border-blue-100 p-4">
-                        <p className="text-sm text-blue-900">{channel.analysis_summary}</p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No analysis available yet</p>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { label: "Editing Quality", score: channel.editing_quality_score },
-                        { label: "Thumbnail Quality", score: channel.thumbnail_quality_score },
-                        { label: "Outsourcing Likelihood", score: channel.outsourcing_likelihood_score },
-                        { label: "Upload Frequency", value: channel.upload_frequency_per_week ? `${channel.upload_frequency_per_week}/week` : "—" },
-                      ].map(item => (
-                        <div key={item.label} className="rounded-lg border p-3">
-                          <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
-                          {"score" in item && item.score !== null && item.score !== undefined ? (
-                            <div>
-                              <p className="text-lg font-bold">{item.score}<span className="text-sm text-muted-foreground font-normal">/100</span></p>
-                            </div>
-                          ) : (
-                            <p className="text-lg font-bold">{("value" in item ? item.value : "—")}</p>
-                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm">{activityLabel(activity)}</p>
+                            <p className="text-xs text-muted-foreground">{timeAgo(activity.created_at)}</p>
+                          </div>
                         </div>
                       ))}
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+                  )}
+                </div>
+              )}
+
+              {/* Analysis Tab */}
+              {activeTab === "analysis" && (
+                <div className="rounded-2xl border bg-white p-5 shadow-sm space-y-4">
+                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">AI Channel Analysis</p>
+                  {channel.analysis_summary ? (
+                    <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-4">
+                      <p className="text-sm text-blue-900">{channel.analysis_summary}</p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No analysis available yet</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Editing Quality", score: channel.editing_quality_score, gradient: "from-indigo-500 to-violet-500" },
+                      { label: "Thumbnail Quality", score: channel.thumbnail_quality_score, gradient: "from-rose-500 to-pink-500" },
+                      { label: "Outsourcing Likelihood", score: channel.outsourcing_likelihood_score, gradient: "from-amber-500 to-orange-400" },
+                      { label: "Upload Frequency", value: channel.upload_frequency_per_week ? `${channel.upload_frequency_per_week}/week` : "—", gradient: "from-emerald-500 to-teal-400" },
+                    ].map(item => {
+                      const score = "score" in item ? item.score : undefined
+                      const bgClass = score !== null && score !== undefined
+                        ? score >= 80 ? "from-emerald-50 to-teal-50 border-emerald-100"
+                        : score >= 60 ? "from-indigo-50 to-violet-50 border-indigo-100"
+                        : "from-amber-50 to-orange-50 border-amber-100"
+                        : "from-muted/30 to-muted/10 border-border"
+                      return (
+                        <div key={item.label} className={`rounded-2xl border bg-gradient-to-br p-4 ${bgClass}`}>
+                          <p className="text-xs text-muted-foreground mb-1">{item.label}</p>
+                          {score !== null && score !== undefined ? (
+                            <p className="text-2xl font-bold">{score}<span className="text-sm text-muted-foreground font-normal">/100</span></p>
+                          ) : (
+                            <p className="text-2xl font-bold">{("value" in item ? item.value : "—")}</p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

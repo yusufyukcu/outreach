@@ -55,6 +55,9 @@ export interface DiscoveredLead {
   relevance_score: number        // 0-100, content-based
   relevance_explanation: string
   expanded_concepts?: string[]   // concepts used for this search
+  // faceless detection
+  faceless_score: number         // 0-100, likelihood of being a faceless/stock channel
+  faceless_signals: string[]     // human-readable signals that triggered the score
 }
 
 export type CRMStage =

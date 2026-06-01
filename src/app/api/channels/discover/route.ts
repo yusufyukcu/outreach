@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
   searchYouTubeChannels,
+  searchYouTubeVideos,
   fetchChannelDetails,
   fetchRecentVideos,
   computeRecentMetrics,
@@ -12,6 +13,7 @@ import {
   nicheRelevanceRatio,
   detectOffTargetCategory,
   detectNiche,
+  scoreFaceless,
   type RecentVideo,
 } from "@/services/youtube"
 import { evaluateLead } from "@/services/lead-quality"
@@ -46,6 +48,8 @@ export async function POST(req: NextRequest) {
       include_low_quality = false,
       english_only = true,
       min_recent_views = 2000,
+      faceless_mode = false,
+      min_faceless_score = 50,
     } = body as {
       keywords: string[]
       niche: string
@@ -56,51 +60,79 @@ export async function POST(req: NextRequest) {
       include_low_quality?: boolean
       english_only?: boolean
       min_recent_views?: number
+      faceless_mode?: boolean
+      min_faceless_score?: number
     }
 
     const nicheSelected = !!niche && niche !== "Any Niche"
 
-    // 1) Expand keywords semantically via AI, then search with all concepts
+    // 1) Expand keywords semantically via AI
     const expansion = await expandKeywords(keywords, service_type)
-    const allConcepts = expansion.all   // original + AI-generated
+    const allConcepts = expansion.all
 
-    // Search in parallel using original keywords + expanded concepts (batched into groups of 3)
-    const searchGroups: string[][] = []
-    // Always search original keywords as one query
-    searchGroups.push(keywords)
-    // Add expanded concepts in pairs to avoid quota waste
-    for (let i = 0; i < expansion.expanded.length; i += 2) {
-      searchGroups.push(expansion.expanded.slice(i, i + 2))
-    }
-    // Cap to 5 search queries total
-    const cappedGroups = searchGroups.slice(0, 5)
+    // 2) Search YouTube — video-based in faceless mode, channel-based otherwise
+    let channelIds: string[]
 
-    const searchResultArrays = await Promise.allSettled(
-      cappedGroups.map((group) =>
-        searchYouTubeChannels({
-          keywords: group,
-          maxResults: 15,
-          relevanceLanguage: english_only ? "en" : undefined,
-        })
+    if (faceless_mode) {
+      // Video search: find videos with list/documentary style titles, then collect their channels
+      const searchGroups: string[][] = [keywords]
+      for (let i = 0; i < expansion.expanded.length; i += 2) {
+        searchGroups.push(expansion.expanded.slice(i, i + 2))
+      }
+      const cappedGroups = searchGroups.slice(0, 5)
+
+      const videoResultArrays = await Promise.allSettled(
+        cappedGroups.map((group) =>
+          searchYouTubeVideos({
+            keywords: group,
+            maxResults: 20,
+            relevanceLanguage: english_only ? "en" : undefined,
+          })
+        )
       )
-    )
 
-    const allSearchResults = searchResultArrays
-      .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
+      const allVideoResults = videoResultArrays
+        .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
 
-    const channelIds = [...new Set(allSearchResults.map((r) => r.channelId).filter(Boolean))]
-    if (channelIds.length === 0) return NextResponse.json({ channels: [], count: 0, analyzed: 0, expanded_concepts: allConcepts })
+      channelIds = [...new Set(allVideoResults.map((r) => r.channelId).filter(Boolean))]
+    } else {
+      // Standard channel search
+      const searchGroups: string[][] = [keywords]
+      for (let i = 0; i < expansion.expanded.length; i += 2) {
+        searchGroups.push(expansion.expanded.slice(i, i + 2))
+      }
+      const cappedGroups = searchGroups.slice(0, 5)
 
-    // 2) Channel details (batched)
+      const searchResultArrays = await Promise.allSettled(
+        cappedGroups.map((group) =>
+          searchYouTubeChannels({
+            keywords: group,
+            maxResults: 15,
+            relevanceLanguage: english_only ? "en" : undefined,
+          })
+        )
+      )
+
+      const allSearchResults = searchResultArrays
+        .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
+
+      channelIds = [...new Set(allSearchResults.map((r) => r.channelId).filter(Boolean))]
+    }
+
+    if (channelIds.length === 0) {
+      return NextResponse.json({ channels: [], count: 0, analyzed: 0, expanded_concepts: allConcepts })
+    }
+
+    // 3) Channel details (batched)
     const details = await fetchChannelDetails(channelIds)
 
-    // 3) Subscriber-range pre-filter, then cap deep analysis
+    // 4) Subscriber-range pre-filter, then cap deep analysis
     const candidates = details
       .filter((c) => c.subscriber_count >= min_subscribers && c.subscriber_count <= max_subscribers)
       .sort((a, b) => b.subscriber_count - a.subscriber_count)
       .slice(0, MAX_DEEP_ANALYZE)
 
-    // 4) Deep-analyze each candidate (recent videos -> metrics -> score)
+    // 5) Deep-analyze each candidate
     const evaluated = await Promise.all(
       candidates.map(async (c) => {
         let videos: RecentVideo[] = []
@@ -117,10 +149,7 @@ export async function POST(req: NextRequest) {
           ? niche
           : detectNiche(c.description ?? "", c.name)
 
-        const businessEmail = extractBusinessEmail(
-          c.description,
-          ...recentDescriptions
-        )
+        const businessEmail = extractBusinessEmail(c.description, ...recentDescriptions)
         const links = hasExternalLinks(c.description, ...recentDescriptions)
         const sponsorship = detectSponsorship(c.description, ...recentDescriptions, ...metrics.recent_titles)
         const isEnglish = looksEnglish(c.name, c.description, ...metrics.recent_titles)
@@ -147,7 +176,6 @@ export async function POST(req: NextRequest) {
           minRecentViews: min_recent_views,
         })
 
-        // Semantic relevance: scored against AI-expanded concepts, NOT channel name
         const relevance = computeSemanticRelevance(
           allConcepts,
           c.description,
@@ -155,17 +183,21 @@ export async function POST(req: NextRequest) {
           recentDescriptions,
         )
 
-        return { channel: c, metrics, businessEmail, links, sponsorship, detectedNiche, result, relevance }
+        const faceless = scoreFaceless(c.description, metrics.recent_titles, metrics)
+
+        return { channel: c, metrics, businessEmail, links, sponsorship, detectedNiche, result, relevance, faceless }
       })
     )
 
-    // 5) Drop hard-excluded, then persist survivors + score floor
-    const threshold = include_low_quality ? 0 : min_score
+    // 6) Drop hard-excluded, apply score floors
+    const qualityThreshold = include_low_quality ? 0 : min_score
     const leads: DiscoveredLead[] = []
 
     for (const e of evaluated) {
       if (e.result.excluded) continue
-      if (e.result.score < threshold) continue
+      if (e.result.score < qualityThreshold) continue
+      // In faceless mode: drop channels that clearly aren't faceless
+      if (faceless_mode && e.faceless.score < min_faceless_score) continue
 
       const c = e.channel
       const channelRow = {
@@ -195,7 +227,6 @@ export async function POST(req: NextRequest) {
         .select()
         .single()
 
-      // Persist contact info if we found an email
       if (upserted?.id && (e.businessEmail || e.links)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
@@ -236,10 +267,11 @@ export async function POST(req: NextRequest) {
         relevance_score: e.relevance.score,
         relevance_explanation: e.relevance.explanation,
         expanded_concepts: allConcepts,
+        faceless_score: e.faceless.score,
+        faceless_signals: e.faceless.signals,
       })
     }
 
-    // 6) Default sort by score (client can re-sort)
     leads.sort((a, b) => b.score - a.score)
 
     return NextResponse.json({

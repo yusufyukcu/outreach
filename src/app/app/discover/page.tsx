@@ -1,6 +1,6 @@
 "use client"
 import { useState, useMemo } from "react"
-import { Search, Loader2, SlidersHorizontal, ArrowUpDown, Sparkles } from "lucide-react"
+import { Search, Loader2, SlidersHorizontal, ArrowUpDown, Sparkles, Ghost } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,7 +17,7 @@ const NICHES = [
   "Music", "Comedy", "News & Politics", "Sports", "Real Estate", "Lifestyle",
 ]
 
-type SortKey = "score" | "relevance" | "activity" | "views" | "consistency"
+type SortKey = "score" | "relevance" | "faceless" | "activity" | "views" | "consistency"
 
 export default function DiscoverPage() {
   const [keywords, setKeywords] = useState("")
@@ -27,6 +27,7 @@ export default function DiscoverPage() {
   const [serviceType, setServiceType] = useState<ServiceType>("editing")
   const [englishOnly, setEnglishOnly] = useState(true)
   const [includeLowQuality, setIncludeLowQuality] = useState(false)
+  const [facelessMode, setFacelessMode] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>("score")
 
   const [loading, setLoading] = useState(false)
@@ -58,6 +59,8 @@ export default function DiscoverPage() {
           include_low_quality: includeLowQuality,
           english_only: englishOnly,
           min_recent_views: 2000,
+          faceless_mode: facelessMode,
+          min_faceless_score: 50,
         }),
       })
       const data = await res.json()
@@ -114,6 +117,9 @@ export default function DiscoverPage() {
     switch (sortKey) {
       case "relevance":
         arr.sort((a, b) => b.relevance_score - a.relevance_score)
+        break
+      case "faceless":
+        arr.sort((a, b) => b.faceless_score - a.faceless_score)
         break
       case "activity":
         arr.sort((a, b) => (a.metrics.days_since_upload ?? 9999) - (b.metrics.days_since_upload ?? 9999))
@@ -194,6 +200,12 @@ export default function DiscoverPage() {
                 Show lower quality leads
               </label>
 
+              <label className={`flex items-center gap-2 text-sm cursor-pointer select-none px-3 py-1.5 rounded-lg border transition-colors ${facelessMode ? "border-violet-400 bg-violet-50 text-violet-800" : "border-input"}`}>
+                <input type="checkbox" checked={facelessMode} onChange={(e) => setFacelessMode(e.target.checked)} className="h-4 w-4 rounded border-input" />
+                <Ghost className="h-3.5 w-3.5" />
+                Faceless channels only
+              </label>
+
               <Button onClick={handleDiscover} disabled={loading} className="ml-auto">
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
                 {loading ? "Analyzing..." : "Discover Leads"}
@@ -224,8 +236,8 @@ export default function DiscoverPage() {
           <div className="flex items-center justify-center py-16">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
-              <p className="text-sm font-medium">Researching channels...</p>
-              <p className="text-xs text-muted-foreground mt-1">Fetching recent videos, checking activity, scoring quality</p>
+              <p className="text-sm font-medium">{facelessMode ? "Hunting faceless channels..." : "Researching channels..."}</p>
+              <p className="text-xs text-muted-foreground mt-1">{facelessMode ? "Searching videos, detecting stock/voiceover channels, scoring quality" : "Fetching recent videos, checking activity, scoring quality"}</p>
             </div>
           </div>
         )}
@@ -256,6 +268,7 @@ export default function DiscoverPage() {
                   <SelectContent>
                     <SelectItem value="score">Lead Score</SelectItem>
                     <SelectItem value="relevance">Content Relevance</SelectItem>
+                    <SelectItem value="faceless">Faceless Score</SelectItem>
                     <SelectItem value="activity">Recent Activity</SelectItem>
                     <SelectItem value="views">Avg Views</SelectItem>
                     <SelectItem value="consistency">Upload Consistency</SelectItem>

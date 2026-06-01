@@ -97,6 +97,143 @@ export async function searchYouTubeChannels(params: {
   }))
 }
 
+// ─── Video search (returns unique channel IDs) ───────────────────────────────
+
+export async function searchYouTubeVideos(params: {
+  keywords: string[]
+  maxResults?: number
+  relevanceLanguage?: string
+}): Promise<{ channelId: string; videoTitle: string }[]> {
+  const apiKey = process.env.YOUTUBE_API_KEY
+  if (!apiKey) throw new Error("YouTube API key not configured")
+
+  const query = params.keywords.join(" ")
+  const url = new URL(`${YOUTUBE_API_BASE}/search`)
+  url.searchParams.set("part", "snippet")
+  url.searchParams.set("q", query)
+  url.searchParams.set("type", "video")
+  url.searchParams.set("order", "relevance")
+  url.searchParams.set("videoDuration", "medium") // 4-20 min, filters out Shorts
+  url.searchParams.set("maxResults", String(params.maxResults ?? 25))
+  if (params.relevanceLanguage) url.searchParams.set("relevanceLanguage", params.relevanceLanguage)
+  url.searchParams.set("key", apiKey)
+
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error(`YouTube API error: ${res.statusText}`)
+  const data = await res.json()
+
+  return (data.items ?? []).map((item: { snippet: { channelId: string; title: string } }) => ({
+    channelId: item.snippet.channelId,
+    videoTitle: item.snippet.title,
+  }))
+}
+
+// ─── Faceless / stock-footage channel detection ────────────────────────────────
+
+// Title patterns that strongly indicate faceless/voiceover content
+const FACELESS_TITLE_PATTERNS = [
+  /\btop\s+\d+\b/i,
+  /\bcountdown\b/i,
+  /\branked\b/i,
+  /\bevery\b.{1,30}\bexplained\b/i,
+  /\bhistory\s+of\b/i,
+  /\bhow\s+\w+\s+works?\b/i,
+  /\bwhy\s+\w/i,
+  /\bbiggest\b/i,
+  /\brichest\b/i,
+  /\bmost\s+\w/i,
+  /\bbest\s+\w/i,
+  /\bworst\s+\w/i,
+  /\bvs\.?\s+\w/i,
+  /\bdocumentary\b/i,
+  /\bfacts\s+about\b/i,
+  /\binside\s+\w/i,
+  /\bsecrets?\s+of\b/i,
+  /\bcountries\s+(?:in|by|with|that)\b/i,
+  /\bcities\s+(?:in|by|with|that)\b/i,
+  /\beverything\s+(?:about|you|we)\b/i,
+]
+
+// Words in channel description that suggest a real person (vlogger/face cam)
+const PERSONAL_SIGNALS = [
+  "my channel", "my life", "my journey", "follow me", "join me", "i am a",
+  "i'm a", "welcome to my", "about me", "my name is", "i create", "i make",
+  "vlog", "vlogger", "daily life", "my family", "my kids", "my husband",
+  "my wife", "my dog", "my cat", "face reveal", "i show my face",
+]
+
+export interface FacelessResult {
+  score: number        // 0-100
+  signals: string[]   // human-readable reasons
+}
+
+export function scoreFaceless(
+  channelDescription: string | null,
+  recentTitles: string[],
+  metrics: RecentVideoMetrics
+): FacelessResult {
+  const signals: string[] = []
+  let score = 0
+
+  // 1. Title pattern analysis (strongest signal)
+  const patternHits = recentTitles.filter((t) =>
+    FACELESS_TITLE_PATTERNS.some((p) => p.test(t))
+  )
+  const patternRatio = recentTitles.length > 0 ? patternHits.length / recentTitles.length : 0
+
+  if (patternRatio >= 0.6) {
+    score += 40
+    signals.push(`${patternHits.length}/${recentTitles.length} videos use list/documentary titles`)
+  } else if (patternRatio >= 0.3) {
+    score += 20
+    signals.push(`${patternHits.length}/${recentTitles.length} videos have faceless-style titles`)
+  }
+
+  // 2. No personal language in description
+  const descLower = (channelDescription ?? "").toLowerCase()
+  const personalHits = PERSONAL_SIGNALS.filter((s) => descLower.includes(s))
+  if (personalHits.length === 0) {
+    score += 20
+    signals.push("No personal/vlogger language in channel description")
+  } else {
+    score -= 15
+    signals.push(`Personal signals found: ${personalHits.slice(0, 2).join(", ")}`)
+  }
+
+  // 3. Shorts ratio is low (faceless channels rarely do Shorts)
+  if (metrics.shorts_pct <= 10) {
+    score += 15
+    signals.push("Low Shorts ratio — consistent long-form producer")
+  } else if (metrics.shorts_pct >= 40) {
+    score -= 10
+    signals.push("High Shorts ratio — less likely faceless")
+  }
+
+  // 4. Long-form heavy
+  if (metrics.long_form_pct >= 70) {
+    score += 15
+    signals.push(`${metrics.long_form_pct}% long-form content`)
+  } else if (metrics.long_form_pct >= 50) {
+    score += 8
+  }
+
+  // 5. Average video length sweet spot (8-20 min = stock/voiceover typical)
+  const avgMin = metrics.avg_video_length_sec / 60
+  if (avgMin >= 8 && avgMin <= 25) {
+    score += 10
+    signals.push(`Avg video length ${Math.round(avgMin)} min — typical faceless format`)
+  }
+
+  // Clamp
+  const finalScore = Math.max(0, Math.min(100, score))
+
+  if (finalScore >= 60 && signals.length === 0) {
+    signals.push("Channel profile matches typical faceless/stock-footage channel")
+  }
+
+  return { score: finalScore, signals }
+}
+
 // ─── Channel details (batched, up to 50 ids) ──────────────────────────────────
 
 export async function fetchChannelDetails(channelIds: string[]): Promise<RawChannel[]> {

@@ -2,7 +2,7 @@
 import Image from "next/image"
 import {
   Users, Eye, PlayCircle, Plus, Check, CalendarClock,
-  Clapperboard, Repeat, Mail, AlertTriangle, Sparkles,
+  Clapperboard, Repeat, Mail, AlertTriangle, Sparkles, Ghost,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -108,6 +108,24 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
               {w}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* Faceless score */}
+      {lead.faceless_score > 0 && (
+        <div className={`mt-3 rounded-lg px-2.5 py-2 ${lead.faceless_score >= 60 ? "bg-indigo-50" : "bg-muted/40"}`}>
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-indigo-700">
+              <Ghost className="h-3 w-3" /> Faceless Score
+            </span>
+            <span className={`text-[11px] font-bold ${
+              lead.faceless_score >= 70 ? "text-indigo-700" :
+              lead.faceless_score >= 45 ? "text-amber-600" : "text-muted-foreground"
+            }`}>{lead.faceless_score}/100</span>
+          </div>
+          {lead.faceless_signals.length > 0 && (
+            <p className="text-[11px] text-indigo-600 leading-relaxed">{lead.faceless_signals[0]}</p>
+          )}
         </div>
       )}
 

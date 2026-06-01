@@ -525,6 +525,120 @@ export function detectNiche(description: string, title: string): string {
   return bestHits > 0 ? best : "General"
 }
 
+// ─── "List video" channel mining ─────────────────────────────────────────────
+// Search YouTube for "best/top [keywords] channels" compilation videos,
+// then extract @handle mentions from their descriptions. These videos are
+// human-curated channel lists — the highest quality discovery signal we have.
+
+const HANDLE_RE = /@([\w.-]{3,})/g
+const YOUTUBE_URL_HANDLE_RE = /youtube\.com\/@([\w.-]{3,})/g
+const YOUTUBE_URL_CHANNEL_RE = /youtube\.com\/channel\/(UC[\w-]{10,})/g
+
+export async function mineChannelsFromListVideos(
+  keywords: string[],
+  maxVideos = 5
+): Promise<{ channelIds: string[]; handles: string[] }> {
+  const apiKey = process.env.YOUTUBE_API_KEY
+  if (!apiKey) return { channelIds: [], handles: [] }
+
+  // Search for compilation/list videos about the topic
+  const listQueries = [
+    `best ${keywords.slice(0, 2).join(" ")} youtube channels`,
+    `top ${keywords.slice(0, 2).join(" ")} channels to watch`,
+  ]
+
+  const foundHandles = new Set<string>()
+  const foundChannelIds = new Set<string>()
+
+  for (const query of listQueries) {
+    try {
+      const url = new URL(`${YOUTUBE_API_BASE}/search`)
+      url.searchParams.set("part", "snippet")
+      url.searchParams.set("q", query)
+      url.searchParams.set("type", "video")
+      url.searchParams.set("order", "relevance")
+      url.searchParams.set("maxResults", String(maxVideos))
+      url.searchParams.set("key", apiKey)
+
+      const res = await fetch(url.toString())
+      if (!res.ok) continue
+      const data = await res.json()
+      const videoIds: string[] = (data.items ?? []).map(
+        (item: { id: { videoId: string } }) => item.id.videoId
+      ).filter(Boolean)
+
+      if (videoIds.length === 0) continue
+
+      // Fetch full video descriptions
+      const vUrl = new URL(`${YOUTUBE_API_BASE}/videos`)
+      vUrl.searchParams.set("part", "snippet")
+      vUrl.searchParams.set("id", videoIds.join(","))
+      vUrl.searchParams.set("key", apiKey)
+
+      const vRes = await fetch(vUrl.toString())
+      if (!vRes.ok) continue
+      const vData = await vRes.json()
+
+      for (const video of (vData.items ?? [])) {
+        const desc: string = video.snippet?.description ?? ""
+        const title: string = video.snippet?.title ?? ""
+        const blob = `${title}\n${desc}`
+
+        // Extract @handles from the description
+        for (const match of blob.matchAll(HANDLE_RE)) {
+          const handle = match[1].toLowerCase()
+          if (handle.length >= 3 && handle.length <= 50) foundHandles.add(handle)
+        }
+        // Extract full youtube.com/@handle URLs
+        for (const match of blob.matchAll(YOUTUBE_URL_HANDLE_RE)) {
+          foundHandles.add(match[1].toLowerCase())
+        }
+        // Extract youtube.com/channel/UCxxx IDs directly
+        for (const match of blob.matchAll(YOUTUBE_URL_CHANNEL_RE)) {
+          foundChannelIds.add(match[1])
+        }
+      }
+    } catch {
+      // ignore failures for individual queries
+    }
+  }
+
+  return {
+    channelIds: [...foundChannelIds],
+    handles: [...foundHandles].slice(0, 30), // cap to avoid too many lookups
+  }
+}
+
+// Resolve @handles to channel IDs using YouTube channels.list?forHandle
+export async function resolveHandlesToChannelIds(handles: string[]): Promise<string[]> {
+  const apiKey = process.env.YOUTUBE_API_KEY
+  if (!apiKey || handles.length === 0) return []
+
+  const channelIds: string[] = []
+
+  // YouTube API only allows one handle per request, so batch with Promise.allSettled
+  // but cap to avoid quota burn
+  const capped = handles.slice(0, 20)
+  const results = await Promise.allSettled(
+    capped.map(async (handle) => {
+      const url = new URL(`${YOUTUBE_API_BASE}/channels`)
+      url.searchParams.set("part", "id")
+      url.searchParams.set("forHandle", handle.startsWith("@") ? handle : `@${handle}`)
+      url.searchParams.set("key", apiKey)
+      const res = await fetch(url.toString())
+      if (!res.ok) return null
+      const data = await res.json()
+      return (data.items?.[0]?.id as string) ?? null
+    })
+  )
+
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value) channelIds.push(r.value)
+  }
+
+  return channelIds
+}
+
 // ─── Small math utilities ──────────────────────────────────────────────────────
 
 function median(nums: number[]): number {

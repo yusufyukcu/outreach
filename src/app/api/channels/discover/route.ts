@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
   searchYouTubeVideos,
+  mineChannelsFromListVideos,
+  resolveHandlesToChannelIds,
   fetchChannelDetails,
   fetchRecentVideos,
   computeRecentMetrics,
@@ -89,18 +91,33 @@ export async function POST(req: NextRequest) {
       )
     )
 
-    // ── Step 3: Count search hit frequency per channel ──────────────────────────
+    // ── Step 3: Mine channels from "best X channels" list videos ────────────────
+    // YouTube creators publish "Top 10 channels about X" videos — these are
+    // human-curated lists. We extract @handle mentions from their descriptions.
+    // Run in parallel with video search to avoid latency hit.
+    const listMinePromise = mineChannelsFromListVideos(keywords, 5)
+
+    // ── Step 4: Count search hit frequency per channel ───────────────────────────
     // A channel appearing in 4 out of 6 queries is more relevant than one in 1.
     // This replaces "sort by subscriber count" as the primary ranking signal.
     const channelHits = new Map<string, number>()
     for (const result of videoResultArrays) {
       if (result.status !== "fulfilled") continue
-      const seen = new Set<string>() // count each channel once per query group
+      const seen = new Set<string>()
       for (const r of result.value) {
         if (!r.channelId || seen.has(r.channelId)) continue
         seen.add(r.channelId)
         channelHits.set(r.channelId, (channelHits.get(r.channelId) ?? 0) + 1)
       }
+    }
+
+    // Merge list-mined channels — give them a base frequency of 2
+    // (manually curated > single search hit, but less than multi-hit)
+    const { channelIds: minedIds, handles: minedHandles } = await listMinePromise
+    const resolvedHandleIds = await resolveHandlesToChannelIds(minedHandles)
+    const allMinedIds = [...new Set([...minedIds, ...resolvedHandleIds])]
+    for (const id of allMinedIds) {
+      if (!channelHits.has(id)) channelHits.set(id, 2)
     }
 
     const channelIds = [...channelHits.keys()]
@@ -273,6 +290,7 @@ export async function POST(req: NextRequest) {
       excluded: evaluated.filter((e) => e.result.excluded).length,
       expanded_concepts: allConcepts,
       original_keywords: keywords,
+      list_mined_count: allMinedIds.length,
     })
   } catch (err) {
     console.error("Discovery error:", err)

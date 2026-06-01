@@ -11,19 +11,27 @@ interface HeaderProps {
 
 export function Header({ title, subtitle, children }: HeaderProps) {
   return (
-    <header className="flex items-center justify-between border-b bg-white px-6 py-4">
-      <div>
-        <h1 className="text-xl font-semibold">{title}</h1>
-        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+    <header className="flex items-center justify-between border-b bg-white/80 backdrop-blur-sm px-6 py-4 sticky top-0 z-10">
+      <div className="animate-fade-in">
+        <h1 className="text-xl font-bold tracking-tight">{title}</h1>
+        {subtitle && (
+          <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
+        )}
       </div>
       <div className="flex items-center gap-3">
         {children}
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" className="rounded-xl relative hover:bg-primary/8 transition-colors">
           <Bell className="h-4 w-4" />
+          <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-indigo-500" />
         </Button>
-        <Avatar className="h-8 w-8">
+        <Avatar className="h-8 w-8 ring-2 ring-primary/20 transition-all hover:ring-primary/40">
           <AvatarImage src="" />
-          <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">YO</AvatarFallback>
+          <AvatarFallback
+            className="text-xs font-bold text-white"
+            style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(280 75% 60%))" }}
+          >
+            YO
+          </AvatarFallback>
         </Avatar>
       </div>
     </header>

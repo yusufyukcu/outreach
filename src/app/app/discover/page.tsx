@@ -301,26 +301,66 @@ export default function DiscoverPage() {
 
           {/* AI idea bar */}
           {showIdeaBar && (
-            <div className="animate-fade-in border-t px-4 py-3 bg-violet-50/50 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-violet-500 shrink-0" />
-              <input
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
-                placeholder='Describe the channel type, e.g. "faceless channels about Africa that make top 10 videos"'
-                value={ideaPrompt}
-                onChange={(e) => setIdeaPrompt(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleGenerateIdeas()}
-                autoFocus
-              />
-              <button
-                onClick={handleGenerateIdeas}
-                disabled={generatingIdeas || !ideaPrompt.trim()}
-                className="pressable inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
-              >
-                {generatingIdeas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Sparkles className="h-3.5 w-3.5" />Generate</>}
-              </button>
-              <button onClick={() => setShowIdeaBar(false)} className="text-muted-foreground hover:text-foreground transition-colors">
-                <X className="h-4 w-4" />
-              </button>
+            <div className="animate-fade-in border-t overflow-hidden" style={{ background: "linear-gradient(135deg, hsl(270 75% 97%) 0%, hsl(243 75% 97%) 100%)" }}>
+              {/* Header strip */}
+              <div className="flex items-center justify-between px-5 pt-4 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-xl flex items-center justify-center shadow-md shrink-0" style={{ background: "linear-gradient(135deg, hsl(280 75% 60%), hsl(243 75% 59%))" }}>
+                    <Wand2 className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-violet-900">AI Keyword Ideas</p>
+                    <p className="text-[11px] text-violet-500">Describe what you&apos;re looking for, AI writes the keywords</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowIdeaBar(false)} className="pressable h-7 w-7 rounded-lg flex items-center justify-center text-violet-400 hover:text-violet-700 hover:bg-violet-100 transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Input row */}
+              <div className="px-5 pb-4 flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Sparkles className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-violet-400 pointer-events-none" />
+                  <input
+                    className="w-full h-11 rounded-xl border border-violet-200 bg-white pl-10 pr-4 text-sm outline-none transition-all duration-150 placeholder:text-violet-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-500/15 text-violet-900"
+                    placeholder='e.g. "faceless channels about top 10 lists in Africa"'
+                    value={ideaPrompt}
+                    onChange={(e) => setIdeaPrompt(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleGenerateIdeas()}
+                    autoFocus
+                  />
+                </div>
+                <button
+                  onClick={handleGenerateIdeas}
+                  disabled={generatingIdeas || !ideaPrompt.trim()}
+                  className="pressable inline-flex items-center gap-2 rounded-xl px-4 h-11 text-sm font-bold text-white whitespace-nowrap disabled:opacity-50 shadow-md"
+                  style={{ background: "linear-gradient(135deg, hsl(280 75% 60%), hsl(243 75% 59%))" }}
+                >
+                  {generatingIdeas
+                    ? <><Loader2 className="h-4 w-4 animate-spin" />Thinking…</>
+                    : <><Sparkles className="h-4 w-4" />Generate Keywords</>
+                  }
+                </button>
+              </div>
+
+              {/* Example prompts */}
+              <div className="px-5 pb-4 flex flex-wrap gap-1.5">
+                {[
+                  "Faceless channels about world history",
+                  "Top 10 list channels under 500k subs",
+                  "Finance channels that don't show face",
+                  "Science documentary channels",
+                ].map((example) => (
+                  <button
+                    key={example}
+                    onClick={() => setIdeaPrompt(example)}
+                    className="pressable inline-flex items-center rounded-full border border-violet-200 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-violet-600 hover:bg-white hover:border-violet-300 transition-all"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>

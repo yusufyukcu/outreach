@@ -3,8 +3,9 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, Search, Users, KanbanSquare,
-  Mail, Settings, LogOut, Zap,
+  Mail, Settings, LogOut,
 } from "lucide-react"
+import { Logo } from "@/components/ui/logo"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -32,15 +33,8 @@ export function Sidebar() {
       style={{ background: "hsl(224 71% 4%)" }}>
 
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-3 py-2 mb-8">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl shrink-0"
-          style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(280 75% 60%))" }}>
-          <Zap className="h-4 w-4 text-white" fill="white" />
-        </div>
-        <div>
-          <p className="text-sm font-bold text-white leading-none">YT Lead Op</p>
-          <p className="text-[11px] mt-0.5" style={{ color: "hsl(220 9% 55%)" }}>AI Lead Platform</p>
-        </div>
+      <div className="px-3 py-2 mb-8">
+        <Logo variant="dark" size="md" />
       </div>
 
       {/* Nav */}

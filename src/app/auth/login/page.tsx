@@ -2,7 +2,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Zap, Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react"
+import { Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react"
+import { Logo } from "@/components/ui/logo"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
@@ -53,11 +54,8 @@ export default function LoginPage() {
 
         {/* Bottom content */}
         <div className="relative z-10 mt-auto">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-white">YT Lead Op</span>
+          <div className="mb-6">
+            <Logo variant="dark" size="lg" />
           </div>
           <p className="text-white/70 text-sm mb-6">AI-powered lead generation for YouTube agencies</p>
           <ul className="space-y-3">
@@ -75,11 +73,8 @@ export default function LoginPage() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-sm">
           {/* Logo */}
-          <div className="flex items-center gap-3 mb-8">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shadow-md">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-bold">YT Lead Op</span>
+          <div className="mb-8">
+            <Logo variant="light" size="md" />
           </div>
 
           <h2 className="text-2xl font-bold mb-1">Welcome back</h2>

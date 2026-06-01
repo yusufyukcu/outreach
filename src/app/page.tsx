@@ -1,8 +1,9 @@
 import Link from "next/link"
 import {
   Search, BarChart3, KanbanSquare, Mail, TrendingUp,
-  ArrowRight, Zap, Sparkles, Ghost, Target, CheckCircle2,
+  ArrowRight, Sparkles, Ghost, Target, CheckCircle2,
 } from "lucide-react"
+import { Logo, LogoMark } from "@/components/ui/logo"
 
 export default function Home() {
   return (
@@ -10,15 +11,7 @@ export default function Home() {
 
       {/* ── Nav ──────────────────────────────────────────────────── */}
       <nav className="flex items-center justify-between px-8 py-5 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-xl shadow-md"
-            style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(280 75% 60%))" }}
-          >
-            <Zap className="h-4.5 w-4.5 text-white" fill="white" />
-          </div>
-          <span className="font-bold text-lg tracking-tight">YT Lead Op</span>
-        </div>
+        <Logo variant="light" size="md" />
         <div className="flex items-center gap-3">
           <Link href="/auth/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2">
             Sign In
@@ -359,15 +352,7 @@ export default function Home() {
       {/* ── Footer ───────────────────────────────────────────────── */}
       <footer className="border-t bg-white py-8 px-8">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div
-              className="flex h-7 w-7 items-center justify-center rounded-lg"
-              style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(280 75% 60%))" }}
-            >
-              <Zap className="h-3.5 w-3.5 text-white" fill="white" />
-            </div>
-            <span className="font-bold text-sm">YT Lead Op</span>
-          </div>
+          <Logo variant="light" size="sm" />
           <p className="text-xs text-muted-foreground">© 2026 YT Lead Op. AI-powered YouTube lead generation.</p>
         </div>
       </footer>

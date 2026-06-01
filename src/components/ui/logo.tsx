@@ -12,52 +12,52 @@ interface LogoProps {
   markOnly?: boolean
 }
 
-/* ── The icon mark ─────────────────────────────────────────────────── */
+/* ── The icon mark — double chevron ───────────────────────────────── */
 export function LogoMark({ size = 32, className }: LogoMarkProps) {
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 32 32"
+      viewBox="0 0 44 44"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
       <defs>
-        <linearGradient id="lm-bg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="hsl(243,75%,59%)" />
-          <stop offset="100%" stopColor="hsl(280,75%,60%)" />
+        <linearGradient id="sl-g1" x1="2" y1="2" x2="30" y2="42" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="hsl(243,75%,65%)" />
+          <stop offset="100%" stopColor="hsl(280,75%,56%)" />
         </linearGradient>
-        <linearGradient id="lm-bolt" x1="13" y1="4" x2="19" y2="28" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="white" stopOpacity="1" />
-          <stop offset="100%" stopColor="white" stopOpacity="0.75" />
+        <linearGradient id="sl-g2" x1="28" y1="8" x2="44" y2="36" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="hsl(280,75%,68%)" />
+          <stop offset="100%" stopColor="hsl(243,75%,72%)" />
         </linearGradient>
-        <linearGradient id="lm-dot" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="hsl(38,95%,65%)" />
-          <stop offset="100%" stopColor="hsl(20,95%,60%)" />
-        </linearGradient>
-        <filter id="lm-glow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="1" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
       </defs>
 
-      {/* Rounded square background */}
-      <rect width="32" height="32" rx="9" fill="url(#lm-bg)" />
-
-      {/* Subtle inner highlight */}
-      <rect width="32" height="32" rx="9" fill="url(#lm-bg)" opacity="0" />
-      <path d="M0 9 Q0 0 9 0 H23 Q32 0 32 9" fill="white" opacity="0.08" />
-
-      {/* Lightning bolt */}
-      <path
-        d="M18 5L10 17.5H16L14 27L22 14.5H16L18 5Z"
-        fill="url(#lm-bolt)"
-        filter="url(#lm-glow)"
+      {/*
+        Left piece: rounded square rotated 45° — the "filled diamond" shape.
+        Center at (18,22), size ~22×22, rx=5 before rotation.
+        We draw it as a path with rounded corners manually.
+      */}
+      <rect
+        x="5"
+        y="5"
+        width="26"
+        height="26"
+        rx="6"
+        transform="rotate(45 18 22)"
+        fill="url(#sl-g1)"
       />
 
-      {/* Orange accent dot */}
-      <circle cx="23" cy="9" r="3.5" fill="url(#lm-dot)" />
+      {/* Right piece: open chevron > */}
+      <path
+        d="M30 13 L40 22 L30 31"
+        stroke="url(#sl-g2)"
+        strokeWidth="5.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
     </svg>
   )
 }
@@ -65,14 +65,14 @@ export function LogoMark({ size = 32, className }: LogoMarkProps) {
 /* ── Full logo (mark + wordmark) ───────────────────────────────────── */
 export function Logo({ variant = "dark", size = "md", className, markOnly = false }: LogoProps) {
   const sizes = {
-    sm: { mark: 26, name: "text-sm",  sub: "text-[10px]", gap: "gap-2" },
-    md: { mark: 32, name: "text-sm",  sub: "text-[11px]", gap: "gap-2.5" },
-    lg: { mark: 40, name: "text-base", sub: "text-xs",    gap: "gap-3" },
+    sm: { mark: 26, name: "text-sm",   sub: "text-[10px]", gap: "gap-2" },
+    md: { mark: 32, name: "text-sm",   sub: "text-[11px]", gap: "gap-2.5" },
+    lg: { mark: 40, name: "text-base", sub: "text-xs",     gap: "gap-3" },
   }
 
   const s = sizes[size]
-  const nameColor  = variant === "dark" ? "text-white"                      : "text-[hsl(224,71%,4%)]"
-  const subColor   = variant === "dark" ? "text-[hsl(220,9%,55%)]"          : "text-[hsl(220,9%,50%)]"
+  const nameColor = variant === "dark" ? "text-white"             : "text-[hsl(224,71%,4%)]"
+  const subColor  = variant === "dark" ? "text-[hsl(220,9%,55%)]" : "text-[hsl(220,9%,50%)]"
 
   if (markOnly) return <LogoMark size={s.mark} className={className} />
 
@@ -81,7 +81,7 @@ export function Logo({ variant = "dark", size = "md", className, markOnly = fals
       <LogoMark size={s.mark} />
       <div className="leading-none">
         <p className={cn("font-bold leading-none tracking-tight", s.name, nameColor)}>
-          YT Lead Op
+          StuckLead Operator
         </p>
         <p className={cn("mt-0.5 font-medium leading-none", s.sub, subColor)}>
           AI Lead Platform

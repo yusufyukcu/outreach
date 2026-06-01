@@ -353,7 +353,7 @@ export default function Home() {
       <footer className="border-t bg-white py-8 px-8">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <Logo variant="light" size="sm" />
-          <p className="text-xs text-muted-foreground">© 2026 YT Lead Op. AI-powered YouTube lead generation.</p>
+          <p className="text-xs text-muted-foreground">© 2026 StuckLead Operator. AI-powered YouTube lead generation.</p>
         </div>
       </footer>
     </div>

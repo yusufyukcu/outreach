@@ -198,7 +198,81 @@ export async function POST(req: NextRequest) {
       })
     )
 
-    // ── Step 7: Apply filters and persist ───────────────────────────────────────
+    // ── Step 7: Auto second-pass from top-scoring seed channels ─────────────────
+    // Take the 3 best channels from round 1 (score ≥ 65, not excluded).
+    // Use their recent video titles as new search queries to find similar channels
+    // that didn't appear in the original search — fully automatic, no user input.
+    const alreadyAnalyzed = new Set(candidates.map((c) => c.youtube_channel_id))
+
+    const seeds = evaluated
+      .filter((e) => !e.result.excluded && e.result.score >= 65)
+      .sort((a, b) => b.result.score - a.result.score)
+      .slice(0, 3)
+
+    if (seeds.length > 0) {
+      // Build search terms from seed video titles: pick titles that look like
+      // content titles (not "Q&A", "vlog", personal stuff)
+      const seedTerms: string[] = []
+      for (const seed of seeds) {
+        const goodTitles = seed.metrics.recent_titles
+          .filter((t) => t.length > 15 && !/\b(q&a|vlog|day in|my life|storytime)\b/i.test(t))
+          .slice(0, 2)
+        seedTerms.push(...goodTitles)
+      }
+
+      if (seedTerms.length > 0) {
+        const seedSearchResults = await Promise.allSettled(
+          seedTerms.slice(0, 4).map((term) =>
+            searchYouTubeVideos({
+              keywords: [term],
+              maxResults: 15,
+              relevanceLanguage: english_only ? "en" : undefined,
+            })
+          )
+        )
+
+        const newChannelIds = new Set<string>()
+        for (const r of seedSearchResults) {
+          if (r.status !== "fulfilled") continue
+          for (const v of r.value) {
+            if (v.channelId && !alreadyAnalyzed.has(v.channelId)) {
+              newChannelIds.add(v.channelId)
+            }
+          }
+        }
+
+        if (newChannelIds.size > 0) {
+          const newDetails = await fetchChannelDetails([...newChannelIds])
+          const newCandidates = newDetails
+            .filter((c) => c.subscriber_count >= min_subscribers && c.subscriber_count <= max_subscribers)
+            .slice(0, 15) // cap second-pass to avoid quota burn
+
+          const secondPassEvaluated = await Promise.all(
+            newCandidates.map(async (c) => {
+              let videos: RecentVideo[] = []
+              try { videos = await fetchRecentVideos(c.uploads_playlist_id, c.youtube_channel_id, 15) } catch { /* */ }
+              const metrics = computeRecentMetrics(videos, c.subscriber_count)
+              const recentDescriptions = videos.map((v) => v.description)
+              const detectedNiche = nicheSelected ? niche : detectNiche(c.description ?? "", c.name)
+              const businessEmail = extractBusinessEmail(c.description, ...recentDescriptions)
+              const links = hasExternalLinks(c.description, ...recentDescriptions)
+              const sponsorship = detectSponsorship(c.description, ...recentDescriptions, ...metrics.recent_titles)
+              const isEnglish = looksEnglish(c.name, c.description, ...metrics.recent_titles)
+              const nicheRatio = nicheRelevanceRatio(nicheSelected ? niche : detectedNiche, c.description, metrics.recent_titles, recentDescriptions)
+              const offTarget = detectOffTargetCategory(c.name, c.description, metrics.recent_titles)
+              const result = evaluateLead({ metrics, subscriberCount: c.subscriber_count, nicheSelected, nicheRatio, offTargetCategory: offTarget, isEnglish, englishOnly: english_only, businessEmail, hasLinks: links, sponsorshipDetected: sponsorship, minRecentViews: min_recent_views })
+              const relevance = computeSemanticRelevance(allConcepts, c.description, metrics.recent_titles, recentDescriptions)
+              const faceless = scoreFaceless(c.description, metrics.recent_titles, metrics)
+              return { channel: c, metrics, businessEmail, links, sponsorship, detectedNiche, result, relevance, faceless, searchHits: 1 }
+            })
+          )
+
+          evaluated.push(...secondPassEvaluated)
+        }
+      }
+    }
+
+    // ── Step 8: Apply filters and persist ───────────────────────────────────────
     const qualityThreshold = include_low_quality ? 0 : min_score
     const leads: DiscoveredLead[] = []
 

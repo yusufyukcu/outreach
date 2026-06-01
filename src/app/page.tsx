@@ -124,9 +124,9 @@ export default function Home() {
             </div>
             <div className="space-y-1.5">
               {[
-                { name: "Connect2Africa", score: 92, color: "from-emerald-500 to-teal-400" },
-                { name: "Africa Reloaded", score: 87, color: "from-indigo-500 to-violet-500" },
-                { name: "R247 Success", score: 81, color: "from-blue-500 to-cyan-400" },
+                { name: "TopLux World", score: 92, color: "from-emerald-500 to-teal-400" },
+                { name: "Finance Insider", score: 87, color: "from-indigo-500 to-violet-500" },
+                { name: "Mega Projects", score: 81, color: "from-blue-500 to-cyan-400" },
               ].map((ch) => (
                 <div key={ch.name} className="flex items-center justify-between bg-muted/40 rounded-lg px-2.5 py-1.5">
                   <span className="text-[11px] font-medium truncate">{ch.name}</span>

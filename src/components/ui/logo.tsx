@@ -18,42 +18,34 @@ export function LogoMark({ size = 32, className }: LogoMarkProps) {
     <svg
       width={size}
       height={size}
-      viewBox="0 0 44 44"
+      viewBox="0 0 80 80"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
       <defs>
-        <linearGradient id="sl-g1" x1="2" y1="2" x2="30" y2="42" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="hsl(243,75%,65%)" />
-          <stop offset="100%" stopColor="hsl(280,75%,56%)" />
-        </linearGradient>
-        <linearGradient id="sl-g2" x1="28" y1="8" x2="44" y2="36" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="hsl(280,75%,68%)" />
-          <stop offset="100%" stopColor="hsl(243,75%,72%)" />
+        <linearGradient id="sl-fill" x1="8" y1="8" x2="72" y2="72" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="hsl(243,75%,68%)" />
+          <stop offset="100%" stopColor="hsl(280,75%,58%)" />
         </linearGradient>
       </defs>
 
-      {/*
-        Left piece: rounded square rotated 45° — the "filled diamond" shape.
-        Center at (18,22), size ~22×22, rx=5 before rotation.
-        We draw it as a path with rounded corners manually.
-      */}
+      {/* Left piece: rounded square rotated 45° (diamond) */}
       <rect
-        x="5"
-        y="5"
-        width="26"
-        height="26"
-        rx="6"
-        transform="rotate(45 18 22)"
-        fill="url(#sl-g1)"
+        x="14"
+        y="14"
+        width="34"
+        height="34"
+        rx="8"
+        transform="rotate(45 31 31)"
+        fill="url(#sl-fill)"
       />
 
-      {/* Right piece: open chevron > */}
+      {/* Right piece: chevron > with rounded caps */}
       <path
-        d="M30 13 L40 22 L30 31"
-        stroke="url(#sl-g2)"
-        strokeWidth="5.5"
+        d="M54 24 L68 40 L54 56"
+        stroke="url(#sl-fill)"
+        strokeWidth="10"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"

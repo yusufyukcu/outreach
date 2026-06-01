@@ -57,6 +57,7 @@ export default function DiscoverPage() {
   const [ideaPrompt, setIdeaPrompt]         = useState("")
   const [generatingIdeas, setGeneratingIdeas] = useState(false)
   const [showIdeaBar, setShowIdeaBar]       = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   async function handleDiscover() {
     if (!keywords.trim()) {
@@ -273,30 +274,22 @@ export default function DiscoverPage() {
             </div>
           )}
 
-          {/* Preset chips */}
-          <div className="border-t px-4 py-3 flex items-center gap-2 overflow-x-auto">
+          {/* Bottom button strip */}
+          <div className="border-t px-4 py-3 flex items-center gap-2">
             <button
-              onClick={() => setShowIdeaBar(!showIdeaBar)}
-              className="pressable inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-violet-500 to-purple-500 px-3 py-1 text-xs font-semibold text-white shadow-sm shrink-0"
+              onClick={() => { setShowIdeaBar(!showIdeaBar); setShowSuggestions(false) }}
+              className={`pressable inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold shadow-sm transition-all ${showIdeaBar ? "bg-violet-600 text-white" : "bg-gradient-to-r from-violet-500 to-purple-500 text-white"}`}
             >
               <Wand2 className="h-3 w-3" />
               AI Ideas
             </button>
-
-            <div className="w-px h-4 bg-border shrink-0" />
-
-            {PRESETS.map((p) => (
-              <button
-                key={p.label}
-                onClick={() => { setKeywords(p.keywords); if (p.faceless) setFacelessMode(true) }}
-                className="pressable group relative inline-flex items-center gap-1.5 rounded-full border border-transparent px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-all duration-150 hover:border-border hover:bg-white shrink-0"
-              >
-                {/* gradient dot */}
-                <span className={`h-2 w-2 rounded-full bg-gradient-to-br ${p.color} shrink-0`} />
-                {p.label}
-                {p.faceless && <Ghost className="h-2.5 w-2.5 text-violet-400" />}
-              </button>
-            ))}
+            <button
+              onClick={() => { setShowSuggestions(!showSuggestions); setShowIdeaBar(false) }}
+              className={`pressable inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold shadow-sm transition-all ${showSuggestions ? "bg-indigo-600 text-white" : "bg-gradient-to-r from-indigo-500 to-blue-500 text-white"}`}
+            >
+              <Sparkles className="h-3 w-3" />
+              Suggestions
+            </button>
           </div>
 
           {/* AI idea bar */}
@@ -358,6 +351,43 @@ export default function DiscoverPage() {
                     className="pressable inline-flex items-center rounded-full border border-violet-200 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-violet-600 hover:bg-white hover:border-violet-300 transition-all"
                   >
                     {example}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Suggestions panel */}
+          {showSuggestions && (
+            <div className="animate-fade-in border-t overflow-hidden" style={{ background: "linear-gradient(135deg, hsl(225 75% 97%) 0%, hsl(243 75% 97%) 100%)" }}>
+              <div className="flex items-center justify-between px-5 pt-4 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-xl flex items-center justify-center shadow-md shrink-0" style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(199 90% 55%))" }}>
+                    <Sparkles className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-indigo-900">Keyword Suggestions</p>
+                    <p className="text-[11px] text-indigo-400">Pick a niche to auto-fill keywords and start searching</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowSuggestions(false)} className="pressable h-7 w-7 rounded-lg flex items-center justify-center text-indigo-400 hover:text-indigo-700 hover:bg-indigo-100 transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="px-5 pb-5 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {PRESETS.map((p) => (
+                  <button
+                    key={p.label}
+                    onClick={() => { setKeywords(p.keywords); if (p.faceless) setFacelessMode(true); setShowSuggestions(false) }}
+                    className="pressable group relative flex items-center gap-3 rounded-xl bg-white border border-indigo-100 px-3 py-2.5 text-left hover:border-indigo-300 hover:shadow-sm transition-all duration-150 overflow-hidden"
+                  >
+                    <span className={`h-8 w-8 rounded-lg bg-gradient-to-br ${p.color} shrink-0 flex items-center justify-center text-base shadow-sm`}>
+                      {p.label.split(" ")[0]}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold text-foreground truncate">{p.label.split(" ").slice(1).join(" ")}</span>
+                      {p.faceless && <span className="inline-flex items-center gap-0.5 text-[10px] text-violet-500 font-medium"><Ghost className="h-2.5 w-2.5" />faceless</span>}
+                    </span>
                   </button>
                 ))}
               </div>

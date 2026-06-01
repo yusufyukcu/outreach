@@ -106,7 +106,7 @@ export function SettingsClient({ userId, email, fullName, orgId, orgName, servic
             <p className="text-xl font-extrabold mt-0.5">{plan.label}</p>
           </div>
           <button
-            className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
+            className="pressable flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
           >
             Upgrade <ChevronRight className="h-4 w-4" />
           </button>
@@ -172,7 +172,7 @@ export function SettingsClient({ userId, email, fullName, orgId, orgName, servic
             <button
               onClick={handleSaveProfile}
               disabled={savingProfile}
-              className="btn-glow w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white transition-all disabled:opacity-60"
+              className="btn-glow w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold text-white disabled:opacity-60"
               style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(280 75% 60%))" }}
             >
               {savingProfile ? (
@@ -212,7 +212,7 @@ export function SettingsClient({ userId, email, fullName, orgId, orgName, servic
             <button
               onClick={handleChangePassword}
               disabled={savingPw || newPassword.length < 8}
-              className="flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="pressable flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {savingPw ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
               Update Password
@@ -246,7 +246,7 @@ export function SettingsClient({ userId, email, fullName, orgId, orgName, servic
             </div>
           </div>
           <button
-            className="flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
+            className="pressable flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
             onClick={() => toast({ title: "Contact support to delete your account", variant: "destructive" })}
           >
             <Trash2 className="h-4 w-4" />

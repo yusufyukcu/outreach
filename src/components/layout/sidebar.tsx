@@ -86,7 +86,7 @@ export function Sidebar() {
         </Link>
         <button
           onClick={handleSignOut}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200"
+          className="pressable flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200"
           style={{ color: "hsl(220 9% 55%)" }}
           onMouseEnter={e => {
             (e.currentTarget as HTMLElement).style.color = "hsl(0 84% 70%)"

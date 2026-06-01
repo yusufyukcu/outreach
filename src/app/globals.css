@@ -45,10 +45,17 @@
   }
 }
 
+/* ── Custom easing curves ─────────────────────────────────────────── */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 /* ── Animations ───────────────────────────────────────────────────── */
 
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -165,19 +172,19 @@
 /* ── Utility classes ──────────────────────────────────────────────── */
 
 .animate-fade-in-up {
-  animation: fade-in-up 0.4s ease both;
+  animation: fade-in-up 0.35s var(--ease-out) both;
 }
 
 .animate-fade-in {
-  animation: fade-in 0.3s ease both;
+  animation: fade-in 0.25s var(--ease-out) both;
 }
 
 .animate-scale-in {
-  animation: scale-in 0.25s ease both;
+  animation: scale-in 0.2s var(--ease-out) both;
 }
 
 .animate-slide-in-right {
-  animation: slide-in-right 0.35s ease both;
+  animation: slide-in-right 0.3s var(--ease-out) both;
 }
 
 .animate-float {
@@ -202,17 +209,17 @@
 
 /* Staggered children */
 .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
-.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
-.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
-.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
-.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 40ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 80ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 160ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 200ms; }
 
 /* Skeleton shimmer */
 .skeleton {
   background: linear-gradient(90deg, hsl(220 14% 93%) 25%, hsl(220 14% 96%) 50%, hsl(220 14% 93%) 75%);
   background-size: 400px 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+  animation: shimmer 1.4s linear infinite;
 }
 
 /* Glass card */
@@ -233,20 +240,37 @@
 /* Glow button */
 .btn-glow {
   box-shadow: 0 0 20px hsl(243 75% 59% / 0.35);
-  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  transition: box-shadow 0.2s var(--ease-out), transform 0.15s var(--ease-out);
 }
-.btn-glow:hover {
-  box-shadow: 0 0 28px hsl(243 75% 59% / 0.5);
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .btn-glow:hover {
+    box-shadow: 0 0 28px hsl(243 75% 59% / 0.5);
+    transform: translateY(-1px);
+  }
+}
+.btn-glow:active {
+  transform: scale(0.97);
+  transition: transform 0.1s var(--ease-out);
+}
+
+/* Pressable — any interactive element that should feel responsive */
+.pressable {
+  transition: transform 0.15s var(--ease-out);
+}
+.pressable:active {
+  transform: scale(0.97);
+  transition: transform 0.1s var(--ease-out);
 }
 
 /* Card lift */
 .card-hover {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
 }
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px hsl(224 71% 4% / 0.1);
+@media (hover: hover) and (pointer: fine) {
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px hsl(224 71% 4% / 0.1);
+  }
 }
 
 /* Gradient border */
@@ -264,4 +288,35 @@
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
+}
+
+/* ── Accessibility: respect reduced motion ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .animate-fade-in-up,
+  .animate-fade-in,
+  .animate-scale-in,
+  .animate-slide-in-right {
+    animation: fade-in 0.15s ease both;
+  }
+  .animate-float,
+  .animate-float-slow,
+  .animate-float-reverse,
+  .animate-block-1,
+  .animate-block-2,
+  .animate-block-3,
+  .animate-block-4,
+  .animate-orbit,
+  .animate-orbit-reverse,
+  .animate-morph,
+  .animate-glow-pulse,
+  .animate-bounce-x {
+    animation: none;
+  }
 }

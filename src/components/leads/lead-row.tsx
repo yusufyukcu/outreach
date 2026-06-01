@@ -1,10 +1,14 @@
 "use client"
+import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { PlayCircle, Mail, AtSign, ExternalLink } from "lucide-react"
+import { PlayCircle, Mail, Copy, Check, Loader2, ChevronDown, ChevronUp, Send } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { LeadScoreBadge } from "./lead-score-badge"
 import { formatNumber, timeAgo } from "@/lib/utils"
+import { toast } from "@/hooks/use-toast"
 import type { Lead, CRMStage } from "@/types"
 
 const STAGE_COLORS: Record<CRMStage, string> = {
@@ -33,66 +37,209 @@ const STAGE_LABELS: Record<CRMStage, string> = {
 
 interface LeadRowProps {
   lead: Lead
+  selected?: boolean
+  onSelect?: (id: string, checked: boolean) => void
+  serviceType?: string
+  needsFollowup?: boolean
 }
 
-export function LeadRow({ lead }: LeadRowProps) {
+export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup }: LeadRowProps) {
   const channel = lead.channel
   const contact = lead.contact
 
+  const [emailOpen, setEmailOpen] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [generated, setGenerated] = useState<{ subject: string; body: string } | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [marking, setMarking] = useState(false)
+
+  async function handleQuickEmail(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (emailOpen && generated) { setEmailOpen(false); return }
+    setEmailOpen(true)
+    if (generated) return // already generated, just toggle open
+    setGenerating(true)
+    try {
+      const res = await fetch("/api/outreach/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel,
+          serviceType: serviceType ?? "editing",
+          tone: "professional",
+          outreachChannel: "email",
+          agencyName: "",
+          agencyValueProp: "",
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setGenerated(data)
+    } catch {
+      toast({ title: "Could not generate email", variant: "destructive" })
+      setEmailOpen(false)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  async function handleCopy(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!generated) return
+    await navigator.clipboard.writeText(`Subject: ${generated.subject}\n\n${generated.body}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+    toast({ title: "Copied to clipboard!" })
+  }
+
+  async function handleMarkSent(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!generated) return
+    setMarking(true)
+    try {
+      await fetch("/api/outreach/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lead_id: lead.id,
+          channel: "email",
+          subject: generated.subject,
+          body: generated.body,
+          status: "sent",
+        }),
+      })
+      toast({ title: "Marked as sent", description: "Lead moved to Contacted" })
+      setEmailOpen(false)
+    } catch {
+      toast({ title: "Failed", variant: "destructive" })
+    } finally {
+      setMarking(false)
+    }
+  }
+
   return (
-    <Link href={`/app/leads/${lead.id}`} className="flex items-center gap-4 px-4 py-3 hover:bg-muted/50 transition-colors border-b last:border-0">
-      {/* Avatar */}
-      <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border bg-muted">
-        {channel?.thumbnail_url ? (
-          <Image src={channel.thumbnail_url} alt={channel.name} fill className="object-cover" unoptimized />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <PlayCircle className="h-4 w-4 text-muted-foreground" />
-          </div>
+    <div className={`border-b last:border-0 ${needsFollowup ? "bg-amber-50/40" : ""}`}>
+      <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors">
+        {/* Checkbox */}
+        {onSelect && (
+          <input
+            type="checkbox"
+            checked={selected ?? false}
+            onChange={(e) => { e.stopPropagation(); onSelect(lead.id, e.target.checked) }}
+            onClick={(e) => e.stopPropagation()}
+            className="h-4 w-4 rounded border-input shrink-0 cursor-pointer"
+          />
         )}
-      </div>
 
-      {/* Channel info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium truncate">{channel?.name ?? "Unknown"}</p>
-          {channel?.niche_primary && (
-            <Badge variant="secondary" className="hidden md:inline-flex text-xs">
-              {channel.niche_primary}
-            </Badge>
+        {/* Avatar — links to detail */}
+        <Link href={`/app/leads/${lead.id}`} className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border bg-muted">
+          {channel?.thumbnail_url ? (
+            <Image src={channel.thumbnail_url} alt={channel.name} fill className="object-cover" unoptimized />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <PlayCircle className="h-4 w-4 text-muted-foreground" />
+            </div>
           )}
-        </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-muted-foreground">
-            {channel ? formatNumber(channel.subscriber_count) + " subs" : "—"}
-          </span>
-          {contact?.email && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Mail className="h-3 w-3" />
-              {contact.email}
+        </Link>
+
+        {/* Channel info — links to detail */}
+        <Link href={`/app/leads/${lead.id}`} className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium truncate">{channel?.name ?? "Unknown"}</p>
+            {channel?.niche_primary && (
+              <Badge variant="secondary" className="hidden md:inline-flex text-xs">
+                {channel.niche_primary}
+              </Badge>
+            )}
+            {needsFollowup && (
+              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                Follow-up needed
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-xs text-muted-foreground">
+              {channel ? formatNumber(channel.subscriber_count) + " subs" : "—"}
             </span>
-          )}
+            {contact?.email && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Mail className="h-3 w-3" />
+                <span className="hidden sm:inline">{contact.email}</span>
+              </span>
+            )}
+          </div>
+        </Link>
+
+        {/* Score */}
+        <div className="hidden sm:block w-20 text-right">
+          <LeadScoreBadge score={lead.lead_score} />
         </div>
+
+        {/* Stage */}
+        <div className="hidden md:block w-28 text-right">
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STAGE_COLORS[lead.crm_stage]}`}>
+            {STAGE_LABELS[lead.crm_stage]}
+          </span>
+        </div>
+
+        {/* Last activity */}
+        <div className="hidden lg:block w-24 text-right">
+          <span className="text-xs text-muted-foreground">
+            {lead.last_contacted_at ? timeAgo(lead.last_contacted_at) : timeAgo(lead.created_at)}
+          </span>
+        </div>
+
+        {/* Quick email button */}
+        <button
+          onClick={handleQuickEmail}
+          className={`shrink-0 flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+            emailOpen ? "bg-primary text-white" : "border border-input bg-white hover:bg-muted text-muted-foreground hover:text-foreground"
+          }`}
+          title="Quick email"
+        >
+          <Mail className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Email</span>
+          {emailOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        </button>
       </div>
 
-      {/* Score */}
-      <div className="hidden sm:block w-20 text-right">
-        <LeadScoreBadge score={lead.lead_score} />
-      </div>
-
-      {/* Stage */}
-      <div className="hidden md:block w-28 text-right">
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STAGE_COLORS[lead.crm_stage]}`}>
-          {STAGE_LABELS[lead.crm_stage]}
-        </span>
-      </div>
-
-      {/* Last activity */}
-      <div className="hidden lg:block w-24 text-right">
-        <span className="text-xs text-muted-foreground">
-          {lead.last_contacted_at ? timeAgo(lead.last_contacted_at) : timeAgo(lead.created_at)}
-        </span>
-      </div>
-    </Link>
+      {/* Inline email panel */}
+      {emailOpen && (
+        <div className="px-4 pb-4 pt-1 border-t bg-muted/20">
+          {generating ? (
+            <div className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Generating personalized email...
+            </div>
+          ) : generated ? (
+            <div className="space-y-2">
+              <div className="rounded-md bg-white border px-3 py-2">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Subject</p>
+                <p className="text-sm font-medium">{generated.subject}</p>
+              </div>
+              <Textarea
+                value={generated.body}
+                onChange={(e) => setGenerated(prev => prev ? { ...prev, body: e.target.value } : null)}
+                rows={6}
+                className="text-sm bg-white"
+                onClick={(e) => e.preventDefault()}
+              />
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={handleCopy} className="flex-1">
+                  {copied ? <><Check className="h-3.5 w-3.5 mr-1" />Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1" />Copy Email</>}
+                </Button>
+                <Button size="sm" onClick={handleMarkSent} disabled={marking} className="flex-1">
+                  <Send className="h-3.5 w-3.5 mr-1" />
+                  {marking ? "Saving..." : "Mark as Sent"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
   )
 }

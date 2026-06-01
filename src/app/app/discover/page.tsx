@@ -46,8 +46,8 @@ const KEYWORD_PRESETS: { label: string; keywords: string; faceless?: boolean }[]
 export default function DiscoverPage() {
   const [keywords, setKeywords] = useState("")
   const [niche, setNiche] = useState("Any Niche")
-  const [minSubs, setMinSubs] = useState("10000")
-  const [maxSubs, setMaxSubs] = useState("500000")
+  const [minSubs, setMinSubs] = useState("5000")
+  const [maxSubs, setMaxSubs] = useState("1000000")
   const [serviceType, setServiceType] = useState<ServiceType>("editing")
   const [englishOnly, setEnglishOnly] = useState(true)
   const [includeLowQuality, setIncludeLowQuality] = useState(false)
@@ -84,10 +84,10 @@ export default function DiscoverPage() {
           min_subscribers: parseInt(minSubs) || 10000,
           max_subscribers: parseInt(maxSubs) || 500000,
           service_type: serviceType,
-          min_score: 75,
+          min_score: 60,
           include_low_quality: includeLowQuality,
           english_only: englishOnly,
-          min_recent_views: 2000,
+          min_recent_views: 1000,
           faceless_mode: facelessMode,
           min_faceless_score: 50,
         }),
@@ -355,7 +355,7 @@ export default function DiscoverPage() {
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
               <p className="text-sm font-medium">{facelessMode ? "Hunting faceless channels..." : "Researching channels..."}</p>
-              <p className="text-xs text-muted-foreground mt-1">{facelessMode ? "Searching videos, detecting stock/voiceover channels, scoring quality" : "Fetching recent videos, checking activity, scoring quality"}</p>
+              <p className="text-xs text-muted-foreground mt-1">Searching videos → collecting channels → analyzing recent content → scoring quality</p>
             </div>
           </div>
         )}

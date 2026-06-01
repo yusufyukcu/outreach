@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import {
-  searchYouTubeChannels,
   searchYouTubeVideos,
   fetchChannelDetails,
   fetchRecentVideos,
@@ -20,8 +19,8 @@ import { evaluateLead } from "@/services/lead-quality"
 import { expandKeywords, computeSemanticRelevance } from "@/services/keyword-expansion"
 import type { DiscoveredLead, ServiceType } from "@/types"
 
-// Deep analysis is quota-heavy (2 units/channel), so cap how many we inspect.
-const MAX_DEEP_ANALYZE = 20
+// Deep analysis costs 2 quota units per channel (playlistItems + videos.list)
+const MAX_DEEP_ANALYZE = 30
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,10 +43,10 @@ export async function POST(req: NextRequest) {
       min_subscribers,
       max_subscribers,
       service_type,
-      min_score = 75,
+      min_score = 60,
       include_low_quality = false,
       english_only = true,
-      min_recent_views = 2000,
+      min_recent_views = 1000,
       faceless_mode = false,
       min_faceless_score = 50,
     } = body as {
@@ -66,73 +65,65 @@ export async function POST(req: NextRequest) {
 
     const nicheSelected = !!niche && niche !== "Any Niche"
 
-    // 1) Expand keywords semantically via AI
+    // ── Step 1: Semantic keyword expansion ──────────────────────────────────────
     const expansion = await expandKeywords(keywords, service_type)
     const allConcepts = expansion.all
 
-    // 2) Search YouTube — video-based in faceless mode, channel-based otherwise
-    let channelIds: string[]
+    // Build search groups: original keywords + expanded concepts in pairs
+    const searchGroups: string[][] = [keywords]
+    for (let i = 0; i < expansion.expanded.length; i += 2) {
+      searchGroups.push(expansion.expanded.slice(i, i + 2))
+    }
+    const cappedGroups = searchGroups.slice(0, 6)
 
-    if (faceless_mode) {
-      // Video search: find videos with list/documentary style titles, then collect their channels
-      const searchGroups: string[][] = [keywords]
-      for (let i = 0; i < expansion.expanded.length; i += 2) {
-        searchGroups.push(expansion.expanded.slice(i, i + 2))
-      }
-      const cappedGroups = searchGroups.slice(0, 5)
-
-      const videoResultArrays = await Promise.allSettled(
-        cappedGroups.map((group) =>
-          searchYouTubeVideos({
-            keywords: group,
-            maxResults: 20,
-            relevanceLanguage: english_only ? "en" : undefined,
-          })
-        )
+    // ── Step 2: Always search VIDEOS (not channels) ─────────────────────────────
+    // Video search surfaces channels that actually MAKE content about the topic,
+    // not just channels named after the keyword. This matches how manual search works.
+    const videoResultArrays = await Promise.allSettled(
+      cappedGroups.map((group) =>
+        searchYouTubeVideos({
+          keywords: group,
+          maxResults: 20,
+          relevanceLanguage: english_only ? "en" : undefined,
+        })
       )
+    )
 
-      const allVideoResults = videoResultArrays
-        .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
-
-      channelIds = [...new Set(allVideoResults.map((r) => r.channelId).filter(Boolean))]
-    } else {
-      // Standard channel search
-      const searchGroups: string[][] = [keywords]
-      for (let i = 0; i < expansion.expanded.length; i += 2) {
-        searchGroups.push(expansion.expanded.slice(i, i + 2))
+    // ── Step 3: Count search hit frequency per channel ──────────────────────────
+    // A channel appearing in 4 out of 6 queries is more relevant than one in 1.
+    // This replaces "sort by subscriber count" as the primary ranking signal.
+    const channelHits = new Map<string, number>()
+    for (const result of videoResultArrays) {
+      if (result.status !== "fulfilled") continue
+      const seen = new Set<string>() // count each channel once per query group
+      for (const r of result.value) {
+        if (!r.channelId || seen.has(r.channelId)) continue
+        seen.add(r.channelId)
+        channelHits.set(r.channelId, (channelHits.get(r.channelId) ?? 0) + 1)
       }
-      const cappedGroups = searchGroups.slice(0, 5)
-
-      const searchResultArrays = await Promise.allSettled(
-        cappedGroups.map((group) =>
-          searchYouTubeChannels({
-            keywords: group,
-            maxResults: 15,
-            relevanceLanguage: english_only ? "en" : undefined,
-          })
-        )
-      )
-
-      const allSearchResults = searchResultArrays
-        .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
-
-      channelIds = [...new Set(allSearchResults.map((r) => r.channelId).filter(Boolean))]
     }
 
+    const channelIds = [...channelHits.keys()]
     if (channelIds.length === 0) {
       return NextResponse.json({ channels: [], count: 0, analyzed: 0, expanded_concepts: allConcepts })
     }
 
-    // 3) Channel details (batched)
+    // ── Step 4: Fetch channel details ───────────────────────────────────────────
     const details = await fetchChannelDetails(channelIds)
 
-    // 4) Subscriber-range pre-filter, then cap deep analysis
+    // ── Step 5: Pre-filter by subscriber range, rank by hit frequency ────────────
+    // Primary sort: how many search queries surfaced this channel (relevance)
+    // Secondary sort: subscriber count (larger = more established)
     const candidates = details
       .filter((c) => c.subscriber_count >= min_subscribers && c.subscriber_count <= max_subscribers)
-      .sort((a, b) => b.subscriber_count - a.subscriber_count)
+      .sort((a, b) => {
+        const hitDiff = (channelHits.get(b.youtube_channel_id) ?? 0) - (channelHits.get(a.youtube_channel_id) ?? 0)
+        if (hitDiff !== 0) return hitDiff
+        return b.subscriber_count - a.subscriber_count
+      })
       .slice(0, MAX_DEEP_ANALYZE)
 
-    // 5) Deep-analyze each candidate
+    // ── Step 6: Deep-analyze each candidate ─────────────────────────────────────
     const evaluated = await Promise.all(
       candidates.map(async (c) => {
         let videos: RecentVideo[] = []
@@ -184,19 +175,19 @@ export async function POST(req: NextRequest) {
         )
 
         const faceless = scoreFaceless(c.description, metrics.recent_titles, metrics)
+        const searchHits = channelHits.get(c.youtube_channel_id) ?? 1
 
-        return { channel: c, metrics, businessEmail, links, sponsorship, detectedNiche, result, relevance, faceless }
+        return { channel: c, metrics, businessEmail, links, sponsorship, detectedNiche, result, relevance, faceless, searchHits }
       })
     )
 
-    // 6) Drop hard-excluded, apply score floors
+    // ── Step 7: Apply filters and persist ───────────────────────────────────────
     const qualityThreshold = include_low_quality ? 0 : min_score
     const leads: DiscoveredLead[] = []
 
     for (const e of evaluated) {
       if (e.result.excluded) continue
       if (e.result.score < qualityThreshold) continue
-      // In faceless mode: drop channels that clearly aren't faceless
       if (faceless_mode && e.faceless.score < min_faceless_score) continue
 
       const c = e.channel
@@ -272,6 +263,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // Sort by lead score descending (client can re-sort)
     leads.sort((a, b) => b.score - a.score)
 
     return NextResponse.json({

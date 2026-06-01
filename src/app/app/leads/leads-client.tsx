@@ -1,5 +1,5 @@
 "use client"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import { Search, Mail, Check, Copy, Loader2, X, ChevronDown, ChevronUp, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -33,12 +33,22 @@ interface BulkResult {
 }
 
 interface LeadsClientProps {
-  leads: Lead[]
   serviceType: ServiceType
 }
 
-export function LeadsClient({ leads, serviceType }: LeadsClientProps) {
+export function LeadsClient({ serviceType }: LeadsClientProps) {
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [loadingLeads, setLoadingLeads] = useState(true)
   const [activeFilter, setActiveFilter] = useState("all")
+
+  useEffect(() => {
+    setLoadingLeads(true)
+    fetch("/api/leads")
+      .then((r) => r.json())
+      .then((data) => setLeads(Array.isArray(data) ? data : []))
+      .catch(() => toast({ title: "Failed to load leads", variant: "destructive" }))
+      .finally(() => setLoadingLeads(false))
+  }, [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkGenerating, setBulkGenerating] = useState(false)
@@ -166,7 +176,12 @@ export function LeadsClient({ leads, serviceType }: LeadsClientProps) {
           <div className="w-20 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right">Email</div>
         </div>
 
-        {filteredLeads.length === 0 ? (
+        {loadingLeads ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="text-sm">Loading leads...</span>
+          </div>
+        ) : filteredLeads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Search className="h-10 w-10 mb-3 opacity-10" />
             <p className="font-semibold">

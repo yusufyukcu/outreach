@@ -3,10 +3,9 @@ import { Header } from "@/components/layout/header"
 import { LeadsClient } from "./leads-client"
 import Link from "next/link"
 import { Plus } from "lucide-react"
-import type { Lead, ServiceType } from "@/types"
+import type { ServiceType } from "@/types"
 
 export const dynamic = "force-dynamic"
-export const revalidate = 0
 
 export default async function LeadsPage() {
   const supabase = await createClient()
@@ -17,24 +16,15 @@ export default async function LeadsPage() {
   const orgId = profile?.org_id
   if (!orgId) return null
 
-  // Fetch org service type for outreach generation
   const { data: org } = await supabase.from("organizations").select("service_type").eq("id", orgId).single()
   const serviceType = (org?.service_type ?? "editing") as ServiceType
 
-  const { data: leads } = await supabase
-    .from("leads")
-    .select("*, channel:channels(*), contact:contacts(*)")
-    .eq("org_id", orgId)
-    .order("lead_score", { ascending: false, nullsFirst: false })
-
-  const allLeads = (leads ?? []) as Lead[]
-
   return (
     <div className="flex flex-col overflow-auto">
-      <Header title="Lead Database" subtitle={`${allLeads.length} total leads in your pipeline`}>
+      <Header title="Lead Database" subtitle="Your lead pipeline">
         <Link href="/app/discover">
           <button
-            className="btn-glow inline-flex items-center gap-2 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+            className="btn-glow inline-flex items-center gap-2 text-white px-4 py-2 rounded-xl text-sm font-semibold"
             style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(280 75% 60%))" }}
           >
             <Plus className="h-4 w-4" />
@@ -44,7 +34,7 @@ export default async function LeadsPage() {
       </Header>
 
       <div className="flex-1 overflow-auto p-6">
-        <LeadsClient leads={allLeads} serviceType={serviceType} />
+        <LeadsClient serviceType={serviceType} />
       </div>
     </div>
   )

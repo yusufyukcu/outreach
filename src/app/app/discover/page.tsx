@@ -144,6 +144,7 @@ export default function DiscoverPage() {
       if (!res.ok) throw new Error(data.error)
       setAddedIds((prev) => new Set([...prev, lead.id!]))
       toast({ title: "Added to leads!", description: `${lead.name} is now in your pipeline` })
+      // Invalidate client router cache so leads page fetches fresh data
       router.refresh()
     } catch {
       toast({ title: "Failed to add lead", variant: "destructive" })

@@ -5,6 +5,9 @@ import Link from "next/link"
 import { Plus } from "lucide-react"
 import type { Lead, ServiceType } from "@/types"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 export default async function LeadsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

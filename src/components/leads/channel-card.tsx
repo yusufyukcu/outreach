@@ -5,8 +5,6 @@ import {
   Clapperboard, Repeat, Mail, AlertTriangle, Sparkles, Ghost,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { LeadScoreBadge } from "./lead-score-badge"
 import { formatNumber, timeAgo } from "@/lib/utils"
 import type { DiscoveredLead } from "@/types"
 
@@ -21,19 +19,32 @@ const POSITIVE_BADGES = new Set([
   "Active", "Long-form", "Strong views", "Consistent", "Business email found", "Contact links", "Has sponsors",
 ])
 
+function ScoreBadge({ score }: { score: number }) {
+  const gradient =
+    score >= 80 ? "from-emerald-500 to-teal-400" :
+    score >= 60 ? "from-indigo-500 to-violet-500" :
+    score >= 40 ? "from-amber-400 to-orange-400" :
+    "from-slate-400 to-slate-500"
+  return (
+    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} shadow-sm`}>
+      <span className="text-sm font-bold text-white leading-none">{score ?? "?"}</span>
+    </div>
+  )
+}
+
 export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelCardProps) {
   const m = lead.metrics
 
   return (
-    <div className="flex flex-col rounded-xl border bg-white p-4 hover:shadow-md transition-shadow">
+    <div className="animate-fade-in-up card-hover flex flex-col rounded-2xl border bg-white p-4 overflow-hidden">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border bg-muted">
+        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border bg-muted">
           {lead.thumbnail_url ? (
             <Image src={lead.thumbnail_url} alt={lead.name} fill className="object-cover" unoptimized />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <PlayCircle className="h-6 w-6 text-muted-foreground" />
+              <PlayCircle className="h-5 w-5 text-muted-foreground" />
             </div>
           )}
         </div>
@@ -44,12 +55,14 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
               <p className="font-semibold text-sm truncate">{lead.name}</p>
               {lead.handle && <p className="text-xs text-muted-foreground truncate">{lead.handle}</p>}
             </div>
-            <LeadScoreBadge score={lead.score} />
+            <ScoreBadge score={lead.score} />
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {lead.niche_primary && (
-              <Badge variant="secondary" className="text-xs">{lead.niche_primary}</Badge>
+              <span className="inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
+                {lead.niche_primary}
+              </span>
             )}
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Users className="h-3 w-3" />
@@ -92,7 +105,9 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
             <span
               key={b}
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                POSITIVE_BADGES.has(b) ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"
+                POSITIVE_BADGES.has(b)
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-blue-50 text-blue-700 border border-blue-200"
               }`}
             >
               {b === "Business email found" && <Mail className="h-3 w-3" />}
@@ -102,7 +117,7 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
           {lead.warnings.map((w) => (
             <span
               key={w}
-              className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+              className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-medium text-amber-700"
             >
               <AlertTriangle className="h-3 w-3" />
               {w}
@@ -113,8 +128,8 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
 
       {/* Faceless score */}
       {lead.faceless_score > 0 && (
-        <div className={`mt-3 rounded-lg px-2.5 py-2 ${lead.faceless_score >= 60 ? "bg-indigo-50" : "bg-muted/40"}`}>
-          <div className="flex items-center justify-between mb-0.5">
+        <div className={`mt-3 rounded-xl px-3 py-2 ${lead.faceless_score >= 60 ? "bg-indigo-50 border border-indigo-100" : "bg-muted/40"}`}>
+          <div className="flex items-center justify-between mb-1">
             <span className="flex items-center gap-1 text-[11px] font-semibold text-indigo-700">
               <Ghost className="h-3 w-3" /> Faceless Score
             </span>
@@ -123,16 +138,22 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
               lead.faceless_score >= 45 ? "text-amber-600" : "text-muted-foreground"
             }`}>{lead.faceless_score}/100</span>
           </div>
+          <div className="h-1 rounded-full bg-indigo-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-700"
+              style={{ width: `${lead.faceless_score}%` }}
+            />
+          </div>
           {lead.faceless_signals.length > 0 && (
-            <p className="text-[11px] text-indigo-600 leading-relaxed">{lead.faceless_signals[0]}</p>
+            <p className="text-[11px] text-indigo-600 leading-relaxed mt-1">{lead.faceless_signals[0]}</p>
           )}
         </div>
       )}
 
       {/* Semantic relevance */}
       {lead.relevance_explanation && (
-        <div className="mt-3 rounded-lg bg-violet-50 px-2.5 py-2">
-          <div className="flex items-center justify-between mb-0.5">
+        <div className="mt-3 rounded-xl bg-violet-50 border border-violet-100 px-3 py-2">
+          <div className="flex items-center justify-between mb-1">
             <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700">
               <Sparkles className="h-3 w-3" /> Content Relevance
             </span>
@@ -141,20 +162,26 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
               lead.relevance_score >= 35 ? "text-amber-600" : "text-red-500"
             }`}>{lead.relevance_score}/100</span>
           </div>
+          <div className="h-1 rounded-full bg-violet-100 overflow-hidden mb-1">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-400 transition-all duration-700"
+              style={{ width: `${lead.relevance_score}%` }}
+            />
+          </div>
           <p className="text-[11px] text-violet-600 leading-relaxed">{lead.relevance_explanation}</p>
         </div>
       )}
 
       {/* Reasoning */}
-      <p className="mt-3 text-xs text-muted-foreground leading-relaxed border-l-2 border-primary/20 pl-2">
+      <p className="mt-3 text-xs text-muted-foreground leading-relaxed border-l-2 border-primary/20 pl-2.5">
         {lead.reasoning}
       </p>
 
       {/* Action */}
       {onAddToLeads && (
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-4 flex items-center justify-between">
           {lead.business_email ? (
-            <span className="flex items-center gap-1 text-xs text-emerald-700 truncate max-w-[60%]">
+            <span className="flex items-center gap-1 text-xs text-emerald-700 truncate max-w-[55%]">
               <Mail className="h-3 w-3 shrink-0" />
               {lead.business_email}
             </span>
@@ -164,11 +191,12 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
             variant={isAdded ? "secondary" : "default"}
             onClick={() => !isAdded && onAddToLeads(lead)}
             disabled={isAdded || isLoading}
+            className={isAdded ? "" : "btn-glow"}
           >
             {isAdded ? (
-              <><Check className="h-3 w-3" /> Added</>
+              <><Check className="h-3 w-3 mr-1" /> Added</>
             ) : isLoading ? "Adding..." : (
-              <><Plus className="h-3 w-3" /> Add to Leads</>
+              <><Plus className="h-3 w-3 mr-1" /> Add to Leads</>
             )}
           </Button>
         </div>
@@ -184,12 +212,12 @@ function Metric({ icon, label, value, danger }: {
   danger?: boolean
 }) {
   return (
-    <div className="rounded-lg border bg-muted/30 px-2 py-1.5">
-      <div className="flex items-center gap-1 text-muted-foreground">
+    <div className="rounded-xl border bg-muted/30 px-2.5 py-2">
+      <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
         {icon}
         <span className="text-[11px]">{label}</span>
       </div>
-      <p className={`mt-0.5 font-semibold ${danger ? "text-amber-600" : "text-foreground"}`}>{value}</p>
+      <p className={`font-semibold text-xs ${danger ? "text-amber-600" : "text-foreground"}`}>{value}</p>
     </div>
   )
 }

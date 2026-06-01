@@ -30,7 +30,10 @@ export default async function LeadsPage() {
     <div className="flex flex-col overflow-auto">
       <Header title="Lead Database" subtitle={`${allLeads.length} total leads in your pipeline`}>
         <Link href="/app/discover">
-          <button className="inline-flex items-center gap-2 bg-primary text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-primary/90">
+          <button
+            className="btn-glow inline-flex items-center gap-2 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+            style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(280 75% 60%))" }}
+          >
             <Plus className="h-4 w-4" />
             Find Leads
           </button>

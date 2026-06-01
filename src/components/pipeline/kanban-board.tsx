@@ -7,15 +7,15 @@ import type { Lead, CRMStage } from "@/types"
 import { toast } from "@/hooks/use-toast"
 
 const STAGES: { id: CRMStage; label: string; color: string }[] = [
-  { id: "new", label: "New", color: "bg-gray-100" },
-  { id: "analyzed", label: "Analyzed", color: "bg-blue-50" },
-  { id: "contacted", label: "Contacted", color: "bg-yellow-50" },
-  { id: "replied", label: "Replied", color: "bg-purple-50" },
-  { id: "interested", label: "Interested", color: "bg-indigo-50" },
-  { id: "meeting_scheduled", label: "Meeting", color: "bg-orange-50" },
-  { id: "proposal_sent", label: "Proposal", color: "bg-pink-50" },
-  { id: "won", label: "Won ✓", color: "bg-emerald-50" },
-  { id: "lost", label: "Lost", color: "bg-red-50" },
+  { id: "new", label: "New", color: "#94a3b8" },
+  { id: "analyzed", label: "Analyzed", color: "#60a5fa" },
+  { id: "contacted", label: "Contacted", color: "#fbbf24" },
+  { id: "replied", label: "Replied", color: "#a78bfa" },
+  { id: "interested", label: "Interested", color: "#818cf8" },
+  { id: "meeting_scheduled", label: "Meeting", color: "#fb923c" },
+  { id: "proposal_sent", label: "Proposal", color: "#f472b6" },
+  { id: "won", label: "Won ✓", color: "#34d399" },
+  { id: "lost", label: "Lost", color: "#f87171" },
 ]
 
 interface KanbanBoardProps {

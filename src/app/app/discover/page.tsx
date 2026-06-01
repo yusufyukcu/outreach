@@ -1,6 +1,6 @@
 "use client"
 import { useState, useMemo } from "react"
-import { Search, Loader2, SlidersHorizontal, ArrowUpDown, Sparkles, Ghost } from "lucide-react"
+import { Search, Loader2, SlidersHorizontal, ArrowUpDown, Sparkles, Ghost, Wand2, ChevronDown, ChevronUp } from "lucide-react"
 import { Header } from "@/components/layout/header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,30 @@ const NICHES = [
 ]
 
 type SortKey = "score" | "relevance" | "faceless" | "activity" | "views" | "consistency"
+
+// Preset keyword templates grouped by category
+const KEYWORD_PRESETS: { label: string; keywords: string; faceless?: boolean }[] = [
+  // Geography / Documentary
+  { label: "🌍 Africa facts", keywords: "africa facts, top 10 africa", faceless: true },
+  { label: "🏙️ Megaprojects", keywords: "megaprojects, mega construction, infrastructure", faceless: true },
+  { label: "🌎 Country rankings", keywords: "richest countries, top countries, country comparison", faceless: true },
+  { label: "🏛️ History documentary", keywords: "history explained, ancient history, world history facts", faceless: true },
+  { label: "🌆 City rankings", keywords: "biggest cities, most beautiful cities, city comparison", faceless: true },
+  { label: "🚀 Space & science", keywords: "space facts, science explained, universe documentary", faceless: true },
+  // Finance
+  { label: "💰 Personal finance", keywords: "personal finance, investing for beginners, passive income" },
+  { label: "📈 Stock market", keywords: "stock market explained, investing tips, finance education" },
+  { label: "🏠 Real estate", keywords: "real estate investing, property tips, real estate explained" },
+  // Business
+  { label: "🏢 Entrepreneurship", keywords: "entrepreneur, startup, business tips, side hustle" },
+  { label: "📱 Online business", keywords: "online business, make money online, digital marketing" },
+  // Health
+  { label: "💪 Fitness education", keywords: "workout tips, fitness explained, gym beginner" },
+  { label: "🧠 Psychology facts", keywords: "psychology facts, human behavior, mind explained" },
+  // Tech
+  { label: "🤖 AI explained", keywords: "artificial intelligence explained, AI technology, future tech" },
+  { label: "💻 Tech reviews", keywords: "tech review, gadget review, technology" },
+]
 
 export default function DiscoverPage() {
   const [keywords, setKeywords] = useState("")
@@ -37,6 +61,11 @@ export default function DiscoverPage() {
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
   const [addingId, setAddingId] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+
+  // Keyword idea generator
+  const [showIdeas, setShowIdeas] = useState(false)
+  const [ideaPrompt, setIdeaPrompt] = useState("")
+  const [generatingIdeas, setGeneratingIdeas] = useState(false)
 
   async function handleDiscover() {
     if (!keywords.trim()) {
@@ -82,6 +111,31 @@ export default function DiscoverPage() {
       toast({ title: "Discovery failed", description: err instanceof Error ? err.message : "Check YouTube API key", variant: "destructive" })
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleGenerateIdeas() {
+    if (!ideaPrompt.trim()) return
+    setGeneratingIdeas(true)
+    try {
+      const res = await fetch("/api/keywords/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: ideaPrompt, service_type: serviceType }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      if (data.keywords) {
+        setKeywords(data.keywords)
+        if (data.faceless_recommended) setFacelessMode(true)
+        setShowIdeas(false)
+        setIdeaPrompt("")
+        toast({ title: "Keywords generated!", description: "Click Discover to search with these keywords." })
+      }
+    } catch {
+      toast({ title: "Could not generate keywords", description: "Check your OpenAI API key", variant: "destructive" })
+    } finally {
+      setGeneratingIdeas(false)
     }
   }
 
@@ -142,13 +196,13 @@ export default function DiscoverPage() {
 
       <div className="flex-1 overflow-auto p-6">
         {/* Search Form */}
-        <Card className="mb-6">
+        <Card className="mb-4">
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="lg:col-span-2 space-y-2">
                 <Label>Keywords</Label>
                 <Input
-                  placeholder="e.g. personal finance, productivity, documentary..."
+                  placeholder="e.g. top 10 africa, megaprojects, history explained..."
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleDiscover()}
@@ -211,6 +265,70 @@ export default function DiscoverPage() {
                 {loading ? "Analyzing..." : "Discover Leads"}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Keyword Ideas Panel */}
+        <Card className="mb-6">
+          <CardContent className="pt-4 pb-4">
+            <button
+              className="flex items-center justify-between w-full text-sm font-medium text-left"
+              onClick={() => setShowIdeas(!showIdeas)}
+            >
+              <span className="flex items-center gap-2">
+                <Wand2 className="h-4 w-4 text-primary" />
+                Not sure what to search? Get keyword ideas
+              </span>
+              {showIdeas ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
+
+            {showIdeas && (
+              <div className="mt-4 space-y-4">
+                {/* AI describe box */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Describe the type of channel you want to find:</p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder='e.g. "faceless channels about Africa that make top 10 videos"'
+                      value={ideaPrompt}
+                      onChange={(e) => setIdeaPrompt(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleGenerateIdeas()}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={handleGenerateIdeas}
+                      disabled={generatingIdeas || !ideaPrompt.trim()}
+                    >
+                      {generatingIdeas
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <><Sparkles className="h-4 w-4 mr-1" /> Generate</>
+                      }
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Preset templates */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Or pick a preset:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {KEYWORD_PRESETS.map((preset) => (
+                      <button
+                        key={preset.label}
+                        onClick={() => {
+                          setKeywords(preset.keywords)
+                          if (preset.faceless) setFacelessMode(true)
+                        }}
+                        className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs hover:bg-muted transition-colors text-left"
+                      >
+                        {preset.label}
+                        {preset.faceless && <Ghost className="h-3 w-3 text-violet-500 ml-0.5" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -296,8 +414,8 @@ export default function DiscoverPage() {
             <Search className="h-16 w-16 mx-auto mb-4 text-muted-foreground/20" />
             <h3 className="text-lg font-semibold mb-2">Find Channels Worth Contacting</h3>
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              The finder fetches each channel&apos;s recent videos, filters out inactive and Shorts-only channels,
-              verifies the niche, and scores real lead quality — so you only see channels likely to need editing.
+              Use the keyword ideas panel above to get started, or type your own keywords.
+              Enable &quot;Faceless channels only&quot; to find stock-footage and voiceover channels.
             </p>
           </div>
         )}

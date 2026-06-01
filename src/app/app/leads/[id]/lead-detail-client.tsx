@@ -102,9 +102,9 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
 
   const [activeTab, setActiveTab] = useState("outreach")
 
-  const scoreColor = lead.lead_score >= 80
+  const scoreColor = (lead.lead_score ?? 0) >= 80
     ? "from-emerald-500 to-teal-400"
-    : lead.lead_score >= 60
+    : (lead.lead_score ?? 0) >= 60
     ? "from-indigo-500 to-violet-400"
     : "from-amber-500 to-orange-400"
 

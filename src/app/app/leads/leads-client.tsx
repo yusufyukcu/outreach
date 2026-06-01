@@ -1,7 +1,7 @@
 "use client"
 import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
-import { Search, Mail, Check, Copy, Loader2, X, ChevronDown, ChevronUp, Bell } from "lucide-react"
+import { Search, Mail, Check, Copy, Loader2, X, ChevronDown, ChevronUp, Bell, Flame, Trophy, Users, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -115,48 +115,119 @@ export function LeadsClient({ serviceType }: LeadsClientProps) {
     toast({ title: `Copied ${bulkResults.length} emails to clipboard` })
   }
 
+  const hotCount = leads.filter((l) => (l.lead_score ?? 0) >= 85).length
+  const wonCount = leads.filter((l) => l.crm_stage === "won").length
+
   return (
     <>
-      {/* Stage filter tabs */}
-      <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1 flex-wrap">
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        {[
+          {
+            label: "Total Leads",
+            value: leads.length,
+            icon: Users,
+            gradient: "from-indigo-500 to-violet-500",
+            glow: "hsl(243 75% 59% / 0.25)",
+            bg: "from-indigo-50 to-violet-50",
+            filter: "all",
+          },
+          {
+            label: "Hot Leads",
+            value: hotCount,
+            icon: Flame,
+            gradient: "from-rose-500 to-orange-400",
+            glow: "hsl(350 80% 60% / 0.25)",
+            bg: "from-rose-50 to-orange-50",
+            filter: "all",
+            hotOnly: true,
+          },
+          {
+            label: "Follow-ups",
+            value: stageCounts["followup"] ?? 0,
+            icon: Bell,
+            gradient: "from-amber-400 to-yellow-400",
+            glow: "hsl(38 90% 55% / 0.25)",
+            bg: "from-amber-50 to-yellow-50",
+            filter: "followup",
+          },
+          {
+            label: "Won",
+            value: wonCount,
+            icon: Trophy,
+            gradient: "from-emerald-500 to-teal-400",
+            glow: "hsl(160 80% 45% / 0.25)",
+            bg: "from-emerald-50 to-teal-50",
+            filter: "won",
+          },
+        ].map((card) => {
+          const Icon = card.icon
+          const isActive = activeFilter === card.filter && !card.hotOnly
+          return (
+            <button
+              key={card.label}
+              onClick={() => {
+                if (card.hotOnly) {
+                  setActiveFilter("all")
+                } else {
+                  setActiveFilter(card.filter)
+                }
+              }}
+              className="pressable relative text-left rounded-2xl border bg-white p-4 shadow-sm overflow-hidden transition-all duration-200"
+              style={isActive ? { boxShadow: `0 0 0 2px ${card.glow.replace("0.25", "0.8")}, 0 4px 20px ${card.glow}` } : {}}
+            >
+              {/* subtle bg gradient */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${card.bg} opacity-0 transition-opacity duration-200 ${isActive ? "opacity-100" : ""}`} />
+              <div className="relative">
+                <div
+                  className={`h-9 w-9 rounded-xl bg-gradient-to-br ${card.gradient} flex items-center justify-center mb-3 shadow-md`}
+                  style={{ boxShadow: `0 4px 14px ${card.glow}` }}
+                >
+                  <Icon className="h-4 w-4 text-white" />
+                </div>
+                <p className="text-2xl font-extrabold tabular-nums leading-none mb-1">{card.value}</p>
+                <p className="text-xs font-medium text-muted-foreground">{card.label}</p>
+              </div>
+              {/* 3D decorative orb */}
+              <div
+                className={`absolute -right-3 -bottom-3 h-16 w-16 rounded-full bg-gradient-to-br ${card.gradient} opacity-10`}
+              />
+              <div
+                className={`absolute -right-1 -bottom-1 h-8 w-8 rounded-full bg-gradient-to-br ${card.gradient} opacity-15`}
+              />
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Stage filter pills */}
+      <div className="flex items-center gap-1 mb-4 overflow-x-auto pb-1">
         {STAGE_FILTERS.map((filter) => {
           const count = stageCounts[filter.value] ?? 0
           const isActive = activeFilter === filter.value
           const isFollowup = filter.value === "followup"
-          const hasFollowups = isFollowup && count > 0
           return (
             <button
               key={filter.value}
               onClick={() => setActiveFilter(filter.value)}
-              className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-medium transition-all ${
+              className={`pressable inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold transition-all duration-150 ${
                 isActive
                   ? isFollowup
-                    ? "bg-amber-500 text-white shadow-sm"
-                    : "bg-primary text-white shadow-sm"
-                  : hasFollowups
-                    ? "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                    : "bg-white border border-input text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    ? "bg-amber-500 text-white"
+                    : "bg-foreground text-white"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
               }`}
             >
-              {isFollowup && <Bell className="h-3.5 w-3.5" />}
+              {isFollowup && <Bell className="h-3 w-3" />}
               {filter.label}
               {count > 0 && (
-                <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full text-[11px] font-bold px-1 ${
-                  isActive ? "bg-white/25 text-white" : "bg-muted text-muted-foreground"
-                }`}>
+                <span className={`text-[10px] font-bold tabular-nums ${isActive ? "opacity-70" : "opacity-60"}`}>
                   {count}
                 </span>
               )}
             </button>
           )
         })}
-        <div className="ml-auto">
-          <Link href="/app/leads?min_score=85">
-            <button className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-medium bg-gradient-to-r from-rose-500 to-orange-400 text-white shadow-sm hover:shadow-md transition-shadow">
-              🔥 Hot Only (85+)
-            </button>
-          </Link>
-        </div>
       </div>
 
       {/* Lead list */}

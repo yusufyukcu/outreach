@@ -94,6 +94,74 @@
   50%       { transform: translateY(-4px); }
 }
 
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  33%       { transform: translateY(-8px) rotate(3deg); }
+  66%       { transform: translateY(-4px) rotate(-2deg); }
+}
+
+@keyframes float-reverse {
+  0%, 100% { transform: translateY(-6px) rotate(0deg); }
+  50%       { transform: translateY(2px) rotate(-3deg); }
+}
+
+@keyframes orbit {
+  0%   { transform: rotate(0deg) translateX(28px) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(28px) rotate(-360deg); }
+}
+
+@keyframes orbit-reverse {
+  0%   { transform: rotate(0deg) translateX(20px) rotate(0deg); }
+  100% { transform: rotate(-360deg) translateX(20px) rotate(360deg); }
+}
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ping-slow {
+  0%   { transform: scale(1); opacity: 0.8; }
+  70%  { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes progress-fill {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+@keyframes bounce-x {
+  0%, 100% { transform: translateX(0); }
+  50%       { transform: translateX(6px); }
+}
+
+@keyframes morph {
+  0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  50%       { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px hsl(243 75% 59% / 0.4), 0 0 60px hsl(243 75% 59% / 0.1); }
+  50%       { box-shadow: 0 0 40px hsl(243 75% 59% / 0.7), 0 0 80px hsl(280 75% 60% / 0.3); }
+}
+
+@keyframes block-float-1 {
+  0%, 100% { transform: translateY(0px) rotateX(0deg); }
+  50%       { transform: translateY(-12px) rotateX(5deg); }
+}
+@keyframes block-float-2 {
+  0%, 100% { transform: translateY(-6px) rotateZ(0deg); }
+  50%       { transform: translateY(4px) rotateZ(3deg); }
+}
+@keyframes block-float-3 {
+  0%, 100% { transform: translateY(-3px) rotateY(0deg); }
+  50%       { transform: translateY(-14px) rotateY(-5deg); }
+}
+@keyframes block-float-4 {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50%       { transform: translateY(-8px) scale(1.05); }
+}
+
 /* ── Utility classes ──────────────────────────────────────────────── */
 
 .animate-fade-in-up {
@@ -115,6 +183,22 @@
 .animate-float {
   animation: float 3s ease-in-out infinite;
 }
+
+.animate-float-slow   { animation: float-slow 4s ease-in-out infinite; }
+.animate-float-reverse { animation: float-reverse 3.5s ease-in-out infinite; }
+.animate-spin-slow    { animation: spin-slow 8s linear infinite; }
+.animate-ping-slow    { animation: ping-slow 2s ease-out infinite; }
+.animate-bounce-x     { animation: bounce-x 1.2s ease-in-out infinite; }
+.animate-morph        { animation: morph 6s ease-in-out infinite; }
+.animate-glow-pulse   { animation: glow-pulse 2s ease-in-out infinite; }
+
+.animate-block-1 { animation: block-float-1 3.2s ease-in-out infinite; }
+.animate-block-2 { animation: block-float-2 2.8s ease-in-out infinite 0.4s; }
+.animate-block-3 { animation: block-float-3 3.6s ease-in-out infinite 0.8s; }
+.animate-block-4 { animation: block-float-4 2.5s ease-in-out infinite 1.2s; }
+
+.animate-orbit        { animation: orbit 4s linear infinite; }
+.animate-orbit-reverse { animation: orbit-reverse 3s linear infinite; }
 
 /* Staggered children */
 .stagger-children > *:nth-child(1) { animation-delay: 0ms; }

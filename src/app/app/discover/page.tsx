@@ -337,19 +337,7 @@ export default function DiscoverPage() {
         )}
 
         {/* Loading */}
-        {loading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center mx-auto mb-5 animate-float shadow-lg">
-                <Search className="h-7 w-7 text-white" />
-              </div>
-              <p className="text-base font-semibold">{facelessMode ? "Hunting faceless channels..." : "Researching channels..."}</p>
-              <p className="text-sm text-muted-foreground mt-1.5 max-w-sm mx-auto">
-                Searching videos → collecting channels → analyzing recent content → scoring quality
-              </p>
-            </div>
-          </div>
-        )}
+        {loading && <DiscoverLoadingScene faceless={facelessMode} />}
 
         {/* Empty after search */}
         {!loading && hasSearched && sortedResults.length === 0 && (
@@ -402,18 +390,288 @@ export default function DiscoverPage() {
         )}
 
         {/* First load empty state */}
-        {!hasSearched && (
-          <div className="animate-fade-in-up text-center py-16" style={{ animationDelay: "150ms" }}>
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center mx-auto mb-5 animate-float shadow-lg">
-              <Search className="h-7 w-7 text-white" />
-            </div>
-            <h3 className="text-lg font-bold mb-2">Find Channels Worth Contacting</h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Use the keyword ideas panel above to get started, or type your own keywords.
-              Enable &quot;Faceless only&quot; to find stock-footage and voiceover channels.
-            </p>
-          </div>
-        )}
+        {!hasSearched && <DiscoverHeroScene />}
+      </div>
+    </div>
+  )
+}
+
+/* ── Animated loading scene ─────────────────────────────────────────── */
+
+const STEPS = [
+  { label: "Expanding keywords with AI", icon: "✦", color: "from-violet-500 to-purple-400" },
+  { label: "Searching YouTube videos",   icon: "▶", color: "from-blue-500 to-cyan-400" },
+  { label: "Collecting channel data",    icon: "⬡", color: "from-indigo-500 to-blue-400" },
+  { label: "Analyzing recent content",   icon: "◎", color: "from-pink-500 to-rose-400" },
+  { label: "Scoring & ranking leads",    icon: "★", color: "from-amber-400 to-orange-400" },
+]
+
+function DiscoverLoadingScene({ faceless }: { faceless: boolean }) {
+  return (
+    <div className="animate-fade-in flex flex-col items-center justify-center py-10 px-4 select-none">
+      {/* 3D block scene */}
+      <div className="relative w-56 h-48 mb-8" style={{ perspective: "600px" }}>
+        {/* Glow backdrop */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className="w-40 h-40 rounded-full animate-morph"
+            style={{
+              background: "radial-gradient(ellipse, hsl(243 75% 59% / 0.15) 0%, transparent 70%)",
+              filter: "blur(20px)",
+            }}
+          />
+        </div>
+
+        {/* Block 1 — large indigo */}
+        <div
+          className="animate-block-1 absolute"
+          style={{ left: "30%", top: "30%", transformStyle: "preserve-3d" }}
+        >
+          <div
+            className="w-16 h-16 rounded-2xl shadow-2xl"
+            style={{
+              background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(243 75% 45%))",
+              boxShadow: "0 20px 40px hsl(243 75% 59% / 0.4), inset 0 1px 0 hsl(0 0% 100% / 0.2)",
+            }}
+          />
+        </div>
+
+        {/* Block 2 — medium pink/rose */}
+        <div
+          className="animate-block-2 absolute"
+          style={{ left: "10%", top: "40%", transformStyle: "preserve-3d" }}
+        >
+          <div
+            className="w-10 h-10 rounded-xl shadow-xl"
+            style={{
+              background: "linear-gradient(135deg, hsl(330 80% 65%), hsl(350 80% 60%))",
+              boxShadow: "0 12px 28px hsl(330 80% 65% / 0.45)",
+            }}
+          />
+        </div>
+
+        {/* Block 3 — small cyan */}
+        <div
+          className="animate-block-3 absolute"
+          style={{ right: "12%", top: "20%", transformStyle: "preserve-3d" }}
+        >
+          <div
+            className="w-8 h-8 rounded-lg shadow-lg"
+            style={{
+              background: "linear-gradient(135deg, hsl(190 90% 55%), hsl(200 90% 50%))",
+              boxShadow: "0 10px 24px hsl(190 90% 55% / 0.5)",
+            }}
+          />
+        </div>
+
+        {/* Block 4 — tall violet */}
+        <div
+          className="animate-block-4 absolute"
+          style={{ right: "25%", top: "48%", transformStyle: "preserve-3d" }}
+        >
+          <div
+            className="w-7 h-14 rounded-xl shadow-xl"
+            style={{
+              background: "linear-gradient(180deg, hsl(280 75% 65%), hsl(280 75% 50%))",
+              boxShadow: "0 16px 32px hsl(280 75% 60% / 0.4)",
+            }}
+          />
+        </div>
+
+        {/* Block 5 — tiny amber dot */}
+        <div
+          className="animate-block-2 absolute"
+          style={{ left: "50%", top: "15%", animationDelay: "0.6s" }}
+        >
+          <div
+            className="w-5 h-5 rounded-lg"
+            style={{
+              background: "linear-gradient(135deg, hsl(38 95% 60%), hsl(20 95% 55%))",
+              boxShadow: "0 8px 16px hsl(38 95% 60% / 0.5)",
+            }}
+          />
+        </div>
+
+        {/* Orbiting ring */}
+        <div
+          className="absolute"
+          style={{
+            left: "42%", top: "38%",
+            width: "60px", height: "60px",
+          }}
+        >
+          <div
+            className="absolute inset-0 rounded-full border-2 animate-spin-slow"
+            style={{
+              borderColor: "transparent",
+              borderTopColor: "hsl(243 75% 59% / 0.5)",
+              borderRightColor: "hsl(280 75% 60% / 0.3)",
+            }}
+          />
+          {/* orbiting dot */}
+          <div
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full animate-orbit"
+            style={{
+              background: "hsl(243 75% 59%)",
+              boxShadow: "0 0 8px hsl(243 75% 59%)",
+              transformOrigin: "0 30px",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Title */}
+      <h3 className="text-xl font-bold mb-1 gradient-text">
+        {faceless ? "Hunting Faceless Channels..." : "Finding Your Best Leads..."}
+      </h3>
+      <p className="text-sm text-muted-foreground mb-8">This takes 30–60 seconds — AI is doing the heavy lifting</p>
+
+      {/* Progress steps */}
+      <div className="w-full max-w-sm space-y-2.5">
+        {STEPS.map((step, i) => (
+          <StepRow key={step.label} step={step} index={i} total={STEPS.length} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function StepRow({ step, index, total }: { step: typeof STEPS[0]; index: number; total: number }) {
+  const delay = index * 0.9 // seconds offset
+  const duration = 3.5 // seconds per step (rough)
+
+  return (
+    <div
+      className="animate-fade-in-up flex items-center gap-3 rounded-2xl bg-white border px-4 py-3 shadow-sm"
+      style={{ animationDelay: `${index * 120}ms` }}
+    >
+      {/* Icon bubble */}
+      <div
+        className={`h-8 w-8 rounded-xl bg-gradient-to-br ${step.color} flex items-center justify-center shrink-0 text-white text-sm font-bold shadow-sm`}
+      >
+        {step.icon}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-foreground truncate">{step.label}</p>
+        {/* Progress bar */}
+        <div className="mt-1 h-1 rounded-full bg-muted overflow-hidden">
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${step.color}`}
+            style={{
+              animation: `progress-fill ${duration}s ease-out both`,
+              animationDelay: `${delay}s`,
+              width: "100%",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Spinner / check */}
+      <div className="shrink-0">
+        <div
+          className="h-4 w-4 rounded-full border-2 border-t-transparent animate-spin"
+          style={{
+            borderColor: `hsl(243 75% 59% / 0.3)`,
+            borderTopColor: "hsl(243 75% 59%)",
+            animationDuration: "0.7s",
+            animationDelay: `${delay}s`,
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+/* ── Hero scene (first load) ────────────────────────────────────────── */
+
+function DiscoverHeroScene() {
+  return (
+    <div className="animate-fade-in-up flex flex-col items-center justify-center py-8 select-none" style={{ animationDelay: "150ms" }}>
+      {/* Floating blocks visual */}
+      <div className="relative w-64 h-44 mb-6" style={{ perspective: "500px" }}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className="w-48 h-32 rounded-full"
+            style={{
+              background: "radial-gradient(ellipse, hsl(243 75% 59% / 0.08) 0%, transparent 70%)",
+              filter: "blur(16px)",
+            }}
+          />
+        </div>
+
+        {/* Main block */}
+        <div className="animate-block-1 absolute" style={{ left: "35%", top: "25%" }}>
+          <div
+            className="w-20 h-20 rounded-3xl"
+            style={{
+              background: "linear-gradient(135deg, hsl(243 75% 62%), hsl(280 75% 65%))",
+              boxShadow: "0 24px 48px hsl(243 75% 59% / 0.35), inset 0 1px 0 hsl(0 0% 100% / 0.25)",
+            }}
+          />
+        </div>
+
+        <div className="animate-block-2 absolute" style={{ left: "8%", top: "35%" }}>
+          <div
+            className="w-12 h-12 rounded-2xl"
+            style={{
+              background: "linear-gradient(135deg, hsl(190 85% 55%), hsl(210 85% 55%))",
+              boxShadow: "0 14px 28px hsl(190 85% 55% / 0.4)",
+            }}
+          />
+        </div>
+
+        <div className="animate-block-3 absolute" style={{ right: "10%", top: "15%" }}>
+          <div
+            className="w-9 h-9 rounded-xl"
+            style={{
+              background: "linear-gradient(135deg, hsl(330 80% 65%), hsl(350 75% 60%))",
+              boxShadow: "0 10px 22px hsl(330 80% 65% / 0.4)",
+            }}
+          />
+        </div>
+
+        <div className="animate-block-4 absolute" style={{ right: "22%", top: "50%" }}>
+          <div
+            className="w-7 h-16 rounded-xl"
+            style={{
+              background: "linear-gradient(180deg, hsl(38 95% 62%), hsl(20 90% 55%))",
+              boxShadow: "0 14px 28px hsl(38 95% 60% / 0.4)",
+            }}
+          />
+        </div>
+
+        <div className="animate-block-2 absolute" style={{ left: "55%", top: "10%", animationDelay: "0.5s" }}>
+          <div
+            className="w-5 h-5 rounded-lg"
+            style={{
+              background: "linear-gradient(135deg, hsl(160 80% 50%), hsl(180 80% 45%))",
+              boxShadow: "0 8px 16px hsl(160 80% 50% / 0.45)",
+            }}
+          />
+        </div>
+      </div>
+
+      <h3 className="text-2xl font-bold mb-2">
+        Find Channels <span className="gradient-text">Worth Contacting</span>
+      </h3>
+      <p className="text-sm text-muted-foreground max-w-sm mx-auto text-center leading-relaxed">
+        Type keywords above or use the ideas panel. AI expands your search,
+        analyzes content quality, and scores each channel automatically.
+      </p>
+
+      {/* Feature pills */}
+      <div className="flex flex-wrap justify-center gap-2 mt-5">
+        {[
+          { label: "AI keyword expansion", color: "bg-violet-50 text-violet-700 border-violet-200" },
+          { label: "Content analysis",      color: "bg-blue-50 text-blue-700 border-blue-200" },
+          { label: "Faceless detection",    color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
+          { label: "Auto second-pass",      color: "bg-pink-50 text-pink-700 border-pink-200" },
+        ].map((pill) => (
+          <span key={pill.label} className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${pill.color}`}>
+            {pill.label}
+          </span>
+        ))}
       </div>
     </div>
   )

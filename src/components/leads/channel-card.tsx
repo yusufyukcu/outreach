@@ -129,24 +129,45 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
 
       {/* Faceless score */}
       {lead.faceless_score > 0 && (
-        <div className={`mt-3 rounded-xl px-3 py-2 ${lead.faceless_score >= 60 ? "bg-indigo-50 border border-indigo-100" : "bg-muted/40"}`}>
+        <div className={`mt-3 rounded-xl px-3 py-2 ${
+          lead.faceless_score >= 60
+            ? "bg-indigo-50 border border-indigo-100"
+            : lead.faceless_score <= 20
+            ? "bg-red-50 border border-red-100"
+            : "bg-muted/40"
+        }`}>
           <div className="flex items-center justify-between mb-1">
-            <span className="flex items-center gap-1 text-[11px] font-semibold text-indigo-700">
-              <Ghost className="h-3 w-3" /> Faceless Score
+            <span className={`flex items-center gap-1 text-[11px] font-semibold ${
+              lead.faceless_score <= 20 ? "text-red-600" : "text-indigo-700"
+            }`}>
+              <Ghost className="h-3 w-3" />
+              {lead.faceless_score <= 20 ? "Face-cam Channel" : "Faceless Score"}
+              {lead.thumbnail_quality?.face_confidence && lead.thumbnail_quality.face_confidence >= 60 && (
+                <span className="ml-1 rounded-full bg-white border px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-slate-500">
+                  AI VISION ✓
+                </span>
+              )}
             </span>
             <span className={`text-[11px] font-bold ${
               lead.faceless_score >= 70 ? "text-indigo-700" :
-              lead.faceless_score >= 45 ? "text-amber-600" : "text-muted-foreground"
+              lead.faceless_score >= 45 ? "text-amber-600" :
+              lead.faceless_score <= 20 ? "text-red-500" : "text-muted-foreground"
             }`}>{lead.faceless_score}/100</span>
           </div>
-          <div className="h-1 rounded-full bg-indigo-100 overflow-hidden">
+          <div className={`h-1 rounded-full overflow-hidden ${lead.faceless_score <= 20 ? "bg-red-100" : "bg-indigo-100"}`}>
             <div
-              className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-700"
+              className={`h-full rounded-full transition-all duration-700 ${
+                lead.faceless_score <= 20
+                  ? "bg-gradient-to-r from-red-400 to-rose-500"
+                  : "bg-gradient-to-r from-indigo-500 to-violet-500"
+              }`}
               style={{ width: `${lead.faceless_score}%` }}
             />
           </div>
           {lead.faceless_signals.length > 0 && (
-            <p className="text-[11px] text-indigo-600 leading-relaxed mt-1">{lead.faceless_signals[0]}</p>
+            <p className={`text-[11px] leading-relaxed mt-1 ${lead.faceless_score <= 20 ? "text-red-500" : "text-indigo-600"}`}>
+              {lead.faceless_signals[0]}
+            </p>
           )}
         </div>
       )}

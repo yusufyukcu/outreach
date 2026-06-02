@@ -349,11 +349,37 @@ export async function POST(req: NextRequest) {
             ).catch(() => null)
           : Promise.resolve(null)
 
-        const thumbnailPromise: Promise<ThumbnailQualityResult | null> = videoIds.length > 0
-          ? analyzeThumbnails(e.channel.name, service_type, videoIds).catch(() => null)
+        // Pass 6 video IDs so vision gets more thumbnails for better face detection accuracy
+        const thumbnailVideoIds = e.videos.slice(0, 6).map((v) => v.id)
+        const thumbnailPromise: Promise<ThumbnailQualityResult | null> = thumbnailVideoIds.length > 0
+          ? analyzeThumbnails(e.channel.name, service_type, thumbnailVideoIds).catch(() => null)
           : Promise.resolve(null)
 
         const [commentResult, thumbnailResult] = await Promise.all([commentPromise, thumbnailPromise])
+
+        // ── Vision-corrected faceless score ─────────────────────────────────────
+        // If AI detected a consistent face in thumbnails with high confidence,
+        // override the text-based faceless score downward — it's clearly not faceless.
+        // If no face detected with high confidence, boost the score.
+        if (thumbnailResult && thumbnailResult.face_confidence >= 60) {
+          if (thumbnailResult.face_detected) {
+            // Face confirmed → hard cap at 20 (not faceless)
+            e.faceless.score = Math.min(e.faceless.score, 20)
+            e.faceless.signals = [
+              thumbnailResult.face_signal,
+              ...e.faceless.signals.filter((s) => !s.toLowerCase().includes("title")),
+            ].slice(0, 3)
+          } else {
+            // No face confirmed → boost score (minimum 55 if confidence ≥ 75)
+            if (thumbnailResult.face_confidence >= 75) {
+              e.faceless.score = Math.max(e.faceless.score, 55)
+            }
+            e.faceless.signals = [
+              thumbnailResult.face_signal,
+              ...e.faceless.signals,
+            ].slice(0, 3)
+          }
+        }
 
         const won_similarity = wonProfile
           ? scoreAgainstWonProfile(

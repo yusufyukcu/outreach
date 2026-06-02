@@ -61,7 +61,7 @@ export interface DiscoveredLead {
   faceless_score: number         // 0-100, likelihood of being a faceless/stock channel
   faceless_signals: string[]     // human-readable signals that triggered the score
   // new quality signals
-  thumbnail_quality: { score: number; signal: string; needs_improvement: boolean } | null
+  thumbnail_quality: { score: number; signal: string; needs_improvement: boolean; face_detected: boolean; face_confidence: number; face_signal: string } | null
   comment_signals: { needs_help: boolean; signal: string; score: number } | null
   won_similarity: number | null
 }

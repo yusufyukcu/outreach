@@ -201,6 +201,17 @@ export interface Contact {
   updated_at: string
 }
 
+export interface WorkExperience {
+  id: string
+  org_id: string
+  user_id: string | null
+  channel_name: string
+  role: string | null
+  result: string | null
+  channel_url: string | null
+  created_at: string
+}
+
 export interface OutreachMessage {
   id: string
   org_id: string

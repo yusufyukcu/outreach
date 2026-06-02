@@ -118,3 +118,28 @@ export function buildSignatureInstruction(signature: string): string {
 
 ${signature}`
 }
+
+// ── Past-work / social-proof helpers ──────────────────────────────────────────
+export interface ExperienceLike {
+  channel_name: string
+  role?: string | null
+  result?: string | null
+}
+
+/**
+ * Build a prompt block describing the sender's past work so the model can weave
+ * in credible social proof. Returns "" when there is no experience to mention.
+ */
+export function buildExperienceInstruction(experiences: ExperienceLike[]): string {
+  if (!experiences || experiences.length === 0) return ""
+  const lines = experiences.slice(0, 8).map((e) => {
+    const parts = [e.channel_name]
+    if (e.role) parts.push(`(${e.role})`)
+    if (e.result) parts.push(`— ${e.result}`)
+    return `- ${parts.join(" ")}`
+  })
+  return `The sender has REAL past experience working with these channels:
+${lines.join("\n")}
+
+If — and only if — it strengthens the pitch, naturally reference this as social proof (e.g. "I've previously worked with ..."). Choose the 1–2 most relevant or impressive; never list them all, and never fabricate or exaggerate. If none feel relevant to this channel, leave it out.`
+}

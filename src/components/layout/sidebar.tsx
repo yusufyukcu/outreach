@@ -3,7 +3,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard, Search, Users, KanbanSquare,
-  Mail, Settings, LogOut,
+  Mail, Settings, LogOut, Briefcase,
 } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { cn } from "@/lib/utils"
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/app/leads", label: "Leads", icon: Users },
   { href: "/app/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/app/outreach", label: "Outreach", icon: Mail },
+  { href: "/app/career", label: "My Career", icon: Briefcase },
 ]
 
 export function Sidebar() {

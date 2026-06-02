@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS, resolveAgencyName, buildSignature, buildSignatureInstruction } from "@/services/outreach"
+import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS, resolveAgencyName, buildSignature, buildSignatureInstruction, buildExperienceInstruction, type ExperienceLike } from "@/services/outreach"
 import type { Channel, ServiceType } from "@/types"
 
 export async function POST(req: NextRequest) {
@@ -56,6 +56,15 @@ export async function POST(req: NextRequest) {
       ? `Agency Name: ${resolvedAgency}`
       : `Note: Do not mention a specific agency name anywhere — refer to your side as "we" / "our team".`
 
+    // Past work, shared across all generated emails as optional social proof.
+    const { data: expRows } = await supabase
+      .from("work_experiences")
+      .select("channel_name, role, result")
+      .eq("org_id", profile.org_id)
+      .order("created_at", { ascending: false })
+      .limit(12)
+    const experienceInstruction = buildExperienceInstruction((expRows ?? []) as ExperienceLike[])
+
     const apiKey = process.env.OPENAI_API_KEY
 
     const results = await Promise.all(
@@ -90,7 +99,7 @@ Outreach Channel: email
 
 Channel Data:
 ${channelContext}
-
+${experienceInstruction ? `\n${experienceInstruction}\n` : ""}
 Generate a concise cold outreach email. Return JSON with exactly:
 - "subject": email subject line
 - "body": email body (max 150 words, punchy, personalized)

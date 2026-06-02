@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS, resolveAgencyName, buildSignature, buildSignatureInstruction } from "@/services/outreach"
+import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS, resolveAgencyName, buildSignature, buildSignatureInstruction, buildExperienceInstruction, type ExperienceLike } from "@/services/outreach"
 import type { Channel, ServiceType, OutreachChannel } from "@/types"
 
 export async function POST(req: NextRequest) {
@@ -30,14 +30,27 @@ export async function POST(req: NextRequest) {
     // email is signed correctly instead of "[Your Name]".
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name, organizations(name)")
+      .select("org_id, full_name, organizations(name)")
       .eq("id", user.id)
-      .single() as { data: { full_name: string | null; organizations: { name: string | null } | null } | null }
+      .single() as { data: { org_id: string | null; full_name: string | null; organizations: { name: string | null } | null } | null }
 
     const senderName = profile?.full_name ?? ""
     const orgName = profile?.organizations?.name ?? ""
     const resolvedAgency = resolveAgencyName(agencyName, orgName)
     const signature = buildSignature(senderName, resolvedAgency)
+
+    // Pull the sender's past work as optional social proof for the email.
+    let experiences: ExperienceLike[] = []
+    if (profile?.org_id) {
+      const { data: exp } = await supabase
+        .from("work_experiences")
+        .select("channel_name, role, result")
+        .eq("org_id", profile.org_id)
+        .order("created_at", { ascending: false })
+        .limit(12)
+      experiences = (exp ?? []) as ExperienceLike[]
+    }
+    const experienceInstruction = buildExperienceInstruction(experiences)
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
@@ -60,7 +73,7 @@ Outreach Channel: ${outreachChannel}
 
 Channel Data:
 ${channelContext}
-
+${experienceInstruction ? `\n${experienceInstruction}\n` : ""}
 Generate a cold outreach message. Return JSON with exactly two fields:
 - "subject": the email subject line (if email) or opening hook (if DM)
 - "body": the full message body

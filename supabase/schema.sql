@@ -174,6 +174,22 @@ CREATE TABLE activities (
 
 CREATE INDEX idx_activities_lead ON activities(lead_id, created_at DESC);
 
+-- ─── WORK EXPERIENCES ─────────────────────────────────────────────────────────
+-- Channels the user/agency has worked with. Used as social proof in outreach.
+
+CREATE TABLE work_experiences (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  org_id       UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id      UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  channel_name TEXT NOT NULL,
+  role         TEXT,
+  result       TEXT,
+  channel_url  TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_work_experiences_org ON work_experiences(org_id, created_at DESC);
+
 -- ─── FUNCTIONS & TRIGGERS ─────────────────────────────────────────────────────
 
 -- Auto-update updated_at
@@ -235,6 +251,7 @@ ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE outreach_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE channels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE work_experiences ENABLE ROW LEVEL SECURITY;
 
 -- Helper: get current user's org_id
 CREATE OR REPLACE FUNCTION get_user_org_id()
@@ -303,6 +320,12 @@ CREATE POLICY "Org members can CRUD messages"
 -- Activities: org-scoped
 CREATE POLICY "Org members can CRUD activities"
   ON activities FOR ALL
+  USING (org_id = get_user_org_id())
+  WITH CHECK (org_id = get_user_org_id());
+
+-- Work experiences: org-scoped
+CREATE POLICY "Org members can CRUD work experiences"
+  ON work_experiences FOR ALL
   USING (org_id = get_user_org_id())
   WITH CHECK (org_id = get_user_org_id());
 

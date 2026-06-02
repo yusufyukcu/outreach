@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS } from "@/services/outreach"
+import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS, resolveAgencyName, buildSignature, buildSignatureInstruction } from "@/services/outreach"
 import type { Channel, ServiceType } from "@/types"
 
 export async function POST(req: NextRequest) {
@@ -9,7 +9,11 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single()
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("org_id, full_name, organizations(name)")
+      .eq("id", user.id)
+      .single() as { data: { org_id: string; full_name: string | null; organizations: { name: string | null } | null } | null }
     if (!profile?.org_id) return NextResponse.json({ error: "No organization" }, { status: 400 })
 
     const { lead_ids, agency_name, agency_value_prop, service_type, tone } = await req.json() as {
@@ -44,6 +48,14 @@ export async function POST(req: NextRequest) {
     }
     const leads = leadsRaw.map((l) => ({ ...l, contact: contactsByChannel[l.channel_id] ?? null }))
 
+    // Sign emails with the sender's real name + agency (org name), omitting the
+    // agency when it's an unchanged default like "My Agency".
+    const resolvedAgency = resolveAgencyName(agency_name, profile.organizations?.name)
+    const signature = buildSignature(profile.full_name, resolvedAgency)
+    const agencyLine = resolvedAgency
+      ? `Agency Name: ${resolvedAgency}`
+      : `Note: Do not mention a specific agency name anywhere — refer to your side as "we" / "our team".`
+
     const apiKey = process.env.OPENAI_API_KEY
 
     const results = await Promise.all(
@@ -62,7 +74,7 @@ export async function POST(req: NextRequest) {
               channel_name: channel.name,
               email: contactEmail,
               subject: `Quick question for ${channel.name}`,
-              body: `Hey ${channel.name},\n\nI've been following your channel and think we could help you grow.\n\nWould love to share a few ideas — worth a quick chat?\n\n— ${agency_name || "Your Agency"}`,
+              body: `Hey ${channel.name},\n\nI've been following your channel and think we could help you grow.\n\nWould love to share a few ideas — worth a quick chat?\n\n${signature}`,
             }
           }
 
@@ -72,7 +84,7 @@ export async function POST(req: NextRequest) {
 
           const userPrompt = `${toneInstruction}
 
-Agency Name: ${agency_name || "Your Agency"}
+${agencyLine}
 Value Proposition: ${agency_value_prop || "We help YouTube channels grow with professional services"}
 Outreach Channel: email
 
@@ -82,6 +94,8 @@ ${channelContext}
 Generate a concise cold outreach email. Return JSON with exactly:
 - "subject": email subject line
 - "body": email body (max 150 words, punchy, personalized)
+
+${buildSignatureInstruction(signature)}
 
 Only return valid JSON.`
 
@@ -116,7 +130,7 @@ Only return valid JSON.`
             channel_name: channel.name,
             email: contactEmail,
             subject: `Quick question for ${channel.name}`,
-            body: `Hey ${channel.name},\n\nI've been following your channel and would love to connect.\n\n— ${agency_name || "Your Agency"}`,
+            body: `Hey ${channel.name},\n\nI've been following your channel and would love to connect.\n\n${signature}`,
           }
         }
       })

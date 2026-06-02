@@ -76,3 +76,45 @@ export const TONE_INSTRUCTIONS = {
   casual: "Tone: Casual and friendly. Write like a fellow creator, not an agency. Use contractions.",
   direct: "Tone: Direct and concise. No fluff. State the problem and the solution immediately.",
 }
+
+// ── Signature helpers ─────────────────────────────────────────────────────────
+// Agency names that are placeholders / unchanged defaults. When the agency name
+// is one of these, we omit it from the email sign-off entirely.
+const DEFAULT_AGENCY_NAMES = new Set(["", "my agency", "your agency"])
+
+export function isRealAgencyName(name: string | null | undefined): boolean {
+  return !!name && !DEFAULT_AGENCY_NAMES.has(name.trim().toLowerCase())
+}
+
+/**
+ * Resolve the agency name to use, preferring an explicitly provided value and
+ * falling back to the organization name. Returns "" when neither is a real,
+ * non-default name (so it can be omitted from the signature).
+ */
+export function resolveAgencyName(
+  provided: string | null | undefined,
+  orgName: string | null | undefined,
+): string {
+  if (isRealAgencyName(provided)) return provided!.trim()
+  if (isRealAgencyName(orgName)) return orgName!.trim()
+  return ""
+}
+
+/** Build the email sign-off from the sender's real name + (optional) agency. */
+export function buildSignature(
+  senderName: string | null | undefined,
+  agencyName: string,
+): string {
+  const lines: string[] = []
+  const name = senderName?.trim()
+  if (name) lines.push(name)
+  if (agencyName) lines.push(agencyName)
+  return lines.length > 0 ? `Best regards,\n${lines.join("\n")}` : "Best regards,"
+}
+
+/** Prompt instruction telling the model to use the exact sign-off, no placeholders. */
+export function buildSignatureInstruction(signature: string): string {
+  return `End the message with EXACTLY this sign-off, each item on its own line. Do NOT invent a name and do NOT use placeholders like "[Your Name]" or "[Your Agency]":
+
+${signature}`
+}

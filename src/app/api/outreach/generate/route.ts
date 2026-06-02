@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS } from "@/services/outreach"
+import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS, resolveAgencyName, buildSignature, buildSignatureInstruction } from "@/services/outreach"
 import type { Channel, ServiceType, OutreachChannel } from "@/types"
 
 export async function POST(req: NextRequest) {
@@ -26,19 +26,35 @@ export async function POST(req: NextRequest) {
       agencyValueProp: string
     }
 
+    // Pull the sender's real name and agency from their profile/org so the
+    // email is signed correctly instead of "[Your Name]".
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, organizations(name)")
+      .eq("id", user.id)
+      .single() as { data: { full_name: string | null; organizations: { name: string | null } | null } | null }
+
+    const senderName = profile?.full_name ?? ""
+    const orgName = profile?.organizations?.name ?? ""
+    const resolvedAgency = resolveAgencyName(agencyName, orgName)
+    const signature = buildSignature(senderName, resolvedAgency)
+
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
       // Return a demo message if no API key configured
-      return NextResponse.json(buildDemoMessage(channel, serviceType, agencyName))
+      return NextResponse.json(buildDemoMessage(channel, serviceType, signature, resolvedAgency))
     }
 
     const channelContext = buildChannelContext(channel)
     const systemPrompt = buildSystemPrompt(serviceType)
     const toneInstruction = TONE_INSTRUCTIONS[tone]
+    const agencyLine = resolvedAgency
+      ? `Agency Name: ${resolvedAgency}`
+      : `Note: Do not mention a specific agency name anywhere — refer to your side as "we" / "our team".`
 
     const userPrompt = `${toneInstruction}
 
-Agency Name: ${agencyName}
+${agencyLine}
 Value Proposition: ${agencyValueProp}
 Outreach Channel: ${outreachChannel}
 
@@ -48,6 +64,8 @@ ${channelContext}
 Generate a cold outreach message. Return JSON with exactly two fields:
 - "subject": the email subject line (if email) or opening hook (if DM)
 - "body": the full message body
+
+${buildSignatureInstruction(signature)}
 
 Only return valid JSON, no other text.`
 
@@ -71,7 +89,7 @@ Only return valid JSON, no other text.`
     if (!response.ok) {
       const err = await response.json()
       console.error("OpenAI error:", err)
-      return NextResponse.json(buildDemoMessage(channel, serviceType, agencyName))
+      return NextResponse.json(buildDemoMessage(channel, serviceType, signature, resolvedAgency))
     }
 
     const data = await response.json()
@@ -87,7 +105,10 @@ Only return valid JSON, no other text.`
   }
 }
 
-function buildDemoMessage(channel: Channel, serviceType: ServiceType, agencyName: string) {
+function buildDemoMessage(channel: Channel, serviceType: ServiceType, signature: string, agencyName: string) {
+  // Inline reference used mid-body; when there's no real agency name, fall back
+  // to a neutral phrase rather than printing an empty/placeholder name.
+  const us = agencyName || "our team"
   const templates: Record<ServiceType, { subject: string; body: string }> = {
     editing: {
       subject: `Your ${channel.niche_primary ?? "channel"} edits are leaving views on the table`,
@@ -97,9 +118,9 @@ Noticed you're putting out ${channel.upload_frequency_per_week ?? 3}+ videos a w
 
 Here's the thing: your content consistently hits ${channel.avg_views_30d ? Math.round(channel.avg_views_30d / 1000) + "K" : "strong"} views per video, but the editing style isn't matching that potential. Tighter cuts and better pacing could push your retention from 35% to 55%+ — which directly compounds into more algorithmic pushes.
 
-We're ${agencyName}. We edit for ${channel.niche_primary ?? "YouTube"} channels specifically. Would it be useful if I pulled together a quick audit of one of your recent videos?
+We edit for ${channel.niche_primary ?? "YouTube"} channels specifically. Would it be useful if I pulled together a quick audit of one of your recent videos?
 
-— ${agencyName}`,
+${signature}`,
     },
     thumbnails: {
       subject: `${channel.name}'s thumbnails vs. what's actually working in ${channel.niche_primary}`,
@@ -113,7 +134,7 @@ I'd love to show you a before/after mockup using one of your actual videos. No c
 
 Worth a look?
 
-— ${agencyName}`,
+${signature}`,
     },
     scripting: {
       subject: `The retention drop at 2:30 in your videos (and why it's fixable)`,
@@ -121,11 +142,11 @@ Worth a look?
 
 You're uploading consistently — but there's a pattern I keep seeing with ${channel.niche_primary ?? "educational"} channels at your size: viewer drop-off usually happens within the first 3 minutes because the hook isn't structured to create the right tension.
 
-At ${agencyName}, we write scripts specifically for ${channel.niche_primary ?? "YouTube"} — structured to keep viewers past the 5-minute mark where the algorithm starts rewarding watch time.
+We write scripts specifically for ${channel.niche_primary ?? "YouTube"} — structured to keep viewers past the 5-minute mark where the algorithm starts rewarding watch time.
 
 Would it be useful to see a rewrite of your last video's intro as a quick demo?
 
-— ${agencyName}`,
+${signature}`,
     },
     growth: {
       subject: `${channel.name}'s growth plateau — here's what I found`,
@@ -139,7 +160,7 @@ We've helped 3 channels at your exact stage push through this and hit 2x growth 
 
 Would that be relevant right now?
 
-— ${agencyName}`,
+${signature}`,
     },
     custom: {
       subject: `Quick question about ${channel.name}`,
@@ -147,11 +168,11 @@ Would that be relevant right now?
 
 Love what you're building in the ${channel.niche_primary ?? "YouTube"} space.
 
-We help channels at your stage level up their production and growth. Would love to share a few specific ideas I had for your channel after reviewing your recent content.
+${us === "our team" ? "We" : `We at ${us}`} help channels at your stage level up their production and growth. Would love to share a few specific ideas I had for your channel after reviewing your recent content.
 
 Worth a quick chat?
 
-— ${agencyName}`,
+${signature}`,
     },
   }
 

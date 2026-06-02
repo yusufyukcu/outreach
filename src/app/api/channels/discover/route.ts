@@ -274,6 +274,14 @@ export async function POST(req: NextRequest) {
 
     // ── Step 8: Apply filters and persist ───────────────────────────────────────
     const qualityThreshold = include_low_quality ? 0 : min_score
+
+    // Fetch channel_ids already in this org's leads so we can exclude them
+    const { data: existingLeads } = await supabase
+      .from("leads")
+      .select("channel_id")
+      .eq("org_id", profile.org_id)
+    const existingChannelIds = new Set((existingLeads ?? []).map((l) => l.channel_id).filter(Boolean))
+
     const leads: DiscoveredLead[] = []
 
     for (const e of evaluated) {
@@ -308,6 +316,9 @@ export async function POST(req: NextRequest) {
         .upsert(channelRow, { onConflict: "youtube_channel_id" })
         .select()
         .single()
+
+      // Skip channels already in this org's leads pipeline
+      if (upserted?.id && existingChannelIds.has(upserted.id)) continue
 
       if (upserted?.id && (e.businessEmail || e.links)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

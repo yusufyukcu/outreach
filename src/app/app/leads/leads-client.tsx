@@ -38,7 +38,7 @@ interface LeadsClientProps {
 }
 
 export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
-  const [leads] = useState<Lead[]>(initialLeads)
+  const [leads, setLeads] = useState<Lead[]>(initialLeads)
   const [loadingLeads] = useState(false)
   const [activeFilter, setActiveFilter] = useState("all")
   const [gmailConnected, setGmailConnected] = useState(false)
@@ -79,6 +79,11 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
     if (activeFilter === "followup") return followupLeads
     return leads.filter((l) => l.crm_stage === (activeFilter as CRMStage))
   }, [leads, followupLeads, activeFilter])
+
+  function handleDeleteLead(id: string) {
+    setLeads((prev) => prev.filter((l) => l.id !== id))
+    setSelectedIds((prev) => { const n = new Set(prev); n.delete(id); return n })
+  }
 
   function toggleSelect(id: string, checked: boolean) {
     setSelectedIds((prev) => { const n = new Set(prev); if (checked) n.add(id); else n.delete(id); return n })
@@ -279,6 +284,7 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
                 lead={lead}
                 selected={selectedIds.has(lead.id)}
                 onSelect={toggleSelect}
+                onDelete={handleDeleteLead}
                 serviceType={serviceType}
                 needsFollowup={followupLeads.some((f) => f.id === lead.id)}
                 gmailConnected={gmailConnected}

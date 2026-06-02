@@ -2,7 +2,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { PlayCircle, Mail, Copy, Check, Loader2, ChevronDown, ChevronUp, Send, Bell, ExternalLink } from "lucide-react"
+import { PlayCircle, Mail, Copy, Check, Loader2, ChevronDown, ChevronUp, Send, Bell, ExternalLink, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { formatNumber, timeAgo } from "@/lib/utils"
@@ -40,12 +40,13 @@ interface LeadRowProps {
   lead: Lead
   selected?: boolean
   onSelect?: (id: string, checked: boolean) => void
+  onDelete?: (id: string) => void
   serviceType?: string
   needsFollowup?: boolean
   gmailConnected?: boolean
 }
 
-export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup, gmailConnected }: LeadRowProps) {
+export function LeadRow({ lead, selected, onSelect, onDelete, serviceType, needsFollowup, gmailConnected }: LeadRowProps) {
   const channel = lead.channel
   const contact = lead.contact
 
@@ -55,6 +56,8 @@ export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup, 
   const [copied, setCopied] = useState(false)
   const [marking, setMarking] = useState(false)
   const [sending, setSending] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   async function handleQuickEmail(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation()
@@ -120,6 +123,22 @@ export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup, 
     } catch {
       toast({ title: "Failed", variant: "destructive" })
     } finally { setMarking(false) }
+  }
+
+  async function handleDelete(e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation()
+    if (!confirmDelete) { setConfirmDelete(true); return }
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error()
+      onDelete?.(lead.id)
+      toast({ title: "Lead deleted" })
+    } catch {
+      toast({ title: "Failed to delete lead", variant: "destructive" })
+      setDeleting(false)
+      setConfirmDelete(false)
+    }
   }
 
   const stage = STAGE_STYLES[lead.crm_stage]
@@ -222,6 +241,22 @@ export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup, 
             <span className="hidden sm:inline">YouTube</span>
           </a>
         )}
+
+        {/* Delete */}
+        <button
+          onClick={handleDelete}
+          onBlur={() => setConfirmDelete(false)}
+          disabled={deleting}
+          title={confirmDelete ? "Click again to confirm" : "Delete lead"}
+          className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${
+            confirmDelete
+              ? "bg-red-500 text-white border border-red-500"
+              : "border border-input bg-white hover:bg-red-50 hover:border-red-200 text-muted-foreground hover:text-red-600"
+          }`}
+        >
+          {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          {confirmDelete && <span className="hidden sm:inline">Confirm?</span>}
+        </button>
 
         {/* Quick email */}
         <button

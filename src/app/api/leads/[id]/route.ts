@@ -30,6 +30,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { error } = await supabase.from("leads").delete().eq("id", id)
+    if (error) throw error
+
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    return NextResponse.json({ error: "Failed to delete lead" }, { status: 500 })
+  }
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params

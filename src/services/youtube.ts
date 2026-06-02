@@ -365,6 +365,8 @@ export function computeRecentMetrics(
       engagement_ratio: 0,
       recent_video_count: 0,
       recent_titles: [],
+      upload_trend: "unknown",
+      upload_trend_pct: 0,
     }
   }
 
@@ -401,6 +403,29 @@ export function computeRecentMetrics(
     ? Math.round((avgViews / subscriberCount) * 1000) / 1000
     : 0
 
+  // ── Upload trend: compare avg views of newer half vs older half ─────────────
+  let upload_trend: RecentVideoMetrics["upload_trend"] = "unknown"
+  let upload_trend_pct = 0
+
+  if (sorted.length >= 4) {
+    const half = Math.floor(sorted.length / 2)
+    // sorted is newest-first, so sorted[0..half-1] are newer
+    const newerHalf = sorted.slice(0, half)
+    const olderHalf = sorted.slice(half)
+    const newerAvg = newerHalf.reduce((s, v) => s + v.views, 0) / newerHalf.length
+    const olderAvg = olderHalf.reduce((s, v) => s + v.views, 0) / olderHalf.length
+
+    if (olderAvg > 0) {
+      const pct = Math.round(((newerAvg - olderAvg) / olderAvg) * 100)
+      upload_trend_pct = pct
+      if (pct > 25) upload_trend = "growing"
+      else if (pct < -25) upload_trend = "declining"
+      else upload_trend = "stable"
+    } else {
+      upload_trend = "stable"
+    }
+  }
+
   return {
     last_upload_at: lastUpload,
     days_since_upload: daysSinceUpload,
@@ -413,6 +438,8 @@ export function computeRecentMetrics(
     engagement_ratio: engagementRatio,
     recent_video_count: sorted.length,
     recent_titles: sorted.slice(0, 10).map((v) => v.title),
+    upload_trend,
+    upload_trend_pct,
   }
 }
 
@@ -637,6 +664,40 @@ export async function resolveHandlesToChannelIds(handles: string[]): Promise<str
   }
 
   return channelIds
+}
+
+// ─── Comment fetching ──────────────────────────────────────────────────────────
+
+export async function fetchVideoComments(videoId: string, maxResults = 25): Promise<string[]> {
+  const apiKey = process.env.YOUTUBE_API_KEY
+  if (!apiKey) return []
+
+  try {
+    const url = new URL(`${YOUTUBE_API_BASE}/commentThreads`)
+    url.searchParams.set("part", "snippet")
+    url.searchParams.set("videoId", videoId)
+    url.searchParams.set("maxResults", String(maxResults))
+    url.searchParams.set("order", "relevance")
+    url.searchParams.set("key", apiKey)
+
+    const res = await fetch(url.toString())
+    if (!res.ok) return []
+    const data = await res.json()
+
+    return ((data.items ?? []) as Array<{
+      snippet?: { topLevelComment?: { snippet?: { textDisplay?: string } } }
+    }>)
+      .map((item) => item.snippet?.topLevelComment?.snippet?.textDisplay ?? "")
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+// ─── Thumbnail URL helper ──────────────────────────────────────────────────────
+
+export function getVideoThumbnailUrl(videoId: string): string {
+  return `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
 }
 
 // ─── Small math utilities ──────────────────────────────────────────────────────

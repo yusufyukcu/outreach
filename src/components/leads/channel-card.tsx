@@ -3,6 +3,7 @@ import Image from "next/image"
 import {
   Users, Eye, PlayCircle, Plus, Check, CalendarClock,
   Clapperboard, Repeat, Mail, AlertTriangle, Sparkles, Ghost,
+  TrendingUp, TrendingDown, MessageSquare, ImageIcon, Trophy,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatNumber, timeAgo } from "@/lib/utils"
@@ -169,6 +170,82 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
             />
           </div>
           <p className="text-[11px] text-violet-600 leading-relaxed">{lead.relevance_explanation}</p>
+        </div>
+      )}
+
+      {/* Upload Trend */}
+      {(m.upload_trend === "growing" || m.upload_trend === "declining") && (
+        <div className={`mt-3 rounded-xl px-3 py-2 ${m.upload_trend === "growing" ? "bg-emerald-50 border border-emerald-100" : "bg-amber-50 border border-amber-100"}`}>
+          <div className="flex items-center gap-1.5">
+            {m.upload_trend === "growing"
+              ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+              : <TrendingDown className="h-3.5 w-3.5 text-amber-600" />}
+            <span className={`text-[11px] font-semibold ${m.upload_trend === "growing" ? "text-emerald-700" : "text-amber-700"}`}>
+              {m.upload_trend === "growing"
+                ? `Views trending +${m.upload_trend_pct}%`
+                : `Views down ${Math.abs(m.upload_trend_pct)}% — burnout signal`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Comment Signals */}
+      {lead.comment_signals != null && lead.comment_signals.score > 30 && (
+        <div className={`mt-3 rounded-xl px-3 py-2 ${lead.comment_signals.needs_help ? "bg-emerald-50 border border-emerald-100" : "bg-slate-50 border border-slate-100"}`}>
+          <div className="flex items-center gap-1.5 mb-1">
+            <MessageSquare className={`h-3.5 w-3.5 ${lead.comment_signals.needs_help ? "text-emerald-600" : "text-slate-500"}`} />
+            <span className={`text-[11px] font-semibold ${lead.comment_signals.needs_help ? "text-emerald-700" : "text-slate-600"}`}>
+              Comment Signals
+            </span>
+            <span className={`ml-auto text-[11px] font-bold ${lead.comment_signals.needs_help ? "text-emerald-700" : "text-slate-500"}`}>
+              {lead.comment_signals.score}/100
+            </span>
+          </div>
+          <p className={`text-[11px] leading-relaxed ${lead.comment_signals.needs_help ? "text-emerald-600" : "text-slate-500"}`}>
+            {lead.comment_signals.signal}
+          </p>
+        </div>
+      )}
+
+      {/* Thumbnail Quality */}
+      {lead.thumbnail_quality != null && (
+        <div className={`mt-3 rounded-xl px-3 py-2 ${lead.thumbnail_quality.score < 50 ? "bg-red-50 border border-red-100" : lead.thumbnail_quality.score > 75 ? "bg-slate-50 border border-slate-100" : "bg-amber-50 border border-amber-100"}`}>
+          <div className="flex items-center justify-between mb-1">
+            <span className={`flex items-center gap-1 text-[11px] font-semibold ${lead.thumbnail_quality.score < 50 ? "text-red-700" : lead.thumbnail_quality.score > 75 ? "text-slate-600" : "text-amber-700"}`}>
+              <ImageIcon className="h-3 w-3" /> Thumbnail Quality
+            </span>
+            <span className={`text-[11px] font-bold ${lead.thumbnail_quality.score < 50 ? "text-red-700" : lead.thumbnail_quality.score > 75 ? "text-slate-500" : "text-amber-700"}`}>
+              {lead.thumbnail_quality.score}/100
+            </span>
+          </div>
+          <div className={`h-1 rounded-full overflow-hidden mb-1 ${lead.thumbnail_quality.score < 50 ? "bg-red-100" : lead.thumbnail_quality.score > 75 ? "bg-slate-200" : "bg-amber-100"}`}>
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${lead.thumbnail_quality.score < 50 ? "bg-gradient-to-r from-red-400 to-orange-400" : lead.thumbnail_quality.score > 75 ? "bg-gradient-to-r from-slate-400 to-slate-500" : "bg-gradient-to-r from-amber-400 to-orange-400"}`}
+              style={{ width: `${lead.thumbnail_quality.score}%` }}
+            />
+          </div>
+          <p className={`text-[11px] leading-relaxed ${lead.thumbnail_quality.score < 50 ? "text-red-600" : lead.thumbnail_quality.score > 75 ? "text-slate-500" : "text-amber-600"}`}>
+            {lead.thumbnail_quality.signal}
+          </p>
+        </div>
+      )}
+
+      {/* Won Similarity */}
+      {lead.won_similarity != null && lead.won_similarity > 20 && (
+        <div className="mt-3 rounded-xl bg-green-50 border border-green-100 px-3 py-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-green-700">
+              <Trophy className="h-3 w-3" /> Won Client Match
+            </span>
+            <span className="text-[11px] font-bold text-green-700">{lead.won_similarity}%</span>
+          </div>
+          <div className="h-1 rounded-full bg-green-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-700"
+              style={{ width: `${lead.won_similarity}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-green-600 mt-1">{lead.won_similarity}% match to your won clients</p>
         </div>
       )}
 

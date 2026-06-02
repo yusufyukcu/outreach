@@ -15,10 +15,14 @@ import {
   detectOffTargetCategory,
   detectNiche,
   scoreFaceless,
+  fetchVideoComments,
   type RecentVideo,
 } from "@/services/youtube"
 import { evaluateLead } from "@/services/lead-quality"
 import { expandKeywords, computeSemanticRelevance } from "@/services/keyword-expansion"
+import { analyzeCommentSignals, type CommentSignalResult } from "@/services/comment-signals"
+import { analyzeThumbnails, type ThumbnailQualityResult } from "@/services/thumbnail-quality"
+import { buildWonProfile, scoreAgainstWonProfile, type WonProfile } from "@/services/won-profile"
 import type { DiscoveredLead, ServiceType } from "@/types"
 
 // Deep analysis costs 2 quota units per channel (playlistItems + videos.list)
@@ -66,6 +70,41 @@ export async function POST(req: NextRequest) {
     }
 
     const nicheSelected = !!niche && niche !== "Any Niche"
+
+    // ── Step 0: Build won profile from past won leads ────────────────────────────
+    let wonProfile: WonProfile | null = null
+    try {
+      const { data: wonLeads } = await supabase
+        .from("leads")
+        .select("channel_id")
+        .eq("org_id", profile.org_id)
+        .eq("crm_stage", "won")
+
+      if (wonLeads && wonLeads.length >= 3) {
+        const wonChannelIds = wonLeads.map((l: { channel_id: string }) => l.channel_id).filter(Boolean)
+        const { data: wonChannelRows } = await supabase
+          .from("channels")
+          .select("subscriber_count, avg_views_30d, upload_frequency_per_week, long_form_pct_approx")
+          .in("id", wonChannelIds)
+
+        if (wonChannelRows && wonChannelRows.length >= 3) {
+          wonProfile = buildWonProfile(wonChannelRows.map((ch: {
+            subscriber_count: number
+            avg_views_30d: number | null
+            upload_frequency_per_week: number | null
+            long_form_pct_approx: number | null
+          }) => ({
+            subscriber_count: ch.subscriber_count ?? 0,
+            engagement_ratio: 0,
+            upload_freq: ch.upload_frequency_per_week ?? 0,
+            long_form_pct: ch.long_form_pct_approx ?? 0,
+            median_views: ch.avg_views_30d ?? 0,
+          })))
+        }
+      }
+    } catch {
+      // won profile is optional, ignore errors
+    }
 
     // ── Step 1: Semantic keyword expansion ──────────────────────────────────────
     const expansion = await expandKeywords(keywords, service_type)
@@ -194,7 +233,7 @@ export async function POST(req: NextRequest) {
         const faceless = scoreFaceless(c.description, metrics.recent_titles, metrics)
         const searchHits = channelHits.get(c.youtube_channel_id) ?? 1
 
-        return { channel: c, metrics, businessEmail, links, sponsorship, detectedNiche, result, relevance, faceless, searchHits }
+        return { channel: c, videos, metrics, businessEmail, links, sponsorship, detectedNiche, result, relevance, faceless, searchHits }
       })
     )
 
@@ -263,7 +302,7 @@ export async function POST(req: NextRequest) {
               const result = evaluateLead({ metrics, subscriberCount: c.subscriber_count, nicheSelected, nicheRatio, offTargetCategory: offTarget, isEnglish, englishOnly: english_only, businessEmail, hasLinks: links, sponsorshipDetected: sponsorship, minRecentViews: min_recent_views })
               const relevance = computeSemanticRelevance(allConcepts, c.description, metrics.recent_titles, recentDescriptions)
               const faceless = scoreFaceless(c.description, metrics.recent_titles, metrics)
-              return { channel: c, metrics, businessEmail, links, sponsorship, detectedNiche, result, relevance, faceless, searchHits: 1 }
+              return { channel: c, videos, metrics, businessEmail, links, sponsorship, detectedNiche, result, relevance, faceless, searchHits: 1 }
             })
           )
 
@@ -281,6 +320,59 @@ export async function POST(req: NextRequest) {
       .select("channel_id")
       .eq("org_id", profile.org_id)
     const existingChannelIds = new Set((existingLeads ?? []).map((l) => l.channel_id).filter(Boolean))
+
+    // ── Phase 2: Comment + thumbnail analysis (only for channels that pass quality) ──
+    // Run in parallel per channel to avoid blocking on sequential API calls
+    type Phase2Result = {
+      comment_signals: CommentSignalResult | null
+      thumbnail_quality: ThumbnailQualityResult | null
+      won_similarity: number | null
+    }
+    const phase2Map = new Map<string, Phase2Result>()
+
+    const phase2Candidates = evaluated.filter((e) => {
+      if (e.result.excluded) return false
+      if (e.result.score < qualityThreshold) return false
+      if (faceless_mode && e.faceless.score < min_faceless_score) return false
+      return true
+    })
+
+    await Promise.allSettled(
+      phase2Candidates.map(async (e) => {
+        const cid = e.channel.youtube_channel_id
+        const videoIds = e.videos.slice(0, 4).map((v) => v.id)
+        const mostRecentVideoId = e.videos[0]?.id ?? null
+
+        const commentPromise: Promise<CommentSignalResult | null> = mostRecentVideoId
+          ? fetchVideoComments(mostRecentVideoId, 25).then((comments) =>
+              analyzeCommentSignals(e.channel.name, service_type, comments)
+            ).catch(() => null)
+          : Promise.resolve(null)
+
+        const thumbnailPromise: Promise<ThumbnailQualityResult | null> = videoIds.length > 0
+          ? analyzeThumbnails(e.channel.name, service_type, videoIds).catch(() => null)
+          : Promise.resolve(null)
+
+        const [commentResult, thumbnailResult] = await Promise.all([commentPromise, thumbnailPromise])
+
+        const won_similarity = wonProfile
+          ? scoreAgainstWonProfile(
+              e.channel.subscriber_count,
+              e.metrics.engagement_ratio,
+              e.metrics.upload_frequency_per_week,
+              e.metrics.long_form_pct,
+              e.metrics.median_recent_views,
+              wonProfile
+            )
+          : null
+
+        phase2Map.set(cid, {
+          comment_signals: commentResult,
+          thumbnail_quality: thumbnailResult,
+          won_similarity,
+        })
+      })
+    )
 
     const leads: DiscoveredLead[] = []
 
@@ -362,6 +454,9 @@ export async function POST(req: NextRequest) {
         expanded_concepts: allConcepts,
         faceless_score: e.faceless.score,
         faceless_signals: e.faceless.signals,
+        thumbnail_quality: phase2Map.get(c.youtube_channel_id)?.thumbnail_quality ?? null,
+        comment_signals: phase2Map.get(c.youtube_channel_id)?.comment_signals ?? null,
+        won_similarity: phase2Map.get(c.youtube_channel_id)?.won_similarity ?? null,
       })
     }
 

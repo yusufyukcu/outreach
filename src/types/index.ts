@@ -14,6 +14,8 @@ export interface RecentVideoMetrics {
   engagement_ratio: number       // avg_recent_views / subscriber_count
   recent_video_count: number     // how many recent videos we actually analyzed
   recent_titles: string[]
+  upload_trend: "growing" | "declining" | "stable" | "unknown"
+  upload_trend_pct: number       // e.g. +45 or -30 (view change %)
 }
 
 export interface QualityBreakdown {
@@ -58,6 +60,10 @@ export interface DiscoveredLead {
   // faceless detection
   faceless_score: number         // 0-100, likelihood of being a faceless/stock channel
   faceless_signals: string[]     // human-readable signals that triggered the score
+  // new quality signals
+  thumbnail_quality: { score: number; signal: string; needs_improvement: boolean } | null
+  comment_signals: { needs_help: boolean; signal: string; score: number } | null
+  won_similarity: number | null
 }
 
 export type CRMStage =

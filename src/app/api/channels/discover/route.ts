@@ -22,6 +22,8 @@ import { evaluateLead } from "@/services/lead-quality"
 import { expandKeywords, computeSemanticRelevance } from "@/services/keyword-expansion"
 import { analyzeCommentSignals, type CommentSignalResult } from "@/services/comment-signals"
 import { analyzeThumbnails, type ThumbnailQualityResult } from "@/services/thumbnail-quality"
+import { analyzeTranscript, type TranscriptAnalysisResult } from "@/services/transcript-analysis"
+import { fetchVideoTranscript } from "@/services/youtube"
 import { buildWonProfile, scoreAgainstWonProfile, type WonProfile } from "@/services/won-profile"
 import type { DiscoveredLead, ServiceType } from "@/types"
 
@@ -326,6 +328,7 @@ export async function POST(req: NextRequest) {
     type Phase2Result = {
       comment_signals: CommentSignalResult | null
       thumbnail_quality: ThumbnailQualityResult | null
+      transcript_analysis: TranscriptAnalysisResult | null
       won_similarity: number | null
     }
     const phase2Map = new Map<string, Phase2Result>()
@@ -355,7 +358,17 @@ export async function POST(req: NextRequest) {
           ? analyzeThumbnails(e.channel.name, service_type, thumbnailVideoIds).catch(() => null)
           : Promise.resolve(null)
 
-        const [commentResult, thumbnailResult] = await Promise.all([commentPromise, thumbnailPromise])
+        const transcriptPromise: Promise<TranscriptAnalysisResult | null> = mostRecentVideoId
+          ? fetchVideoTranscript(mostRecentVideoId)
+              .then((transcript) =>
+                transcript
+                  ? analyzeTranscript(e.channel.name, service_type, transcript)
+                  : null
+              )
+              .catch(() => null)
+          : Promise.resolve(null)
+
+        const [commentResult, thumbnailResult, transcriptResult] = await Promise.all([commentPromise, thumbnailPromise, transcriptPromise])
 
         // ── Vision-corrected faceless score ─────────────────────────────────────
         // If AI detected a consistent face in thumbnails with high confidence,
@@ -381,6 +394,19 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // ── Transcript-corrected faceless score ──────────────────────────────────
+        if (transcriptResult && transcriptResult.faceless_confidence >= 65) {
+          if (transcriptResult.is_faceless) {
+            e.faceless.score = Math.max(e.faceless.score, 60)
+          } else {
+            e.faceless.score = Math.min(e.faceless.score, 25)
+          }
+          e.faceless.signals = [
+            transcriptResult.faceless_signal,
+            ...e.faceless.signals,
+          ].slice(0, 3)
+        }
+
         const won_similarity = wonProfile
           ? scoreAgainstWonProfile(
               e.channel.subscriber_count,
@@ -395,6 +421,7 @@ export async function POST(req: NextRequest) {
         phase2Map.set(cid, {
           comment_signals: commentResult,
           thumbnail_quality: thumbnailResult,
+          transcript_analysis: transcriptResult,
           won_similarity,
         })
       })
@@ -483,6 +510,7 @@ export async function POST(req: NextRequest) {
         thumbnail_quality: phase2Map.get(c.youtube_channel_id)?.thumbnail_quality ?? null,
         comment_signals: phase2Map.get(c.youtube_channel_id)?.comment_signals ?? null,
         won_similarity: phase2Map.get(c.youtube_channel_id)?.won_similarity ?? null,
+        transcript_analysis: phase2Map.get(c.youtube_channel_id)?.transcript_analysis ?? null,
       })
     }
 

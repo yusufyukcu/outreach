@@ -3,7 +3,7 @@ import Image from "next/image"
 import {
   Users, Eye, PlayCircle, Plus, Check, CalendarClock,
   Clapperboard, Repeat, Mail, AlertTriangle, Sparkles, Ghost,
-  TrendingUp, TrendingDown, MessageSquare, ImageIcon, Trophy,
+  TrendingUp, TrendingDown, MessageSquare, ImageIcon, Trophy, FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatNumber, timeAgo } from "@/lib/utils"
@@ -248,6 +248,38 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
           <p className={`text-[11px] leading-relaxed ${lead.thumbnail_quality.score < 50 ? "text-red-600" : lead.thumbnail_quality.score > 75 ? "text-slate-500" : "text-amber-600"}`}>
             {lead.thumbnail_quality.signal}
           </p>
+        </div>
+      )}
+
+      {/* Transcript Analysis */}
+      {lead.transcript_analysis != null && (lead.transcript_analysis.editing_need_score > 20 || lead.transcript_analysis.faceless_confidence >= 65) && (
+        <div className="mt-3 rounded-xl bg-sky-50 border border-sky-100 px-3 py-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-sky-700">
+              <FileText className="h-3 w-3" /> Transcript Analysis
+            </span>
+            <span className={`text-[11px] font-bold ${lead.transcript_analysis.editing_need_score >= 60 ? "text-sky-700" : lead.transcript_analysis.editing_need_score >= 35 ? "text-amber-600" : "text-slate-500"}`}>
+              Need {lead.transcript_analysis.editing_need_score}/100
+            </span>
+          </div>
+          <div className="h-1 rounded-full bg-sky-100 overflow-hidden mb-1.5">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-sky-400 to-blue-500 transition-all duration-700"
+              style={{ width: `${lead.transcript_analysis.editing_need_score}%` }}
+            />
+          </div>
+          {lead.transcript_analysis.faceless_signal && (
+            <p className="text-[11px] text-sky-600 leading-relaxed mb-1">{lead.transcript_analysis.faceless_signal}</p>
+          )}
+          {lead.transcript_analysis.editing_signals.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {lead.transcript_analysis.editing_signals.map((sig) => (
+                <span key={sig} className="inline-flex items-center rounded-full bg-sky-100 border border-sky-200 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+                  {sig}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

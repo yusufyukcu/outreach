@@ -64,6 +64,7 @@ export interface DiscoveredLead {
   thumbnail_quality: { score: number; signal: string; needs_improvement: boolean; face_detected: boolean; face_confidence: number; face_signal: string } | null
   comment_signals: { needs_help: boolean; signal: string; score: number } | null
   won_similarity: number | null
+  transcript_analysis: { is_faceless: boolean; faceless_confidence: number; faceless_signal: string; editing_need_score: number; editing_signals: string[] } | null
 }
 
 export type CRMStage =

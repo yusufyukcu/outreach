@@ -666,6 +666,96 @@ export async function resolveHandlesToChannelIds(handles: string[]): Promise<str
   return channelIds
 }
 
+// ─── Transcript fetching ──────────────────────────────────────────────────────
+
+/**
+ * Fetch the auto-generated (or manual) transcript for a YouTube video.
+ * Returns plain text, or null if no captions are available.
+ *
+ * Strategy:
+ * 1. Fetch the watch page to extract ytInitialPlayerResponse JSON
+ * 2. Parse captionTracks[0].baseUrl from the player response
+ * 3. Fetch the caption XML and strip tags to plain text
+ */
+export async function fetchVideoTranscript(videoId: string): Promise<string | null> {
+  try {
+    // 1. Fetch the watch page
+    const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    })
+    if (!pageRes.ok) return null
+
+    const html = await pageRes.text()
+
+    // 2. Extract ytInitialPlayerResponse JSON
+    const jsonMatch = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\})(?:;|\s*<\/script>)/)
+    if (!jsonMatch) return null
+
+    let playerResponse: Record<string, unknown>
+    try {
+      playerResponse = JSON.parse(jsonMatch[1])
+    } catch {
+      return null
+    }
+
+    // 3. Navigate to captionTracks
+    const captionTracks = (
+      playerResponse?.captions as Record<string, unknown> | undefined
+    )?.playerCaptionsTracklistRenderer as Record<string, unknown> | undefined
+
+    const tracks = captionTracks?.captionTracks as Array<{ baseUrl: string; languageCode?: string }> | undefined
+    if (!tracks || tracks.length === 0) return null
+
+    // Prefer English track, fall back to first available
+    const track =
+      tracks.find((t) => t.languageCode === "en" || t.languageCode?.startsWith("en")) ??
+      tracks[0]
+
+    if (!track?.baseUrl) return null
+
+    // 4. Fetch the caption XML
+    const captionRes = await fetch(track.baseUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      },
+    })
+    if (!captionRes.ok) return null
+
+    const xml = await captionRes.text()
+
+    // 5. Parse <text> elements via regex (no DOM parser in edge runtime)
+    const textParts: string[] = []
+    const textRe = /<text[^>]*>([\s\S]*?)<\/text>/g
+    let m: RegExpExecArray | null
+    while ((m = textRe.exec(xml)) !== null) {
+      textParts.push(m[1])
+    }
+
+    if (textParts.length === 0) return null
+
+    // Decode HTML entities and join
+    const raw = textParts.join(" ")
+    const decoded = raw
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, "&")
+      .replace(/&quot;/g, '"')
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+
+    return decoded.length > 0 ? decoded : null
+  } catch {
+    return null
+  }
+}
+
 // ─── Comment fetching ──────────────────────────────────────────────────────────
 
 export async function fetchVideoComments(videoId: string, maxResults = 25): Promise<string[]> {

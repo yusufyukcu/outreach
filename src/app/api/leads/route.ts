@@ -16,9 +16,11 @@ export async function GET(req: NextRequest) {
     const stage = searchParams.get("stage") as CRMStage | null
     const minScore = searchParams.get("min_score")
 
+    // `contacts` has no direct FK to `leads` (both reference `channels`), so we
+    // embed only the leads→channels relationship and merge contacts separately.
     let query = supabase
       .from("leads")
-      .select("*, channel:channels(*), contact:contacts(*)")
+      .select("*, channel:channels(*)")
       .eq("org_id", profile.org_id)
       .order("lead_score", { ascending: false, nullsFirst: false })
 
@@ -28,7 +30,16 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query
     if (error) throw error
 
-    return NextResponse.json(data)
+    const leadRows = data ?? []
+    const channelIds = [...new Set(leadRows.map((l) => l.channel_id).filter(Boolean))]
+    let contactsByChannel: Record<string, unknown> = {}
+    if (channelIds.length > 0) {
+      const { data: contacts } = await supabase.from("contacts").select("*").in("channel_id", channelIds)
+      contactsByChannel = Object.fromEntries((contacts ?? []).map((c) => [c.channel_id, c]))
+    }
+    const merged = leadRows.map((l) => ({ ...l, contact: contactsByChannel[l.channel_id] ?? null }))
+
+    return NextResponse.json(merged)
   } catch (err) {
     console.error(err)
     return NextResponse.json({ error: "Failed to fetch leads" }, { status: 500 })

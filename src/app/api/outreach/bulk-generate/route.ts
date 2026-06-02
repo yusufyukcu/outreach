@@ -24,16 +24,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No lead IDs provided" }, { status: 400 })
     }
 
-    // Fetch leads with channels
-    const { data: leads } = await supabase
+    // Fetch leads with channels. `contacts` has no direct FK to `leads`, so we
+    // fetch contacts separately by channel_id and merge them in.
+    const { data: leadsRaw } = await supabase
       .from("leads")
-      .select("id, channel:channels(*), contact:contacts(*)")
+      .select("id, channel_id, channel:channels(*)")
       .eq("org_id", profile.org_id)
       .in("id", lead_ids)
 
-    if (!leads || leads.length === 0) {
+    if (!leadsRaw || leadsRaw.length === 0) {
       return NextResponse.json({ error: "No leads found" }, { status: 404 })
     }
+
+    const channelIds = [...new Set(leadsRaw.map((l) => l.channel_id).filter(Boolean))]
+    let contactsByChannel: Record<string, unknown> = {}
+    if (channelIds.length > 0) {
+      const { data: contacts } = await supabase.from("contacts").select("*").in("channel_id", channelIds)
+      contactsByChannel = Object.fromEntries((contacts ?? []).map((c) => [c.channel_id, c]))
+    }
+    const leads = leadsRaw.map((l) => ({ ...l, contact: contactsByChannel[l.channel_id] ?? null }))
 
     const apiKey = process.env.OPENAI_API_KEY
 

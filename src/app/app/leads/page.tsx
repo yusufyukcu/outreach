@@ -16,14 +16,37 @@ export default async function LeadsPage() {
   const orgId = profile?.org_id
   if (!orgId) return null
 
-  const [{ data: org }, { data: leads }] = await Promise.all([
+  // NOTE: `contacts` has no direct FK to `leads` (both reference `channels`),
+  // so we cannot embed `contact:contacts(*)` directly off leads — PostgREST
+  // errors and returns null, leaving the list empty. Embed only the guaranteed
+  // leads→channels relationship, then fetch contacts separately and merge.
+  const [{ data: org }, { data: leads, error: leadsError }] = await Promise.all([
     supabase.from("organizations").select("service_type").eq("id", orgId).single(),
     supabase
       .from("leads")
-      .select("*, channel:channels(*), contact:contacts(*)")
+      .select("*, channel:channels(*)")
       .eq("org_id", orgId)
       .order("lead_score", { ascending: false, nullsFirst: false }),
   ])
+
+  if (leadsError) console.error("Failed to load leads:", leadsError)
+
+  const leadRows = leads ?? []
+  const channelIds = [...new Set(leadRows.map((l) => l.channel_id).filter(Boolean))]
+
+  let contactsByChannel: Record<string, unknown> = {}
+  if (channelIds.length > 0) {
+    const { data: contacts } = await supabase
+      .from("contacts")
+      .select("*")
+      .in("channel_id", channelIds)
+    contactsByChannel = Object.fromEntries((contacts ?? []).map((c) => [c.channel_id, c]))
+  }
+
+  const leadsWithContacts = leadRows.map((l) => ({
+    ...l,
+    contact: contactsByChannel[l.channel_id] ?? null,
+  }))
 
   const serviceType = (org?.service_type ?? "editing") as ServiceType
 
@@ -42,7 +65,7 @@ export default async function LeadsPage() {
       </Header>
 
       <div className="flex-1 overflow-auto p-6">
-        <LeadsClient serviceType={serviceType} initialLeads={(leads ?? []) as Lead[]} />
+        <LeadsClient serviceType={serviceType} initialLeads={leadsWithContacts as Lead[]} />
       </div>
     </div>
   )

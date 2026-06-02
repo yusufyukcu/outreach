@@ -10,12 +10,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     const { data, error } = await supabase
       .from("leads")
-      .select("*, channel:channels(*), contact:contacts(*)")
+      .select("*, channel:channels(*)")
       .eq("id", id)
       .single()
 
     if (error) return NextResponse.json({ error: "Lead not found" }, { status: 404 })
-    return NextResponse.json(data)
+
+    // `contacts` has no direct FK to `leads`; fetch by channel_id separately.
+    const { data: contact } = await supabase
+      .from("contacts")
+      .select("*")
+      .eq("channel_id", data.channel_id)
+      .maybeSingle()
+
+    return NextResponse.json({ ...data, contact: contact ?? null })
   } catch (err) {
     console.error(err)
     return NextResponse.json({ error: "Failed to fetch lead" }, { status: 500 })

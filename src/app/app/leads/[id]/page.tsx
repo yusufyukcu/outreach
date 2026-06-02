@@ -21,13 +21,22 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
       data: { org_id: string; organizations: { service_type: string } | null } | null
     }
 
+  // `contacts` has no direct FK to `leads`, so embed only channels and fetch
+  // the contact separately by channel_id (see leads list page for details).
   const { data: lead, error } = await supabase
     .from("leads")
-    .select("*, channel:channels(*), contact:contacts(*)")
+    .select("*, channel:channels(*)")
     .eq("id", id)
     .single()
 
   if (error || !lead) notFound()
+
+  const { data: contact } = await supabase
+    .from("contacts")
+    .select("*")
+    .eq("channel_id", lead.channel_id)
+    .maybeSingle()
+  ;(lead as { contact?: unknown }).contact = contact ?? null
 
   const { data: activities } = await supabase
     .from("activities")

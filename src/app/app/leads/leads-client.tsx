@@ -1,5 +1,5 @@
 "use client"
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo } from "react"
 import Link from "next/link"
 import { Search, Mail, Check, Copy, Loader2, X, ChevronDown, ChevronUp, Bell, Flame, Trophy, Users, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -34,21 +34,13 @@ interface BulkResult {
 
 interface LeadsClientProps {
   serviceType: ServiceType
+  initialLeads: Lead[]
 }
 
-export function LeadsClient({ serviceType }: LeadsClientProps) {
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [loadingLeads, setLoadingLeads] = useState(true)
+export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
+  const [leads, setLeads] = useState<Lead[]>(initialLeads)
+  const [loadingLeads] = useState(false)
   const [activeFilter, setActiveFilter] = useState("all")
-
-  useEffect(() => {
-    setLoadingLeads(true)
-    fetch("/api/leads")
-      .then((r) => r.json())
-      .then((data) => setLeads(Array.isArray(data) ? data : []))
-      .catch(() => toast({ title: "Failed to load leads", variant: "destructive" }))
-      .finally(() => setLoadingLeads(false))
-  }, [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkGenerating, setBulkGenerating] = useState(false)

@@ -3,7 +3,7 @@ import { Header } from "@/components/layout/header"
 import { LeadsClient } from "./leads-client"
 import Link from "next/link"
 import { Plus } from "lucide-react"
-import type { ServiceType } from "@/types"
+import type { ServiceType, Lead } from "@/types"
 
 export const dynamic = "force-dynamic"
 
@@ -16,7 +16,15 @@ export default async function LeadsPage() {
   const orgId = profile?.org_id
   if (!orgId) return null
 
-  const { data: org } = await supabase.from("organizations").select("service_type").eq("id", orgId).single()
+  const [{ data: org }, { data: leads }] = await Promise.all([
+    supabase.from("organizations").select("service_type").eq("id", orgId).single(),
+    supabase
+      .from("leads")
+      .select("*, channel:channels(*), contact:contacts(*)")
+      .eq("org_id", orgId)
+      .order("lead_score", { ascending: false, nullsFirst: false }),
+  ])
+
   const serviceType = (org?.service_type ?? "editing") as ServiceType
 
   return (
@@ -34,7 +42,7 @@ export default async function LeadsPage() {
       </Header>
 
       <div className="flex-1 overflow-auto p-6">
-        <LeadsClient serviceType={serviceType} />
+        <LeadsClient serviceType={serviceType} initialLeads={(leads ?? []) as Lead[]} />
       </div>
     </div>
   )

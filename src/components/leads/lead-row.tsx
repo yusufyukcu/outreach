@@ -2,7 +2,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { PlayCircle, Mail, Copy, Check, Loader2, ChevronDown, ChevronUp, Send, Bell } from "lucide-react"
+import { PlayCircle, Mail, Copy, Check, Loader2, ChevronDown, ChevronUp, Send, Bell, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { formatNumber, timeAgo } from "@/lib/utils"
@@ -103,6 +103,14 @@ export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup }
 
   const stage = STAGE_STYLES[lead.crm_stage]
 
+  // Build a link to the channel's YouTube page — prefer the @handle, fall back
+  // to the canonical /channel/<id> URL.
+  const youtubeUrl = channel
+    ? channel.handle
+      ? `https://www.youtube.com/${channel.handle.startsWith("@") ? channel.handle : "@" + channel.handle}`
+      : `https://www.youtube.com/channel/${channel.youtube_channel_id}`
+    : null
+
   return (
     <div className={`border-b last:border-0 transition-colors ${needsFollowup ? "bg-amber-50/50" : ""}`}>
       <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors group">
@@ -178,6 +186,21 @@ export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup }
             {lead.last_contacted_at ? timeAgo(lead.last_contacted_at) : timeAgo(lead.created_at)}
           </span>
         </div>
+
+        {/* Open YouTube channel */}
+        {youtubeUrl && (
+          <a
+            href={youtubeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title="Open YouTube channel"
+            className="pressable shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium border border-input bg-white text-muted-foreground transition-all hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">YouTube</span>
+          </a>
+        )}
 
         {/* Quick email */}
         <button

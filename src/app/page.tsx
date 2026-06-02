@@ -266,21 +266,7 @@ export default function Home() {
           {FEATURES.map((f) => (
             <div
               key={f.title}
-              className="animate-fade-in-up group rounded-2xl p-6 transition-all duration-300"
-              style={{
-                background: "hsl(0 0% 100% / 0.04)",
-                border: "1px solid hsl(0 0% 100% / 0.08)",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background = "hsl(0 0% 100% / 0.07)"
-                ;(e.currentTarget as HTMLDivElement).style.borderColor = "hsl(0 0% 100% / 0.14)"
-                ;(e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)"
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background = "hsl(0 0% 100% / 0.04)"
-                ;(e.currentTarget as HTMLDivElement).style.borderColor = "hsl(0 0% 100% / 0.08)"
-                ;(e.currentTarget as HTMLDivElement).style.transform = "translateY(0)"
-              }}
+              className="animate-fade-in-up feature-card rounded-2xl p-6"
             >
               <div
                 className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl mb-5 bg-gradient-to-br ${f.gradient}`}

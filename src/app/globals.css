@@ -265,6 +265,20 @@
   animation: shimmer 1.4s linear infinite;
 }
 
+/* Feature card (dark landing page) */
+.feature-card {
+  background: hsl(0 0% 100% / 0.04);
+  border: 1px solid hsl(0 0% 100% / 0.08);
+  transition: background 0.2s var(--ease-out), border-color 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .feature-card:hover {
+    background: hsl(0 0% 100% / 0.07);
+    border-color: hsl(0 0% 100% / 0.14);
+    transform: translateY(-2px);
+  }
+}
+
 /* Glass card */
 .glass {
   background: hsl(0 0% 100% / 0.7);

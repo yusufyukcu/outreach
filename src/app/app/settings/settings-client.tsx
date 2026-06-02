@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
+import { signInWithGoogle } from "@/lib/google-signin"
 import { toast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import type { ServiceType } from "@/types"
@@ -64,6 +65,12 @@ export function SettingsClient({ userId, email, fullName, orgId, orgName, servic
     else if (status === "error") toast({ title: "Gmail connection failed", variant: "destructive" })
     if (status) window.history.replaceState({}, "", "/app/settings")
   }, [])
+
+  async function handleConnectGmail() {
+    const error = await signInWithGoogle("/app/settings?gmail=connected")
+    if (error) toast({ title: "Couldn't start Google sign-in", description: error.message, variant: "destructive" })
+    // On success the browser redirects to Google's consent screen.
+  }
 
   async function handleDisconnectGmail() {
     setDisconnecting(true)
@@ -233,7 +240,7 @@ export function SettingsClient({ userId, email, fullName, orgId, orgName, servic
             </div>
           ) : !gmail.configured ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700 leading-relaxed">
-              Gmail sending isn&apos;t configured on the server yet. Add <code className="font-mono font-semibold">GOOGLE_CLIENT_ID</code> and <code className="font-mono font-semibold">GOOGLE_CLIENT_SECRET</code> to your environment, then reload.
+              Gmail sending isn&apos;t set up on the server yet. Enable the Google provider in Supabase (Auth → Providers) and add the same <code className="font-mono font-semibold">GOOGLE_CLIENT_ID</code> / <code className="font-mono font-semibold">GOOGLE_CLIENT_SECRET</code> to your environment, then reload.
             </div>
           ) : gmail.connected ? (
             <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/20 px-4 py-3">
@@ -253,13 +260,18 @@ export function SettingsClient({ userId, email, fullName, orgId, orgName, servic
               </button>
             </div>
           ) : (
-            <a
-              href="/api/gmail/connect"
-              className="pressable inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold hover:bg-muted transition-colors"
-            >
-              <Send className="h-4 w-4" />
-              Connect Gmail
-            </a>
+            <div className="space-y-2">
+              <button
+                onClick={handleConnectGmail}
+                className="pressable inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold hover:bg-muted transition-colors"
+              >
+                <Send className="h-4 w-4" />
+                Connect Gmail
+              </button>
+              <p className="text-xs text-muted-foreground">
+                Reconnects via Google and grants permission to send. Tip: signing in with Google connects this automatically.
+              </p>
+            </div>
           )}
         </div>
 

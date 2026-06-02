@@ -1,64 +1,15 @@
-// Gmail OAuth + send helpers. Implemented with plain fetch (no SDK) so there's
-// no extra dependency. The OAuth client credentials come from env:
-//   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
-// The redirect URI is `${APP_URL}/api/gmail/callback` and must be registered
-// in the Google Cloud Console OAuth client.
+// Gmail send helpers. Implemented with plain fetch (no SDK) so there's no extra
+// dependency. Authentication happens via Supabase "Sign in with Google" (the
+// google provider, configured in the Supabase dashboard) which returns a
+// provider refresh token we store in `gmail_accounts`. To mint fresh access
+// tokens for sending we call Google's token endpoint with the SAME OAuth client
+// credentials Supabase uses:  GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET.
 
-const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
 
-// Send scope + identity so we can read the connected address from the id_token.
-export const GMAIL_SCOPES = [
-  "https://www.googleapis.com/auth/gmail.send",
-  "openid",
-  "email",
-].join(" ")
-
 export function gmailConfigured(): boolean {
   return !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET
-}
-
-export function getRedirectUri(origin: string): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || origin
-  return `${base}/api/gmail/callback`
-}
-
-export function buildAuthUrl(origin: string, state: string): string {
-  const params = new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID!,
-    redirect_uri: getRedirectUri(origin),
-    response_type: "code",
-    scope: GMAIL_SCOPES,
-    access_type: "offline",
-    prompt: "consent", // force a refresh_token every time
-    state,
-  })
-  return `${GOOGLE_AUTH_URL}?${params.toString()}`
-}
-
-interface TokenResponse {
-  access_token: string
-  refresh_token?: string
-  expires_in: number
-  id_token?: string
-  scope?: string
-}
-
-export async function exchangeCodeForTokens(code: string, origin: string): Promise<TokenResponse> {
-  const res = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      redirect_uri: getRedirectUri(origin),
-      grant_type: "authorization_code",
-    }),
-  })
-  if (!res.ok) throw new Error(`Token exchange failed: ${await res.text()}`)
-  return res.json()
 }
 
 export async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
@@ -74,17 +25,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
   })
   if (!res.ok) throw new Error(`Token refresh failed: ${await res.text()}`)
   return res.json()
-}
-
-/** Pull the email address out of a Google id_token (JWT) without verifying it. */
-export function emailFromIdToken(idToken: string): string | null {
-  try {
-    const payload = idToken.split(".")[1]
-    const json = Buffer.from(payload, "base64").toString("utf8")
-    return JSON.parse(json).email ?? null
-  } catch {
-    return null
-  }
 }
 
 // RFC 2047 encode a header value when it contains non-ASCII (e.g. Turkish).

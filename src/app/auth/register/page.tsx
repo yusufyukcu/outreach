@@ -6,6 +6,7 @@ import { Loader2, CheckCircle2 } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { GoogleButton } from "@/components/auth/google-button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "@/hooks/use-toast"
@@ -100,6 +101,14 @@ export default function RegisterPage() {
 
           <h2 className="text-2xl font-bold mb-1">Create your account</h2>
           <p className="text-sm text-muted-foreground mb-6">Set up your agency profile to start finding leads</p>
+
+          <GoogleButton next="/app/dashboard" label="Sign up with Google" />
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">

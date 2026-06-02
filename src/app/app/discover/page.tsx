@@ -1,5 +1,5 @@
 "use client"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   Search, Loader2, Sparkles, Ghost, Wand2,
   ArrowUpDown, Zap, SlidersHorizontal, ChevronDown, X,
@@ -58,6 +58,39 @@ export default function DiscoverPage() {
   const [generatingIdeas, setGeneratingIdeas] = useState(false)
   const [showIdeaBar, setShowIdeaBar]       = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [restored, setRestored] = useState(false)
+
+  // ── Restore previous discovery session on mount ────────────────────────
+  // Discover results would otherwise be lost when navigating to another page
+  // and back. We cache them in sessionStorage until a new search is run.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("discover-session")
+      if (raw) {
+        const s = JSON.parse(raw)
+        if (s.keywords) setKeywords(s.keywords)
+        if (typeof s.facelessMode === "boolean") setFacelessMode(s.facelessMode)
+        if (Array.isArray(s.results)) setResults(s.results)
+        if (s.meta) setMeta(s.meta)
+        if (Array.isArray(s.expandedConcepts)) setExpandedConcepts(s.expandedConcepts)
+        if (Array.isArray(s.addedIds)) setAddedIds(new Set(s.addedIds))
+        if (s.hasSearched) setHasSearched(true)
+        if (s.serviceType) setServiceType(s.serviceType)
+      }
+    } catch { /* ignore corrupt cache */ }
+    setRestored(true)
+  }, [])
+
+  // ── Persist discovery session whenever results change ──────────────────
+  useEffect(() => {
+    if (!restored) return
+    try {
+      sessionStorage.setItem("discover-session", JSON.stringify({
+        keywords, facelessMode, results, meta, expandedConcepts,
+        addedIds: [...addedIds], hasSearched, serviceType,
+      }))
+    } catch { /* quota / serialization issues — non-fatal */ }
+  }, [restored, keywords, facelessMode, results, meta, expandedConcepts, addedIds, hasSearched, serviceType])
 
   async function handleDiscover() {
     if (!keywords.trim()) {

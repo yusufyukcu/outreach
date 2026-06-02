@@ -1,8 +1,8 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   User, Building2, Zap, Shield, Bell, ChevronRight,
-  Check, Loader2, Mail, Key, Trash2,
+  Check, Loader2, Mail, Key, Trash2, Send,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -47,6 +47,37 @@ export function SettingsClient({ userId, email, fullName, orgId, orgName, servic
 
   const [newPassword, setNewPassword]     = useState("")
   const [savingPw, setSavingPw]           = useState(false)
+
+  const [gmail, setGmail] = useState<{ connected: boolean; email: string | null; configured: boolean }>({ connected: false, email: null, configured: true })
+  const [gmailLoading, setGmailLoading]   = useState(true)
+  const [disconnecting, setDisconnecting] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/gmail/status").then(r => r.json()).then(setGmail).catch(() => {}).finally(() => setGmailLoading(false))
+
+    // Feedback when returning from the Google OAuth flow.
+    const status = new URLSearchParams(window.location.search).get("gmail")
+    if (status === "connected") toast({ title: "Gmail connected!", description: "You can now send emails directly from the app." })
+    else if (status === "denied") toast({ title: "Connection cancelled", variant: "destructive" })
+    else if (status === "not_configured") toast({ title: "Gmail isn't set up", description: "Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to your environment.", variant: "destructive" })
+    else if (status === "retry") toast({ title: "Please reconnect", description: "Google didn't return a refresh token. Remove app access in your Google account, then try again.", variant: "destructive" })
+    else if (status === "error") toast({ title: "Gmail connection failed", variant: "destructive" })
+    if (status) window.history.replaceState({}, "", "/app/settings")
+  }, [])
+
+  async function handleDisconnectGmail() {
+    setDisconnecting(true)
+    try {
+      const res = await fetch("/api/gmail/disconnect", { method: "POST" })
+      if (!res.ok) throw new Error()
+      setGmail(g => ({ ...g, connected: false, email: null }))
+      toast({ title: "Gmail disconnected" })
+    } catch {
+      toast({ title: "Failed to disconnect", variant: "destructive" })
+    } finally {
+      setDisconnecting(false)
+    }
+  }
 
   const plan = PLAN_STYLES[planTier] ?? PLAN_STYLES.free
 
@@ -182,6 +213,54 @@ export function SettingsClient({ userId, email, fullName, orgId, orgName, servic
               ) : "Save Changes"}
             </button>
           </div>
+        </div>
+
+        {/* Email sending (Gmail) */}
+        <div className="animate-fade-in-up rounded-2xl border bg-white p-5 shadow-sm" style={{ animationDelay: "90ms" }}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-red-500 to-orange-400 flex items-center justify-center shadow-sm">
+              <Send className="h-4 w-4 text-white" />
+            </div>
+            <div className="flex-1">
+              <h2 className="font-bold text-sm">Email Sending</h2>
+              <p className="text-xs text-muted-foreground">Connect Gmail to send outreach directly from the app</p>
+            </div>
+          </div>
+
+          {gmailLoading ? (
+            <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Checking connection…
+            </div>
+          ) : !gmail.configured ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700 leading-relaxed">
+              Gmail sending isn&apos;t configured on the server yet. Add <code className="font-mono font-semibold">GOOGLE_CLIENT_ID</code> and <code className="font-mono font-semibold">GOOGLE_CLIENT_SECRET</code> to your environment, then reload.
+            </div>
+          ) : gmail.connected ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/20 px-4 py-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_0_3px_hsl(160_80%_45%/0.15)]" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{gmail.email}</p>
+                  <p className="text-xs text-muted-foreground">Connected — ready to send</p>
+                </div>
+              </div>
+              <button
+                onClick={handleDisconnectGmail}
+                disabled={disconnecting}
+                className="pressable shrink-0 rounded-xl border px-3 py-1.5 text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                {disconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Disconnect"}
+              </button>
+            </div>
+          ) : (
+            <a
+              href="/api/gmail/connect"
+              className="pressable inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold hover:bg-muted transition-colors"
+            >
+              <Send className="h-4 w-4" />
+              Connect Gmail
+            </a>
+          )}
         </div>
 
         {/* Security */}

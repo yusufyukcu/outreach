@@ -1,7 +1,7 @@
 "use client"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
-import { Search, Mail, Check, Copy, Loader2, X, ChevronDown, ChevronUp, Bell, Flame, Trophy, Users, TrendingUp } from "lucide-react"
+import { Search, Mail, Check, Copy, Loader2, X, ChevronDown, ChevronUp, Bell, Flame, Trophy, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -38,9 +38,19 @@ interface LeadsClientProps {
 }
 
 export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
-  const [leads, setLeads] = useState<Lead[]>(initialLeads)
+  const [leads] = useState<Lead[]>(initialLeads)
   const [loadingLeads] = useState(false)
   const [activeFilter, setActiveFilter] = useState("all")
+  const [gmailConnected, setGmailConnected] = useState(false)
+  // Captured once on mount so the follow-up cutoff stays stable across renders.
+  const [nowMs] = useState(() => Date.now())
+
+  useEffect(() => {
+    fetch("/api/gmail/status")
+      .then((r) => r.json())
+      .then((d) => setGmailConnected(!!d.connected))
+      .catch(() => {})
+  }, [])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkGenerating, setBulkGenerating] = useState(false)
@@ -51,12 +61,12 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
   const [copiedIds, setCopiedIds] = useState<Set<string>>(new Set())
 
   const followupLeads = useMemo(() => {
-    const cutoff = new Date(Date.now() - THREE_DAYS_MS).toISOString()
+    const cutoff = new Date(nowMs - THREE_DAYS_MS).toISOString()
     return leads.filter((l) =>
       l.crm_stage === "contacted" &&
       (l.last_contacted_at ? l.last_contacted_at < cutoff : l.updated_at < cutoff)
     )
-  }, [leads])
+  }, [leads, nowMs])
 
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = { all: leads.length, followup: followupLeads.length }
@@ -271,6 +281,7 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
                 onSelect={toggleSelect}
                 serviceType={serviceType}
                 needsFollowup={followupLeads.some((f) => f.id === lead.id)}
+                gmailConnected={gmailConnected}
               />
             ))}
           </div>

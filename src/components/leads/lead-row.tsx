@@ -42,9 +42,10 @@ interface LeadRowProps {
   onSelect?: (id: string, checked: boolean) => void
   serviceType?: string
   needsFollowup?: boolean
+  gmailConnected?: boolean
 }
 
-export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup }: LeadRowProps) {
+export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup, gmailConnected }: LeadRowProps) {
   const channel = lead.channel
   const contact = lead.contact
 
@@ -53,6 +54,7 @@ export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup }
   const [generated, setGenerated] = useState<{ subject: string; body: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [marking, setMarking] = useState(false)
+  const [sending, setSending] = useState(false)
 
   async function handleQuickEmail(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation()
@@ -82,6 +84,25 @@ export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup }
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
     toast({ title: "Copied to clipboard!" })
+  }
+
+  async function handleSend(e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation()
+    if (!generated || !contact?.email) return
+    setSending(true)
+    try {
+      const res = await fetch("/api/gmail/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: contact.email, subject: generated.subject, body: generated.body, lead_id: lead.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to send")
+      toast({ title: "Email sent!", description: `Sent to ${contact.email}` })
+      setEmailOpen(false)
+    } catch (err) {
+      toast({ title: "Failed to send", description: err instanceof Error ? err.message : "", variant: "destructive" })
+    } finally { setSending(false) }
   }
 
   async function handleMarkSent(e: React.MouseEvent) {
@@ -240,12 +261,26 @@ export function LeadRow({ lead, selected, onSelect, serviceType, needsFollowup }
               />
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" onClick={handleCopy} className="flex-1 rounded-xl">
-                  {copied ? <><Check className="h-3.5 w-3.5 mr-1.5" />Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1.5" />Copy Email</>}
+                  {copied ? <><Check className="h-3.5 w-3.5 mr-1.5" />Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1.5" />Copy</>}
                 </Button>
-                <Button size="sm" onClick={handleMarkSent} disabled={marking} className="flex-1 rounded-xl">
-                  <Send className="h-3.5 w-3.5 mr-1.5" />
-                  {marking ? "Saving..." : "Mark as Sent"}
-                </Button>
+                {gmailConnected && contact?.email ? (
+                  <Button
+                    size="sm"
+                    onClick={handleSend}
+                    disabled={sending}
+                    className="flex-1 rounded-xl btn-glow text-white"
+                    style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(280 75% 60%))" }}
+                  >
+                    {sending
+                      ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Sending…</>
+                      : <><Send className="h-3.5 w-3.5 mr-1.5" />Send Email</>}
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={handleMarkSent} disabled={marking} className="flex-1 rounded-xl">
+                    <Send className="h-3.5 w-3.5 mr-1.5" />
+                    {marking ? "Saving..." : "Mark as Sent"}
+                  </Button>
+                )}
               </div>
             </div>
           ) : null}

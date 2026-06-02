@@ -190,6 +190,21 @@ CREATE TABLE work_experiences (
 
 CREATE INDEX idx_work_experiences_org ON work_experiences(org_id, created_at DESC);
 
+-- ─── GMAIL ACCOUNTS ───────────────────────────────────────────────────────────
+-- Per-user OAuth tokens for sending email directly via the Gmail API.
+
+CREATE TABLE gmail_accounts (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE UNIQUE,
+  org_id        UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  email         TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  access_token  TEXT,
+  expiry        TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ─── FUNCTIONS & TRIGGERS ─────────────────────────────────────────────────────
 
 -- Auto-update updated_at
@@ -252,6 +267,7 @@ ALTER TABLE outreach_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE channels ENABLE ROW LEVEL SECURITY;
 ALTER TABLE work_experiences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gmail_accounts ENABLE ROW LEVEL SECURITY;
 
 -- Helper: get current user's org_id
 CREATE OR REPLACE FUNCTION get_user_org_id()
@@ -328,6 +344,12 @@ CREATE POLICY "Org members can CRUD work experiences"
   ON work_experiences FOR ALL
   USING (org_id = get_user_org_id())
   WITH CHECK (org_id = get_user_org_id());
+
+-- Gmail accounts: strictly per-user
+CREATE POLICY "Users manage their own gmail account"
+  ON gmail_accounts FOR ALL
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
 -- ─── SEED DATA (NICHES) ───────────────────────────────────────────────────────
 

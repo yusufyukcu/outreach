@@ -22,89 +22,161 @@ function FlowBackground() {
     function resize() {
       W = canvas!.width  = window.innerWidth
       H = canvas!.height = window.innerHeight
+      // Repaint solid bg on resize to avoid white flash
+      ctx.fillStyle = BG
+      ctx.fillRect(0, 0, W, H)
     }
     resize()
     window.addEventListener("resize", resize)
 
-    type Streak = {
-      sx: number; sy: number
-      cx1: number; cy1: number
-      cx2: number; cy2: number
-      ex: number;  ey: number
-      hue: number
-      alpha: number
-      width: number
-      driftAmp: number
-      driftFreq: number
-      phase: number
+    // ── Deep navy background matching the reference image ──────────────
+    const BG = "rgb(2, 8, 28)"
+
+    // ── Wave band definition ────────────────────────────────────────────
+    // Each band is a filled polygon drawn as a closed sine-wave path.
+    // Multiple harmonics are summed per band to produce the organic silk look.
+    type Band = {
+      // Vertical centre of the band (0-1 of H)
+      centerY:  number
+      // Amplitude of each harmonic [px at full H]
+      amps:     number[]
+      // Frequency of each harmonic [cycles across W]
+      freqs:    number[]
+      // Phase offset of each harmonic [rad]
+      phases:   number[]
+      // Drift speed of each harmonic [rad/frame]
+      speeds:   number[]
+      // Band half-height (fill thickness) as fraction of H
+      halfH:    number
+      // Color stops: [hue, sat%, lig%, alpha] from left to right
+      colorA:   [number, number, number, number]
+      colorB:   [number, number, number, number]
+      // Thickness of the bright stroke on the wave crest
+      strokeAlpha: number
     }
 
-    function makeStreak(): Streak {
-      const amber = Math.random() < 0.28
-      const sy = H * (0.1 + Math.random() * 0.8)
-      const ex = W * (0.55 + Math.random() * 0.55)
-      return {
-        sx: W * Math.random() * 0.25,
-        sy,
-        cx1: W * (0.15 + Math.random() * 0.35),
-        cy1: sy + (Math.random() - 0.5) * H * 0.35,
-        cx2: W * (0.45 + Math.random() * 0.3),
-        cy2: sy + (Math.random() - 0.5) * H * 0.35,
-        ex,
-        ey: sy + (Math.random() - 0.5) * H * 0.25,
-        hue:      amber ? 28 + Math.random() * 18 : 198 + Math.random() * 32,
-        alpha:    0.12 + Math.random() * 0.22,
-        width:    1.5 + Math.random() * 5,
-        driftAmp: 25 + Math.random() * 55,
-        driftFreq: 0.00025 + Math.random() * 0.00035,
-        phase:    Math.random() * Math.PI * 2,
+    // 18 bands — blues, cyans, indigo, and a few teal accents
+    const BAND_DEFS: Omit<Band, "phases" | "speeds">[] = [
+      // deep background swells — wide, slow, low contrast
+      { centerY:0.12, amps:[60,30,15], freqs:[0.6,1.3,2.1], halfH:0.10, colorA:[215,90,22,0.00], colorB:[220,80,38,0.18], strokeAlpha:0.06 },
+      { centerY:0.28, amps:[80,40,20], freqs:[0.5,1.1,2.4], halfH:0.14, colorA:[210,85,18,0.00], colorB:[218,90,42,0.22], strokeAlpha:0.08 },
+      { centerY:0.45, amps:[90,45,22], freqs:[0.4,0.9,1.8], halfH:0.16, colorA:[205,80,15,0.00], colorB:[215,88,48,0.28], strokeAlpha:0.10 },
+      { centerY:0.60, amps:[85,40,18], freqs:[0.55,1.2,2.2], halfH:0.14, colorA:[210,85,16,0.00], colorB:[220,85,44,0.24], strokeAlpha:0.09 },
+      { centerY:0.75, amps:[70,35,16], freqs:[0.5,1.0,2.0], halfH:0.12, colorA:[215,88,18,0.00], colorB:[222,82,40,0.20], strokeAlpha:0.07 },
+      { centerY:0.88, amps:[55,28,12], freqs:[0.65,1.4,2.3], halfH:0.10, colorA:[218,85,20,0.00], colorB:[224,80,36,0.16], strokeAlpha:0.05 },
+      // mid-layer — medium brightness, crest highlight
+      { centerY:0.20, amps:[50,25,12], freqs:[0.7,1.5,2.8], halfH:0.07, colorA:[205,90,30,0.00], colorB:[195,95,62,0.35], strokeAlpha:0.22 },
+      { centerY:0.35, amps:[55,28,14], freqs:[0.6,1.2,2.5], halfH:0.07, colorA:[210,88,28,0.00], colorB:[200,92,58,0.38], strokeAlpha:0.25 },
+      { centerY:0.52, amps:[60,30,15], freqs:[0.5,1.1,2.2], halfH:0.08, colorA:[208,85,26,0.00], colorB:[198,95,60,0.40], strokeAlpha:0.28 },
+      { centerY:0.67, amps:[52,26,13], freqs:[0.6,1.3,2.4], halfH:0.07, colorA:[212,88,28,0.00], colorB:[202,90,56,0.36], strokeAlpha:0.22 },
+      { centerY:0.82, amps:[48,24,11], freqs:[0.7,1.4,2.6], halfH:0.06, colorA:[215,86,26,0.00], colorB:[205,88,54,0.32], strokeAlpha:0.18 },
+      // bright crest lines — narrow, high contrast, pure cyan-white
+      { centerY:0.18, amps:[45,22,10], freqs:[0.8,1.7,3.0], halfH:0.025, colorA:[190,100,70,0.00], colorB:[185,100,88,0.55], strokeAlpha:0.60 },
+      { centerY:0.32, amps:[50,25,12], freqs:[0.7,1.5,2.8], halfH:0.025, colorA:[195,100,68,0.00], colorB:[188,100,86,0.60], strokeAlpha:0.65 },
+      { centerY:0.50, amps:[55,27,13], freqs:[0.6,1.3,2.5], halfH:0.025, colorA:[192,100,72,0.00], colorB:[185,100,90,0.58], strokeAlpha:0.62 },
+      { centerY:0.65, amps:[48,24,11], freqs:[0.7,1.4,2.7], halfH:0.025, colorA:[196,100,68,0.00], colorB:[190,100,86,0.55], strokeAlpha:0.58 },
+      { centerY:0.79, amps:[42,21,10], freqs:[0.8,1.6,2.9], halfH:0.022, colorA:[198,100,66,0.00], colorB:[192,100,84,0.50], strokeAlpha:0.52 },
+      // deep indigo accent swells
+      { centerY:0.40, amps:[100,50,24], freqs:[0.35,0.8,1.6], halfH:0.18, colorA:[235,75,12,0.00], colorB:[240,80,35,0.20], strokeAlpha:0.05 },
+      { centerY:0.58, amps:[95,48,22],  freqs:[0.38,0.85,1.7], halfH:0.16, colorA:[230,78,12,0.00], colorB:[238,82,36,0.18], strokeAlpha:0.05 },
+    ]
+
+    // Randomise per-band phases and speeds
+    const bands: Band[] = BAND_DEFS.map((def) => ({
+      ...def,
+      phases: def.amps.map(() => Math.random() * Math.PI * 2),
+      speeds: def.amps.map((_, i) => (0.0003 + i * 0.00015 + Math.random() * 0.0002) * (Math.random() < 0.5 ? 1 : -1)),
+    }))
+
+    // ── Helpers ─────────────────────────────────────────────────────────
+    // Evaluate the summed wave Y offset at position x for a band
+    function waveY(band: Band, x: number, t: number): number {
+      let y = 0
+      for (let i = 0; i < band.amps.length; i++) {
+        const a = band.amps[i] * (H / 900) // scale with screen height
+        const f = band.freqs[i]
+        y += a * Math.sin(f * (x / W) * Math.PI * 2 + band.phases[i] + t * band.speeds[i] * 60)
+      }
+      return y
+    }
+
+    // Build a closed polygon path for the filled band
+    function bandPath(band: Band, t: number) {
+      const cy  = band.centerY * H
+      const hh  = band.halfH   * H
+      const steps = Math.ceil(W / 4) // 1 point per 4px — enough smoothness
+
+      ctx.beginPath()
+      // Top edge (wave + halfH above centre)
+      for (let i = 0; i <= steps; i++) {
+        const x = (i / steps) * W
+        const y = cy + waveY(band, x, t) - hh
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+      }
+      // Bottom edge (wave - halfH, reversed)
+      for (let i = steps; i >= 0; i--) {
+        const x = (i / steps) * W
+        const y = cy + waveY(band, x, t) + hh
+        ctx.lineTo(x, y)
+      }
+      ctx.closePath()
+    }
+
+    // Build only the crest stroke path (centre line of the wave)
+    function crestPath(band: Band, t: number) {
+      const cy    = band.centerY * H
+      const steps = Math.ceil(W / 4)
+      ctx.beginPath()
+      for (let i = 0; i <= steps; i++) {
+        const x = (i / steps) * W
+        const y = cy + waveY(band, x, t)
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
       }
     }
 
-    const STREAK_COUNT = 20
-    const streaks: Streak[] = Array.from({ length: STREAK_COUNT }, makeStreak)
-
-    // Prime solid background
-    ctx.fillStyle = "rgb(4,6,20)"
-    ctx.fillRect(0, 0, W, H)
-
-    let frame = 0
+    // ── Render loop ─────────────────────────────────────────────────────
+    let t = 0
     function draw() {
-      // Very slow trail fade — low alpha so motion blur is long & silky
-      ctx.fillStyle = "rgba(4,6,20,0.018)"
+      // Hard clear — no trail, bands are fully re-drawn each frame
+      ctx.fillStyle = BG
       ctx.fillRect(0, 0, W, H)
 
-      for (const s of streaks) {
-        const wave  = Math.sin(frame * s.driftFreq * 1000 + s.phase)
-        const wave2 = Math.cos(frame * s.driftFreq * 600  + s.phase + 1.2)
-        const dy1   = wave  * s.driftAmp
-        const dy2   = wave2 * s.driftAmp * 0.6
-        const dey   = Math.sin(frame * s.driftFreq * 400 + s.phase + 2) * s.driftAmp * 0.4
+      for (const band of bands) {
+        const [hA, sA, lA, aA] = band.colorA
+        const [hB, sB, lB, aB] = band.colorB
 
-        const grad = ctx.createLinearGradient(s.sx, s.sy, s.ex, s.ey + dey)
-        grad.addColorStop(0,    `hsla(${s.hue},88%,65%,0)`)
-        grad.addColorStop(0.25, `hsla(${s.hue},88%,65%,${s.alpha * 0.6})`)
-        grad.addColorStop(0.55, `hsla(${s.hue},88%,65%,${s.alpha})`)
-        grad.addColorStop(0.8,  `hsla(${s.hue},88%,65%,${s.alpha * 0.5})`)
-        grad.addColorStop(1,    `hsla(${s.hue},88%,65%,0)`)
+        // Horizontal gradient across the band fill
+        const grad = ctx.createLinearGradient(0, 0, W, 0)
+        grad.addColorStop(0,    `hsla(${hA},${sA}%,${lA}%,${aA})`)
+        grad.addColorStop(0.35, `hsla(${hB},${sB}%,${lB}%,${aB * 0.7})`)
+        grad.addColorStop(0.65, `hsla(${hB},${sB}%,${lB}%,${aB})`)
+        grad.addColorStop(1,    `hsla(${hA},${sA}%,${lA}%,${aA})`)
 
-        ctx.beginPath()
-        ctx.moveTo(s.sx, s.sy)
-        ctx.bezierCurveTo(
-          s.cx1, s.cy1 + dy1,
-          s.cx2, s.cy2 + dy2,
-          s.ex,  s.ey  + dey,
-        )
-        ctx.strokeStyle = grad
-        ctx.lineWidth   = s.width + Math.sin(frame * s.driftFreq * 900 + s.phase) * 1.2
-        ctx.lineCap     = "round"
-        ctx.shadowColor = `hsla(${s.hue},90%,60%,0.45)`
-        ctx.shadowBlur  = 14
-        ctx.stroke()
-        ctx.shadowBlur  = 0
+        // Filled band
+        bandPath(band, t)
+        ctx.fillStyle = grad
+        ctx.fill()
+
+        // Bright crest stroke
+        if (band.strokeAlpha > 0.1) {
+          crestPath(band, t)
+          const sg = ctx.createLinearGradient(0, 0, W, 0)
+          sg.addColorStop(0,    `hsla(${hB},${sB}%,${lB + 10}%,0)`)
+          sg.addColorStop(0.3,  `hsla(${hB},${sB}%,${lB + 10}%,${band.strokeAlpha * 0.6})`)
+          sg.addColorStop(0.6,  `hsla(${hB},${sB}%,${lB + 10}%,${band.strokeAlpha})`)
+          sg.addColorStop(1,    `hsla(${hB},${sB}%,${lB + 10}%,0)`)
+          ctx.strokeStyle = sg
+          ctx.lineWidth   = Math.max(1, band.halfH * H * 0.18)
+          ctx.lineCap     = "round"
+          ctx.shadowColor = `hsla(${hB},100%,80%,0.35)`
+          ctx.shadowBlur  = 8
+          ctx.stroke()
+          ctx.shadowBlur  = 0
+        }
       }
 
-      frame++
+      // Speed: ~0.008 rad/frame → one full wave cycle ≈ 785 frames ≈ 13s at 60fps
+      t += 0.008
       raf = requestAnimationFrame(draw)
     }
 
@@ -126,14 +198,14 @@ function FlowBackground() {
 
 export default function Home() {
   return (
-    <div className="min-h-screen overflow-x-hidden relative" style={{ background: "rgb(4,6,20)" }}>
+    <div className="min-h-screen overflow-x-hidden relative" style={{ background: "rgb(2,8,28)" }}>
       <FlowBackground />
 
       {/* dim overlay so content stays readable */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse 90% 80% at 65% 45%, transparent 20%, rgba(4,6,20,0.55) 100%)",
+          background: "radial-gradient(ellipse 90% 80% at 65% 45%, transparent 20%, rgba(2,8,28,0.55) 100%)",
           zIndex: 1,
         }}
       />

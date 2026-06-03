@@ -4,6 +4,12 @@ import { useState, useRef, useCallback, useEffect } from "react"
 import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle, Ghost } from "lucide-react"
 import type { ServiceType } from "@/types"
 
+const NICHES = [
+  "Any Niche", "Technology", "Personal Finance", "Health & Fitness", "Food & Cooking",
+  "Gaming", "Travel & Vlogging", "Beauty & Fashion", "Business", "Education",
+  "Music", "Comedy", "News & Politics", "Sports", "Real Estate", "Lifestyle",
+]
+
 interface AutoLeadClientProps {
   serviceType: ServiceType
   orgName: string
@@ -51,6 +57,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [successfulPatterns, setSuccessfulPatterns] = useState<string[]>([])
   const [minSubs, setMinSubs] = useState(1000)
   const [maxSubs, setMaxSubs] = useState(500000)
+  const [selectedNiche, setSelectedNiche] = useState("Any Niche")
 
   const runningRef = useRef(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -69,7 +76,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
       const kwRes = await fetch("/api/autolead/keywords", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_type: serviceType, org_niche: orgNiche, previous_keywords: usedKeywords.slice(-20), successful_patterns: successfulPatterns.slice(-10) }),
+        body: JSON.stringify({ service_type: serviceType, org_niche: selectedNiche === "Any Niche" ? orgNiche : selectedNiche, previous_keywords: usedKeywords.slice(-20), successful_patterns: successfulPatterns.slice(-10) }),
       })
       if (!kwRes.ok) throw new Error("Failed to generate keywords")
       const { keywords, niche } = await kwRes.json()
@@ -82,7 +89,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         const discoverRes = await fetch("/api/channels/discover", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keywords: [keyword], niche, service_type: serviceType, min_score: 60, min_subscribers: minSubs, max_subscribers: maxSubs, english_only: true, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
+          body: JSON.stringify({ keywords: [keyword], niche: selectedNiche === "Any Niche" ? (niche || "") : selectedNiche, service_type: serviceType, min_score: 60, min_subscribers: minSubs, max_subscribers: maxSubs, english_only: true, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
         })
         if (!discoverRes.ok) { addLog(`Failed to discover for "${keyword}"`, "error"); continue }
         const discoverData = await discoverRes.json()
@@ -132,7 +139,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
       addLog(`⏳ Next cycle in ${selectedFrequency.label.toLowerCase().replace("every ", "")}...`, "info")
       timeoutRef.current = setTimeout(() => { if (runningRef.current) runCycle() }, selectedFrequency.value)
     }
-  }, [serviceType, orgNiche, orgName, usedKeywords, selectedFrequency, facelessMode, successfulPatterns, minSubs, maxSubs])
+  }, [serviceType, orgNiche, orgName, usedKeywords, selectedFrequency, facelessMode, successfulPatterns, minSubs, maxSubs, selectedNiche])
 
   function handleStart() { runningRef.current = true; setRunning(true); addLog("🚀 AutoLead started", "success"); runCycle() }
   function handleStop() {
@@ -233,6 +240,31 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               <p className="text-xs text-muted-foreground mt-1 font-medium">{stat.label}</p>
             </div>
           ))}
+        </div>
+
+        {/* Niche selector */}
+        <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
+          <h3 className="text-sm font-bold text-foreground mb-3">Target Niche</h3>
+          <div className="flex flex-wrap gap-2">
+            {NICHES.map((n) => {
+              const active = selectedNiche === n
+              return (
+                <button
+                  key={n}
+                  onClick={() => !running && setSelectedNiche(n)}
+                  disabled={running}
+                  className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={active
+                    ? { background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))", color: "white" }
+                    : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                  }
+                >
+                  {n}
+                </button>
+              )
+            })}
+          </div>
+          {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change niche</p>}
         </div>
 
         {/* Frequency selector */}

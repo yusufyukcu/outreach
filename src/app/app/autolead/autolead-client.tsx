@@ -95,15 +95,16 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         if (!discoverRes.ok) { addLog(`Failed to discover for "${keyword}"`, "error"); continue }
         const discoverData = await discoverRes.json()
         const channels = (discoverData.channels ?? [])
-          .filter((ch: { score?: number; youtube_channel_id?: string }) => {
+          .filter((ch: { score?: number; youtube_channel_id?: string; id?: string }) => {
             if ((ch.score ?? 0) < 60) return false
-            const ytId = ch.youtube_channel_id
-            if (ytId && seenChannelIds.current.has(ytId)) return false
+            if (ch.id && seenChannelIds.current.has(ch.id)) return false
+            if (ch.youtube_channel_id && seenChannelIds.current.has(ch.youtube_channel_id)) return false
             return true
           })
           .slice(0, 5)
         if (channels.length === 0) { addLog(`No qualifying channels for "${keyword}"`, "info"); continue }
         for (const ch of channels) {
+          if (ch.id) seenChannelIds.current.add(ch.id)
           if (ch.youtube_channel_id) seenChannelIds.current.add(ch.youtube_channel_id)
         }
         addLog(`Found ${channels.length} qualifying channels`, "success")
@@ -114,13 +115,14 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
 
         for (const ch of channels) {
           if (!runningRef.current) return
-          const channelName = ch.channel?.name ?? ch.name ?? "Unknown Channel"
-          const score = ch.score ?? ch.lead_score ?? 0
+          const channelName = ch.name ?? "Unknown Channel"
+          const channelDbId: string | undefined = ch.id
+          const score = ch.score ?? 0
           addLog(`✓ ${channelName} (score: ${score})`, "success")
 
           let leadId: string | null = null
           try {
-            const leadRes = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel_id: ch.channel?.id ?? ch.channel_id, score, score_breakdown: ch.score_breakdown }) })
+            const leadRes = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel_id: channelDbId, score, score_breakdown: ch.quality_breakdown }) })
             if (leadRes.ok) {
               const leadData = await leadRes.json()
               leadId = leadData.id
@@ -133,7 +135,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
           } catch { addLog(`Failed to add lead: ${channelName}`, "error") }
 
           try {
-            const emailRes = await fetch("/api/outreach/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch.channel ?? ch, serviceType, tone: "professional", outreachChannel: "email", agencyName: orgName, agencyValueProp: "" }) })
+            const emailRes = await fetch("/api/outreach/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch, serviceType, tone: "professional", outreachChannel: "email", agencyName: orgName, agencyValueProp: "" }) })
             if (emailRes.ok && leadId) {
               const emailData = await emailRes.json()
               const saveRes = await fetch("/api/outreach/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_id: leadId, channel: "email", subject: emailData.subject, body: emailData.body, status: "pending" }) })

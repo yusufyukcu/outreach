@@ -1,8 +1,5 @@
 @import "tailwindcss";
 
-/* Hide Spline watermark */
-#logo { display: none !important; }
-
 @theme {
   --color-border: hsl(220 13% 91%);
   --color-input: hsl(220 13% 91%);

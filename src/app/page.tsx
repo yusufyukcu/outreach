@@ -172,6 +172,41 @@ export default function Home() {
             </div>
           </div>
 
+          {/* AutoLead card */}
+          <div
+            className="animate-float absolute z-10 rounded-2xl border shadow-xl p-3 w-48"
+            style={{
+              bottom: "8%", left: "2%", animationDuration: "5.5s", animationDelay: "1s",
+              background: "linear-gradient(135deg, hsl(243 75% 12%), hsl(265 80% 10%))",
+              borderColor: "hsl(243 75% 59% / 0.3)",
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <div className="h-5 w-5 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))" }}>
+                  <Zap className="h-3 w-3 text-white fill-current" />
+                </div>
+                <span className="text-[10px] font-bold text-white/80">AutoLead</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[9px] font-bold text-emerald-400">ON</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              {[
+                { icon: "📧", text: "Email → FinanceHub", color: "text-indigo-300" },
+                { icon: "✓", text: "Found (score 87)", color: "text-emerald-300" },
+                { icon: "🔍", text: "faceless finance", color: "text-white/40" },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-1.5 rounded px-1.5 py-1" style={{ background: "hsl(0 0% 100% / 0.05)" }}>
+                  <span className="text-[9px]">{item.icon}</span>
+                  <span className={`text-[9px] font-medium truncate ${item.color}`}>{item.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* 3D floating blocks */}
 
           {/* Large indigo cube */}

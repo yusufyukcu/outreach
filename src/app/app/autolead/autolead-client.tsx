@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle, Ghost } from "lucide-react"
+import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle, Ghost, Clock, ChevronDown } from "lucide-react"
 import type { ServiceType } from "@/types"
 
 const NICHES = [
@@ -60,6 +60,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [selectedNiche, setSelectedNiche] = useState("Any Niche")
   const [selectedDuration, setSelectedDuration] = useState<number | null>(null) // ms, null = unlimited
   const [remainingMs, setRemainingMs] = useState<number | null>(null)
+  const [durationOpen, setDurationOpen] = useState(false)
   const seenChannelIds = useRef<Set<string>>(new Set())
 
   const runningRef = useRef(false)
@@ -253,11 +254,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                 </span>
               </div>
               <p className="text-xs text-muted-foreground/60 mt-0.5">
-                {running
-                  ? remainingMs !== null
-                    ? `Stops in ${formatRemaining(remainingMs)}`
-                    : `Cycling ${selectedFrequency.label.toLowerCase()}`
-                  : "Click Start to begin"}
+                {running ? `Cycling ${selectedFrequency.label.toLowerCase()}` : "Click Start to begin"}
               </p>
             </div>
           </div>
@@ -275,6 +272,52 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               <Ghost className="h-4 w-4" />
               Faceless
             </button>
+
+            {/* Timer toggle button */}
+            <div className="relative">
+              <button
+                onClick={() => !running && setDurationOpen((o) => !o)}
+                disabled={running}
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95"
+                style={selectedDuration !== null
+                  ? { background: "hsl(243 75% 59% / 0.1)", border: "1px solid hsl(243 75% 59% / 0.3)", color: "hsl(243 75% 50%)" }
+                  : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                }
+              >
+                <Clock className="h-4 w-4" />
+                {running && remainingMs !== null
+                  ? <span className="font-mono text-xs">{formatRemaining(remainingMs)}</span>
+                  : selectedDuration !== null
+                    ? DURATION_OPTIONS.find((d) => d.value === selectedDuration)?.label ?? "Timer"
+                    : "Timer"
+                }
+                {!running && <ChevronDown className={`h-3.5 w-3.5 transition-transform ${durationOpen ? "rotate-180" : ""}`} />}
+              </button>
+
+              {/* Dropdown */}
+              {durationOpen && !running && (
+                <div className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-2xl border border-border shadow-lg p-2 min-w-[140px] animate-scale-in">
+                  {[{ label: "Unlimited", value: null }, ...DURATION_OPTIONS].map((opt) => {
+                    const active = selectedDuration === opt.value
+                    return (
+                      <button
+                        key={opt.label}
+                        onClick={() => { setSelectedDuration(opt.value); setDurationOpen(false) }}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all"
+                        style={active
+                          ? { background: "hsl(243 75% 59% / 0.08)", color: "hsl(243 75% 50%)", fontWeight: 600 }
+                          : { color: "hsl(220 9% 40%)" }
+                        }
+                      >
+                        {opt.label}
+                        {active && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={running ? () => handleStop() : handleStart}
               className="inline-flex items-center gap-2 px-7 py-3 rounded-xl font-bold text-sm transition-all active:scale-95"
@@ -362,59 +405,6 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             })}
           </div>
           {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change frequency</p>}
-        </div>
-
-        {/* Duration selector */}
-        <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
-          <h3 className="text-sm font-bold text-foreground mb-3">Run Duration</h3>
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => !running && setSelectedDuration(null)}
-              disabled={running}
-              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              style={selectedDuration === null
-                ? { background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))", color: "white" }
-                : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
-              }
-            >
-              Unlimited
-            </button>
-            {DURATION_OPTIONS.map((opt) => {
-              const active = selectedDuration === opt.value
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => !running && setSelectedDuration(opt.value)}
-                  disabled={running}
-                  className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={active
-                    ? { background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))", color: "white" }
-                    : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
-                  }
-                >
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
-          {running && remainingMs !== null && (
-            <div className="mt-3">
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-muted-foreground/60">Time remaining</span>
-                <span className="font-mono font-semibold text-foreground">{formatRemaining(remainingMs)}</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-1000"
-                  style={{
-                    width: `${(remainingMs / selectedDuration!) * 100}%`,
-                    background: "linear-gradient(90deg, hsl(243 75% 55%), hsl(280 80% 58%))",
-                  }}
-                />
-              </div>
-            </div>
-          )}
-          {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change duration</p>}
         </div>
 
         {/* Subscriber range */}

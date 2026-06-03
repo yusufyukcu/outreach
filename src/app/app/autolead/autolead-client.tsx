@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle, Ghost, Clock, ChevronDown, Sparkles } from "lucide-react"
+import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle, Ghost, Clock, ChevronDown } from "lucide-react"
 import type { ServiceType } from "@/types"
 
 const NICHES = [
@@ -62,7 +62,6 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [remainingMs, setRemainingMs] = useState<number | null>(null)
   const [durationOpen, setDurationOpen] = useState(false)
   const [subsOpen, setSubsOpen] = useState(false)
-  const [aiPrompt, setAiPrompt] = useState("")
 
   const SUB_PRESETS = [
     { label: "Any", min: 1000, max: 500000 },
@@ -98,11 +97,12 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
       const kwRes = await fetch("/api/autolead/keywords", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_type: serviceType, org_niche: selectedNiche === "Any Niche" ? orgNiche : selectedNiche, previous_keywords: usedKeywords.slice(-20), successful_patterns: successfulPatterns.slice(-10), user_prompt: aiPrompt }),
+        body: JSON.stringify({ service_type: serviceType, org_niche: selectedNiche === "Any Niche" ? orgNiche : selectedNiche, previous_keywords: usedKeywords.slice(-20), successful_patterns: successfulPatterns.slice(-10) }),
       })
       if (!kwRes.ok) throw new Error("Failed to generate keywords")
-      const { keywords, niche } = await kwRes.json()
+      const { keywords, niche, target } = await kwRes.json()
       if (!keywords || keywords.length === 0) { addLog("No keywords generated, skipping cycle", "error"); return }
+      if (target) addLog(`🎯 Targeting: ${target}`, "info")
       setUsedKeywords((prev) => [...prev, ...keywords])
 
       for (const keyword of keywords.slice(0, 2)) {
@@ -173,7 +173,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
       addLog(`⏳ Next cycle in ${selectedFrequency.label.toLowerCase().replace("every ", "")}...`, "info")
       timeoutRef.current = setTimeout(() => { if (runningRef.current) runCycle() }, selectedFrequency.value)
     }
-  }, [serviceType, orgNiche, orgName, usedKeywords, selectedFrequency, facelessMode, successfulPatterns, minSubs, maxSubs, selectedNiche, aiPrompt])
+  }, [serviceType, orgNiche, orgName, usedKeywords, selectedFrequency, facelessMode, successfulPatterns, minSubs, maxSubs, selectedNiche])
 
   function handleStart() {
     runningRef.current = true
@@ -412,26 +412,6 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               <p className="text-xs text-muted-foreground mt-1 font-medium">{stat.label}</p>
             </div>
           ))}
-        </div>
-
-        {/* AI prompt */}
-        <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="h-4 w-4" style={{ color: "hsl(280 75% 55%)" }} />
-            <h3 className="text-sm font-bold text-foreground">Describe what you&apos;re looking for</h3>
-          </div>
-          <textarea
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            disabled={running}
-            rows={2}
-            placeholder="e.g. faceless finance channels that narrate stock market news, or small cooking channels with bad thumbnails..."
-            className="w-full rounded-xl border border-border bg-muted/40 px-3.5 py-2.5 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all resize-none"
-          />
-          <p className="text-xs text-muted-foreground/60 mt-2">
-            AI generates fresh keywords from your description each cycle. Leave empty to auto-target your niche.
-          </p>
-          {running && <p className="text-xs text-muted-foreground/50 mt-1">Stop AutoLead to edit</p>}
         </div>
 
         {/* Niche selector */}

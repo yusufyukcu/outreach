@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { service_type, org_niche, previous_keywords = [], successful_patterns = [], user_prompt = "" } = await req.json()
+    const { service_type, org_niche, previous_keywords = [], successful_patterns = [] } = await req.json()
 
     // Fetch org_id from profile
     const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single()
@@ -59,10 +59,6 @@ export async function POST(req: NextRequest) {
       ? `\n\nThese keyword patterns have worked well recently (produced high-scoring channels): ${successful_patterns.join(", ")}. Generate variations and expansions of these.`
       : ""
 
-    const userPromptContext = user_prompt && user_prompt.trim()
-      ? `\n\nMOST IMPORTANT — the user is specifically looking for this kind of channel: "${user_prompt.trim()}". Your keywords MUST target exactly this description. Generate fresh variations each time that surface these specific channels.`
-      : ""
-
     const serviceDescriptions: Record<string, string> = {
       editing: "video editing services for YouTube channels",
       thumbnails: "custom thumbnail design for YouTube channels",
@@ -88,35 +84,24 @@ export async function POST(req: NextRequest) {
           },
           {
             role: "user",
-            content: `Generate 4 YouTube search terms to find channels that need ${serviceDesc}.
+            content: `Find YouTube channels that need ${serviceDesc}.
 
 Context: org niche = "${org_niche ?? "general content"}"
 
-You are generating SHORT SEARCH TERMS (2-5 words max), NOT titles or sentences.
-Think like someone searching YouTube for a TYPE of content/channel to watch.
+STEP 1 — Internally invent a specific "target description": pick ONE concrete type of channel worth pitching to right now (a specific sub-niche + format + audience). Be imaginative and pick a different angle than before each time. Example targets: "small faceless channels narrating Reddit relationship stories", "mid-size UK personal finance creators doing talking-head advice", "growing channels reviewing budget tech gadgets with weak thumbnails".
 
-Good examples:
-- "passive income investing"
-- "faceless finance channel"
-- "reddit story narration"
-- "UK personal finance"
-- "screen recording tutorials"
-- "real estate beginner tips"
-- "AI tools review"
-- "solo female travel"
+STEP 2 — From that target description, derive 4 SHORT YouTube search terms (2-5 words max) that would actually surface those channels.
 
-Bad examples (too long, title-like):
-- "AI tools for small businesses 2024" ❌
-- "how to make money online fast" ❌
-- "best emerging tech gadgets reviews unedited" ❌
+Search terms must be SHORT — think what someone types into YouTube to find that TYPE of content.
+Good: "reddit story narration", "UK personal finance", "budget tech review", "faceless finance channel"
+Bad (too long/title-like): "AI tools for small businesses 2024" ❌, "how to make money online fast" ❌
 
 Rules:
 - MAX 5 words per term
 - Niche + format or niche + audience — that's it
-- Must surface channels in your niche that need ${serviceDesc}
-- Vary: one micro-niche, one format type, one audience angle, one trending topic${userPromptContext}${previousList}${wonNicheContext}${successfulPatternsContext}
+- All 4 terms should target the SAME specific channel type from your description (so the cycle stays focused), but vary the phrasing/angle${previousList}${wonNicheContext}${successfulPatternsContext}
 
-Return JSON: { "keywords": ["term1", "term2", "term3", "term4"], "niche": "main niche label" }`,
+Return JSON: { "target": "your invented target description", "keywords": ["term1", "term2", "term3", "term4"], "niche": "main niche label" }`,
           },
         ],
         temperature: 0.9,
@@ -134,6 +119,7 @@ Return JSON: { "keywords": ["term1", "term2", "term3", "term4"], "niche": "main 
     return NextResponse.json({
       keywords: content.keywords ?? [],
       niche: content.niche ?? org_niche ?? "youtube",
+      target: content.target ?? "",
     })
   } catch (err) {
     console.error("Keyword generation error:", err)

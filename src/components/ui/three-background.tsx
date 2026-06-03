@@ -88,7 +88,6 @@ export function ThreeBackground() {
   return (
     <div
       ref={containerRef}
-      className="pointer-events-none fixed inset-0 z-0"
       style={{ width: "100vw", height: "100vh" }}
     />
   )

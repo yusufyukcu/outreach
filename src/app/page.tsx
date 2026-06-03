@@ -4,10 +4,13 @@ import {
   ArrowRight, Sparkles, Ghost, Target, CheckCircle2,
 } from "lucide-react"
 import { Logo, LogoMark } from "@/components/ui/logo"
+import { SplineBackground } from "@/components/ui/spline-background"
 
 export default function Home() {
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ background: "hsl(220 20% 97%)" }}>
+    <div className="relative min-h-screen overflow-x-hidden">
+      <SplineBackground />
+      <div className="relative z-10">
 
       {/* ── Nav ──────────────────────────────────────────────────── */}
       <nav className="flex items-center justify-between px-8 py-5 max-w-7xl mx-auto">
@@ -356,6 +359,7 @@ export default function Home() {
           <p className="text-xs text-muted-foreground">© 2026 StuckLead Operator. AI-powered YouTube lead generation.</p>
         </div>
       </footer>
+      </div>
     </div>
   )
 }

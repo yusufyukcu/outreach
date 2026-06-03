@@ -84,24 +84,35 @@ export async function POST(req: NextRequest) {
           },
           {
             role: "user",
-            content: `Generate 4 high-quality YouTube search queries to find channels that desperately need ${serviceDesc}.
+            content: `Generate 4 YouTube search terms to find channels that need ${serviceDesc}.
 
 Context: org niche = "${org_niche ?? "general content"}"
 
-Think about:
-- Fast-growing niches where creators are overwhelmed (e.g. "AI tools explained", "real estate investing 2024", "solo travel vlog")
-- Channels that post raw/unedited content and need help (e.g. "talking head business advice", "screen recording tutorials")
-- Specific content formats that signal outsourcing potential (e.g. "faceless documentary", "top 10 facts channel", "reddit story narration")
-- Emerging micro-niches with lots of uploads but low production quality
-- Geographic or demographic niches often overlooked (e.g. "UK personal finance", "Spanish language fitness")
+You are generating SHORT SEARCH TERMS (2-5 words max), NOT titles or sentences.
+Think like someone searching YouTube for a TYPE of content/channel to watch.
+
+Good examples:
+- "passive income investing"
+- "faceless finance channel"
+- "reddit story narration"
+- "UK personal finance"
+- "screen recording tutorials"
+- "real estate beginner tips"
+- "AI tools review"
+- "solo female travel"
+
+Bad examples (too long, title-like):
+- "AI tools for small businesses 2024" ❌
+- "how to make money online fast" ❌
+- "best emerging tech gadgets reviews unedited" ❌
 
 Rules:
-- Each query must be something a real person would type into YouTube search
-- Be SPECIFIC — not "finance youtube" but "passive income investing beginner 2024"
-- Vary the angles: one niche topic, one format type, one pain-point angle, one trending sub-niche
-- NO generic terms like "youtube channel", "video editing tips", "content creation"${previousList}${wonNicheContext}${successfulPatternsContext}
+- MAX 5 words per term
+- Niche + format or niche + audience — that's it
+- Must surface channels in your niche that need ${serviceDesc}
+- Vary: one micro-niche, one format type, one audience angle, one trending topic${previousList}${wonNicheContext}${successfulPatternsContext}
 
-Return JSON: { "keywords": ["query1", "query2", "query3", "query4"], "niche": "main niche label" }`,
+Return JSON: { "keywords": ["term1", "term2", "term3", "term4"], "niche": "main niche label" }`,
           },
         ],
         temperature: 0.9,

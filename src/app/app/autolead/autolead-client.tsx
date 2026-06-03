@@ -80,11 +80,11 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         const discoverRes = await fetch("/api/channels/discover", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keywords: [keyword], niche, service_type: serviceType, min_score: 60, english_only: true, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
+          body: JSON.stringify({ keywords: [keyword], niche, service_type: serviceType, min_score: 60, min_subscribers: 1000, max_subscribers: 500000, english_only: true, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
         })
         if (!discoverRes.ok) { addLog(`Failed to discover for "${keyword}"`, "error"); continue }
         const discoverData = await discoverRes.json()
-        const channels = (discoverData.results ?? []).filter((ch: { score?: number }) => (ch.score ?? 0) >= 60).slice(0, 5)
+        const channels = (discoverData.channels ?? []).filter((ch: { score?: number }) => (ch.score ?? 0) >= 60).slice(0, 5)
         if (channels.length === 0) { addLog(`No qualifying channels for "${keyword}"`, "info"); continue }
         addLog(`Found ${channels.length} qualifying channels`, "success")
         setStats((prev) => ({ ...prev, found: prev.found + channels.length }))

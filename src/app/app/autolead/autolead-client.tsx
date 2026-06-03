@@ -34,9 +34,9 @@ const FREQUENCY_OPTIONS: FrequencyOption[] = [
 ]
 
 const BADGE_STYLES: Record<string, string> = {
-  red: "bg-red-500/15 text-red-400 border border-red-500/30",
-  yellow: "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30",
-  green: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
+  red: "bg-red-50 text-red-500 border border-red-200",
+  yellow: "bg-yellow-50 text-yellow-600 border border-yellow-200",
+  green: "bg-emerald-50 text-emerald-600 border border-emerald-200",
 }
 
 let logIdCounter = 0
@@ -142,30 +142,24 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   useEffect(() => () => { runningRef.current = false; if (timeoutRef.current) clearTimeout(timeoutRef.current) }, [])
 
   const logColors: Record<LogEntry["type"], string> = {
-    info: "text-white/35",
-    success: "text-emerald-400",
-    email: "text-indigo-300",
-    search: "text-sky-400",
-    error: "text-red-400",
+    info: "text-muted-foreground",
+    success: "text-emerald-600",
+    email: "text-indigo-600",
+    search: "text-sky-600",
+    error: "text-red-500",
   }
   const logIcons: Record<LogEntry["type"], React.ReactNode> = {
-    info: <div className="h-1.5 w-1.5 rounded-full bg-white/20 mt-1.5 shrink-0" />,
-    success: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0 mt-0.5" />,
-    email: <Mail className="h-3.5 w-3.5 text-indigo-300 shrink-0 mt-0.5" />,
-    search: <Search className="h-3.5 w-3.5 text-sky-400 shrink-0 mt-0.5" />,
-    error: <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0 mt-0.5" />,
+    info: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 mt-1.5 shrink-0" />,
+    success: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />,
+    email: <Mail className="h-3.5 w-3.5 text-indigo-500 shrink-0 mt-0.5" />,
+    search: <Search className="h-3.5 w-3.5 text-sky-500 shrink-0 mt-0.5" />,
+    error: <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />,
   }
 
   return (
-    <div
-      className="min-h-screen -m-6 p-8"
-      style={{ background: "linear-gradient(135deg, hsl(243 75% 8%), hsl(265 80% 6%), hsl(280 75% 8%))" }}
-    >
-      {/* Background orbs */}
-      <div className="fixed -top-40 -left-40 w-96 h-96 rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, hsl(243 75% 59% / 0.1), transparent 70%)", filter: "blur(60px)" }} />
-      <div className="fixed -bottom-40 -right-40 w-96 h-96 rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, hsl(280 80% 60% / 0.08), transparent 70%)", filter: "blur(60px)" }} />
+    <div className="min-h-screen -m-6 p-8 bg-background">
 
-      <div className="relative z-10 max-w-3xl mx-auto space-y-5">
+      <div className="max-w-3xl mx-auto space-y-5">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
@@ -173,25 +167,25 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             <Zap className="h-5 w-5 text-white fill-white" />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold text-white">AutoLead</h1>
-            <p className="text-xs text-white/40">Automatically discovers and contacts YouTube channels</p>
+            <h1 className="text-xl font-extrabold text-foreground">AutoLead</h1>
+            <p className="text-xs text-muted-foreground">Automatically discovers and contacts YouTube channels</p>
           </div>
         </div>
 
         {/* Status + Start/Stop card */}
-        <div className="rounded-2xl p-5 flex items-center justify-between" style={{ background: "hsl(0 0% 100% / 0.04)", border: "1px solid hsl(0 0% 100% / 0.08)" }}>
+        <div className="bg-white rounded-2xl p-5 flex items-center justify-between border border-border shadow-sm">
           <div className="flex items-center gap-4">
-            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${running ? "shadow-lg" : ""}`} style={{ background: running ? "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))" : "hsl(0 0% 100% / 0.06)", boxShadow: running ? "0 0 30px hsl(243 75% 59% / 0.4)" : "none" }}>
-              <Zap className={`h-6 w-6 ${running ? "text-white fill-white" : "text-white/30"}`} />
+            <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${running ? "shadow-lg" : ""}`} style={{ background: running ? "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))" : "hsl(243 75% 59% / 0.08)", boxShadow: running ? "0 0 30px hsl(243 75% 59% / 0.35)" : "none" }}>
+              <Zap className={`h-6 w-6 ${running ? "text-white fill-white" : "text-primary/40"}`} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full ${running ? "bg-emerald-400 animate-pulse" : "bg-white/20"}`} />
-                <span className={`text-sm font-bold ${running ? "text-emerald-400" : "text-white/40"}`}>
+                <div className={`h-2 w-2 rounded-full ${running ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"}`} />
+                <span className={`text-sm font-bold ${running ? "text-emerald-600" : "text-muted-foreground"}`}>
                   {running ? "Running" : "Stopped"}
                 </span>
               </div>
-              <p className="text-xs text-white/30 mt-0.5">
+              <p className="text-xs text-muted-foreground/60 mt-0.5">
                 {running ? `Cycling ${selectedFrequency.label.toLowerCase()}` : "Click Start to begin"}
               </p>
             </div>
@@ -203,8 +197,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               disabled={running}
               className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95"
               style={facelessMode
-                ? { background: "hsl(270 75% 55% / 0.25)", border: "1px solid hsl(270 75% 60% / 0.5)", color: "hsl(270 75% 75%)" }
-                : { background: "hsl(0 0% 100% / 0.06)", border: "1px solid hsl(0 0% 100% / 0.12)", color: "hsl(0 0% 100% / 0.4)" }
+                ? { background: "hsl(270 75% 55% / 0.1)", border: "1px solid hsl(270 75% 55% / 0.3)", color: "hsl(270 75% 45%)" }
+                : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
               }
             >
               <Ghost className="h-4 w-4" />
@@ -212,10 +206,10 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             </button>
             <button
               onClick={running ? handleStop : handleStart}
-              className="inline-flex items-center gap-2 px-7 py-3 rounded-xl font-bold text-sm text-white transition-all active:scale-95"
+              className="inline-flex items-center gap-2 px-7 py-3 rounded-xl font-bold text-sm transition-all active:scale-95"
               style={running
-                ? { background: "hsl(0 84% 50% / 0.2)", border: "1px solid hsl(0 84% 50% / 0.4)", color: "hsl(0 84% 70%)" }
-                : { background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))", boxShadow: "0 0 24px hsl(243 75% 59% / 0.35)" }
+                ? { background: "hsl(0 84% 50% / 0.08)", border: "1px solid hsl(0 84% 50% / 0.3)", color: "hsl(0 84% 50%)" }
+                : { background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))", color: "white", boxShadow: "0 0 24px hsl(243 75% 59% / 0.3)" }
               }
             >
               {running ? <><Square className="h-4 w-4 fill-current" /> Stop</> : <><Play className="h-4 w-4 fill-current" /> Start</>}
@@ -226,22 +220,22 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Total Found", value: stats.found, grad: "hsl(243 90% 80%), hsl(280 85% 80%)" },
-            { label: "Emails Queued", value: stats.emailsQueued, grad: "hsl(199 90% 70%), hsl(180 85% 60%)" },
-            { label: "Leads Added", value: stats.leadsAdded, grad: "hsl(150 80% 60%), hsl(170 85% 50%)" },
+            { label: "Total Found", value: stats.found, grad: "hsl(243 75% 55%), hsl(280 80% 58%)" },
+            { label: "Emails Queued", value: stats.emailsQueued, grad: "hsl(199 80% 45%), hsl(180 75% 40%)" },
+            { label: "Leads Added", value: stats.leadsAdded, grad: "hsl(150 60% 40%), hsl(170 70% 35%)" },
           ].map((stat) => (
-            <div key={stat.label} className="rounded-2xl p-4 text-center" style={{ background: "hsl(0 0% 100% / 0.04)", border: "1px solid hsl(0 0% 100% / 0.07)" }}>
+            <div key={stat.label} className="bg-white rounded-2xl p-4 text-center border border-border shadow-sm">
               <p className="text-3xl font-extrabold tabular-nums bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(135deg, ${stat.grad})` }}>
                 {stat.value}
               </p>
-              <p className="text-xs text-white/35 mt-1 font-medium">{stat.label}</p>
+              <p className="text-xs text-muted-foreground mt-1 font-medium">{stat.label}</p>
             </div>
           ))}
         </div>
 
         {/* Frequency selector */}
-        <div className="rounded-2xl p-5" style={{ background: "hsl(0 0% 100% / 0.04)", border: "1px solid hsl(0 0% 100% / 0.08)" }}>
-          <h3 className="text-sm font-bold text-white/70 mb-3">Frequency</h3>
+        <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
+          <h3 className="text-sm font-bold text-foreground mb-3">Frequency</h3>
           <div className="space-y-1.5">
             {FREQUENCY_OPTIONS.map((opt) => {
               const isSelected = selectedFrequency.value === opt.value
@@ -252,17 +246,17 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                   disabled={running}
                   className="w-full flex items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all duration-150"
                   style={{
-                    background: isSelected ? "hsl(243 75% 59% / 0.12)" : "transparent",
-                    border: isSelected ? "1px solid hsl(243 75% 59% / 0.3)" : "1px solid transparent",
+                    background: isSelected ? "hsl(243 75% 59% / 0.06)" : "transparent",
+                    border: isSelected ? "1px solid hsl(243 75% 59% / 0.25)" : "1px solid transparent",
                     cursor: running ? "not-allowed" : "pointer",
                     opacity: running && !isSelected ? 0.4 : 1,
                   }}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0" style={{ borderColor: isSelected ? "hsl(243 75% 70%)" : "hsl(0 0% 100% / 0.2)" }}>
-                      {isSelected && <div className="h-1.5 w-1.5 rounded-full" style={{ background: "hsl(243 75% 70%)" }} />}
+                    <div className="h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0" style={{ borderColor: isSelected ? "hsl(243 75% 59%)" : "hsl(220 9% 70%)" }}>
+                      {isSelected && <div className="h-1.5 w-1.5 rounded-full" style={{ background: "hsl(243 75% 59%)" }} />}
                     </div>
-                    <span className={isSelected ? "text-white/90 font-semibold" : "text-white/50"}>{opt.label}</span>
+                    <span className={isSelected ? "text-foreground font-semibold" : "text-muted-foreground"}>{opt.label}</span>
                   </div>
                   <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${BADGE_STYLES[opt.badge]}`}>
                     {opt.badgeText}
@@ -271,30 +265,30 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               )
             })}
           </div>
-          {running && <p className="text-xs text-white/25 mt-3">Stop AutoLead to change frequency</p>}
+          {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change frequency</p>}
         </div>
 
         {/* Activity log */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: "hsl(0 0% 100% / 0.04)", border: "1px solid hsl(0 0% 100% / 0.08)" }}>
-          <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: "1px solid hsl(0 0% 100% / 0.06)" }}>
-            <h3 className="text-sm font-bold text-white/70">Activity Log</h3>
+        <div className="bg-white rounded-2xl overflow-hidden border border-border shadow-sm">
+          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+            <h3 className="text-sm font-bold text-foreground">Activity Log</h3>
             {log.length > 0 && (
-              <button onClick={() => setLog([])} className="text-xs text-white/25 hover:text-white/60 transition-colors">Clear</button>
+              <button onClick={() => setLog([])} className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">Clear</button>
             )}
           </div>
           <div className="h-72 overflow-y-auto p-4 space-y-1.5">
             {log.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-white/20">
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground/40">
                 <Zap className="h-8 w-8 mb-2 opacity-30" />
                 <p className="text-sm">No activity yet</p>
                 <p className="text-xs mt-1">Start AutoLead to see live updates</p>
               </div>
             ) : (
               log.map((entry) => (
-                <div key={entry.id} className="flex items-start gap-2 rounded-lg px-2.5 py-1.5" style={{ background: "hsl(0 0% 100% / 0.03)" }}>
+                <div key={entry.id} className="flex items-start gap-2 rounded-lg px-2.5 py-1.5 bg-muted/40">
                   {logIcons[entry.type]}
                   <span className={`text-xs flex-1 min-w-0 leading-relaxed ${logColors[entry.type]}`}>{entry.message}</span>
-                  <span className="text-[10px] text-white/20 shrink-0 tabular-nums mt-0.5">
+                  <span className="text-[10px] text-muted-foreground/40 shrink-0 tabular-nums mt-0.5">
                     {entry.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                   </span>
                 </div>

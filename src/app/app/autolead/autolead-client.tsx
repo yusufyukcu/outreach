@@ -58,10 +58,21 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [minSubs, setMinSubs] = useState(1000)
   const [maxSubs, setMaxSubs] = useState(500000)
   const [selectedNiche, setSelectedNiche] = useState("Any Niche")
+  const [selectedDuration, setSelectedDuration] = useState<number | null>(null) // ms, null = unlimited
+  const [remainingMs, setRemainingMs] = useState<number | null>(null)
   const seenChannelIds = useRef<Set<string>>(new Set())
 
   const runningRef = useRef(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const durationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const DURATION_OPTIONS = [
+    { label: "1 hour", value: 60 * 60_000 },
+    { label: "3 hours", value: 3 * 60 * 60_000 },
+    { label: "8 hours", value: 8 * 60 * 60_000 },
+    { label: "24 hours", value: 24 * 60 * 60_000 },
+  ]
 
   function addLog(message: string, type: LogEntry["type"] = "info") {
     setLog((prev) => [
@@ -154,14 +165,48 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     }
   }, [serviceType, orgNiche, orgName, usedKeywords, selectedFrequency, facelessMode, successfulPatterns, minSubs, maxSubs, selectedNiche])
 
-  function handleStart() { runningRef.current = true; setRunning(true); addLog("🚀 AutoLead started", "success"); runCycle() }
-  function handleStop() {
-    runningRef.current = false; setRunning(false)
+  function handleStart() {
+    runningRef.current = true
+    setRunning(true)
+    addLog("🚀 AutoLead started", "success")
+    if (selectedDuration) {
+      setRemainingMs(selectedDuration)
+      tickRef.current = setInterval(() => {
+        setRemainingMs((prev) => {
+          if (prev === null || prev <= 1000) return null
+          return prev - 1000
+        })
+      }, 1000)
+      durationTimerRef.current = setTimeout(() => {
+        handleStop(true)
+      }, selectedDuration)
+    }
+    runCycle()
+  }
+  function handleStop(timedOut = false) {
+    runningRef.current = false
+    setRunning(false)
+    setRemainingMs(null)
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }
-    addLog("⏹ AutoLead stopped", "info")
+    if (durationTimerRef.current) { clearTimeout(durationTimerRef.current); durationTimerRef.current = null }
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
+    addLog(timedOut ? "⏱ Duration reached — AutoLead stopped" : "⏹ AutoLead stopped", "info")
   }
 
-  useEffect(() => () => { runningRef.current = false; if (timeoutRef.current) clearTimeout(timeoutRef.current) }, [])
+  useEffect(() => () => {
+    runningRef.current = false
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    if (durationTimerRef.current) clearTimeout(durationTimerRef.current)
+    if (tickRef.current) clearInterval(tickRef.current)
+  }, [])
+
+  function formatRemaining(ms: number) {
+    const h = Math.floor(ms / 3_600_000)
+    const m = Math.floor((ms % 3_600_000) / 60_000)
+    const s = Math.floor((ms % 60_000) / 1000)
+    if (h > 0) return `${h}h ${m.toString().padStart(2, "0")}m ${s.toString().padStart(2, "0")}s`
+    return `${m}m ${s.toString().padStart(2, "0")}s`
+  }
 
   const logColors: Record<LogEntry["type"], string> = {
     info: "text-muted-foreground",
@@ -208,7 +253,11 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                 </span>
               </div>
               <p className="text-xs text-muted-foreground/60 mt-0.5">
-                {running ? `Cycling ${selectedFrequency.label.toLowerCase()}` : "Click Start to begin"}
+                {running
+                  ? remainingMs !== null
+                    ? `Stops in ${formatRemaining(remainingMs)}`
+                    : `Cycling ${selectedFrequency.label.toLowerCase()}`
+                  : "Click Start to begin"}
               </p>
             </div>
           </div>
@@ -227,7 +276,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               Faceless
             </button>
             <button
-              onClick={running ? handleStop : handleStart}
+              onClick={running ? () => handleStop() : handleStart}
               className="inline-flex items-center gap-2 px-7 py-3 rounded-xl font-bold text-sm transition-all active:scale-95"
               style={running
                 ? { background: "hsl(0 84% 50% / 0.08)", border: "1px solid hsl(0 84% 50% / 0.3)", color: "hsl(0 84% 50%)" }
@@ -313,6 +362,59 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             })}
           </div>
           {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change frequency</p>}
+        </div>
+
+        {/* Duration selector */}
+        <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
+          <h3 className="text-sm font-bold text-foreground mb-3">Run Duration</h3>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => !running && setSelectedDuration(null)}
+              disabled={running}
+              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={selectedDuration === null
+                ? { background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))", color: "white" }
+                : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+              }
+            >
+              Unlimited
+            </button>
+            {DURATION_OPTIONS.map((opt) => {
+              const active = selectedDuration === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => !running && setSelectedDuration(opt.value)}
+                  disabled={running}
+                  className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={active
+                    ? { background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))", color: "white" }
+                    : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                  }
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+          {running && remainingMs !== null && (
+            <div className="mt-3">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-muted-foreground/60">Time remaining</span>
+                <span className="font-mono font-semibold text-foreground">{formatRemaining(remainingMs)}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-1000"
+                  style={{
+                    width: `${(remainingMs / selectedDuration!) * 100}%`,
+                    background: "linear-gradient(90deg, hsl(243 75% 55%), hsl(280 80% 58%))",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change duration</p>}
         </div>
 
         {/* Subscriber range */}

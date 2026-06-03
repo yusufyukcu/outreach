@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { service_type, org_niche, previous_keywords = [], successful_patterns = [] } = await req.json()
+    const { service_type, org_niche, previous_keywords = [], successful_patterns = [], user_prompt = "" } = await req.json()
 
     // Fetch org_id from profile
     const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single()
@@ -57,6 +57,10 @@ export async function POST(req: NextRequest) {
 
     const successfulPatternsContext = successful_patterns.length > 0
       ? `\n\nThese keyword patterns have worked well recently (produced high-scoring channels): ${successful_patterns.join(", ")}. Generate variations and expansions of these.`
+      : ""
+
+    const userPromptContext = user_prompt && user_prompt.trim()
+      ? `\n\nMOST IMPORTANT — the user is specifically looking for this kind of channel: "${user_prompt.trim()}". Your keywords MUST target exactly this description. Generate fresh variations each time that surface these specific channels.`
       : ""
 
     const serviceDescriptions: Record<string, string> = {
@@ -110,7 +114,7 @@ Rules:
 - MAX 5 words per term
 - Niche + format or niche + audience — that's it
 - Must surface channels in your niche that need ${serviceDesc}
-- Vary: one micro-niche, one format type, one audience angle, one trending topic${previousList}${wonNicheContext}${successfulPatternsContext}
+- Vary: one micro-niche, one format type, one audience angle, one trending topic${userPromptContext}${previousList}${wonNicheContext}${successfulPatternsContext}
 
 Return JSON: { "keywords": ["term1", "term2", "term3", "term4"], "niche": "main niche label" }`,
           },

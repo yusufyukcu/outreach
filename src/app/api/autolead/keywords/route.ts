@@ -48,17 +48,28 @@ export async function POST(req: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `You are a YouTube channel discovery expert. Generate search keywords to find YouTube channels that would benefit from ${serviceDesc}. Focus on niches, topics, and channel types that match. Return JSON only.`,
+            content: `You are an expert at finding YouTube channels that need ${serviceDesc}. You think like a hunter — you know exactly what types of channels are underserved, growing fast, and likely to outsource production. You generate real YouTube search queries that surface these channels. Return JSON only.`,
           },
           {
             role: "user",
-            content: `Generate 4 creative and varied YouTube search keywords to discover channels in the "${org_niche ?? "general"}" space that would benefit from ${serviceDesc}.
+            content: `Generate 4 high-quality YouTube search queries to find channels that desperately need ${serviceDesc}.
 
-Requirements:
-- Each keyword should target a different angle or sub-niche
-- Use specific, searchable terms (not too broad)
-- Mix keyword styles: some niche-specific, some topic-based, some format-based
-- Return JSON: { "keywords": ["keyword1", "keyword2", ...], "niche": "detected niche" }${previousList}`,
+Context: org niche = "${org_niche ?? "general content"}"
+
+Think about:
+- Fast-growing niches where creators are overwhelmed (e.g. "AI tools explained", "real estate investing 2024", "solo travel vlog")
+- Channels that post raw/unedited content and need help (e.g. "talking head business advice", "screen recording tutorials")
+- Specific content formats that signal outsourcing potential (e.g. "faceless documentary", "top 10 facts channel", "reddit story narration")
+- Emerging micro-niches with lots of uploads but low production quality
+- Geographic or demographic niches often overlooked (e.g. "UK personal finance", "Spanish language fitness")
+
+Rules:
+- Each query must be something a real person would type into YouTube search
+- Be SPECIFIC — not "finance youtube" but "passive income investing beginner 2024"
+- Vary the angles: one niche topic, one format type, one pain-point angle, one trending sub-niche
+- NO generic terms like "youtube channel", "video editing tips", "content creation"${previousList}
+
+Return JSON: { "keywords": ["query1", "query2", "query3", "query4"], "niche": "main niche label" }`,
           },
         ],
         temperature: 0.9,

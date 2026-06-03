@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle } from "lucide-react"
+import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle, Ghost } from "lucide-react"
 import type { ServiceType } from "@/types"
 
 interface AutoLeadClientProps {
@@ -47,6 +47,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [log, setLog] = useState<LogEntry[]>([])
   const [stats, setStats] = useState({ found: 0, emailsQueued: 0, leadsAdded: 0 })
   const [usedKeywords, setUsedKeywords] = useState<string[]>([])
+  const [facelessMode, setFacelessMode] = useState(false)
+  const [successfulPatterns, setSuccessfulPatterns] = useState<string[]>([])
 
   const runningRef = useRef(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -65,7 +67,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
       const kwRes = await fetch("/api/autolead/keywords", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_type: serviceType, org_niche: orgNiche, previous_keywords: usedKeywords.slice(-20) }),
+        body: JSON.stringify({ service_type: serviceType, org_niche: orgNiche, previous_keywords: usedKeywords.slice(-20), successful_patterns: successfulPatterns.slice(-10) }),
       })
       if (!kwRes.ok) throw new Error("Failed to generate keywords")
       const { keywords, niche } = await kwRes.json()
@@ -78,7 +80,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         const discoverRes = await fetch("/api/channels/discover", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keywords: [keyword], niche, service_type: serviceType, min_score: 60, english_only: true }),
+          body: JSON.stringify({ keywords: [keyword], niche, service_type: serviceType, min_score: 60, english_only: true, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
         })
         if (!discoverRes.ok) { addLog(`Failed to discover for "${keyword}"`, "error"); continue }
         const discoverData = await discoverRes.json()
@@ -86,6 +88,9 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         if (channels.length === 0) { addLog(`No qualifying channels for "${keyword}"`, "info"); continue }
         addLog(`Found ${channels.length} qualifying channels`, "success")
         setStats((prev) => ({ ...prev, found: prev.found + channels.length }))
+        if (channels.some((ch: { score?: number }) => (ch.score ?? 0) >= 75)) {
+          setSuccessfulPatterns((prev) => [...prev, keyword])
+        }
 
         for (const ch of channels) {
           if (!runningRef.current) return
@@ -125,7 +130,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
       addLog(`⏳ Next cycle in ${selectedFrequency.label.toLowerCase().replace("every ", "")}...`, "info")
       timeoutRef.current = setTimeout(() => { if (runningRef.current) runCycle() }, selectedFrequency.value)
     }
-  }, [serviceType, orgNiche, orgName, usedKeywords, selectedFrequency])
+  }, [serviceType, orgNiche, orgName, usedKeywords, selectedFrequency, facelessMode, successfulPatterns])
 
   function handleStart() { runningRef.current = true; setRunning(true); addLog("🚀 AutoLead started", "success"); runCycle() }
   function handleStop() {
@@ -192,16 +197,30 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             </div>
           </div>
 
-          <button
-            onClick={running ? handleStop : handleStart}
-            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl font-bold text-sm text-white transition-all active:scale-95"
-            style={running
-              ? { background: "hsl(0 84% 50% / 0.2)", border: "1px solid hsl(0 84% 50% / 0.4)", color: "hsl(0 84% 70%)" }
-              : { background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))", boxShadow: "0 0 24px hsl(243 75% 59% / 0.35)" }
-            }
-          >
-            {running ? <><Square className="h-4 w-4 fill-current" /> Stop</> : <><Play className="h-4 w-4 fill-current" /> Start</>}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFacelessMode(!facelessMode)}
+              disabled={running}
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95"
+              style={facelessMode
+                ? { background: "hsl(270 75% 55% / 0.25)", border: "1px solid hsl(270 75% 60% / 0.5)", color: "hsl(270 75% 75%)" }
+                : { background: "hsl(0 0% 100% / 0.06)", border: "1px solid hsl(0 0% 100% / 0.12)", color: "hsl(0 0% 100% / 0.4)" }
+              }
+            >
+              <Ghost className="h-4 w-4" />
+              Faceless
+            </button>
+            <button
+              onClick={running ? handleStop : handleStart}
+              className="inline-flex items-center gap-2 px-7 py-3 rounded-xl font-bold text-sm text-white transition-all active:scale-95"
+              style={running
+                ? { background: "hsl(0 84% 50% / 0.2)", border: "1px solid hsl(0 84% 50% / 0.4)", color: "hsl(0 84% 70%)" }
+                : { background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))", boxShadow: "0 0 24px hsl(243 75% 59% / 0.35)" }
+              }
+            >
+              {running ? <><Square className="h-4 w-4 fill-current" /> Stop</> : <><Play className="h-4 w-4 fill-current" /> Start</>}
+            </button>
+          </div>
         </div>
 
         {/* Stats row */}

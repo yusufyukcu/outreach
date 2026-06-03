@@ -7,7 +7,31 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { service_type, org_niche, previous_keywords = [] } = await req.json()
+    const { service_type, org_niche, previous_keywords = [], successful_patterns = [] } = await req.json()
+
+    // Fetch org_id from profile
+    const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single()
+    const orgId = profile?.org_id
+
+    // Fetch won/contacted leads to learn from successful niches
+    let wonNiches: string[] = []
+    if (orgId) {
+      const { data: wonLeads } = await supabase
+        .from("leads")
+        .select("channel:channels(niche_primary, niche_secondary, description)")
+        .eq("org_id", orgId)
+        .in("crm_stage", ["won", "contacted", "interested", "replied"])
+        .limit(20)
+      if (wonLeads) {
+        const nicheSet = new Set<string>()
+        for (const lead of wonLeads) {
+          const ch = lead.channel as { niche_primary?: string; niche_secondary?: string } | null
+          if (ch?.niche_primary) nicheSet.add(ch.niche_primary)
+          if (ch?.niche_secondary) nicheSet.add(ch.niche_secondary)
+        }
+        wonNiches = Array.from(nicheSet).filter(Boolean).slice(0, 10)
+      }
+    }
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
@@ -25,6 +49,14 @@ export async function POST(req: NextRequest) {
 
     const previousList = previous_keywords.length > 0
       ? `\n\nAvoid these already-used keywords: ${previous_keywords.join(", ")}`
+      : ""
+
+    const wonNicheContext = wonNiches.length > 0
+      ? `\n\nOur agency has had success with channels in these niches: ${wonNiches.join(", ")}. Generate keywords targeting similar niches.`
+      : ""
+
+    const successfulPatternsContext = successful_patterns.length > 0
+      ? `\n\nThese keyword patterns have worked well recently (produced high-scoring channels): ${successful_patterns.join(", ")}. Generate variations and expansions of these.`
       : ""
 
     const serviceDescriptions: Record<string, string> = {
@@ -67,7 +99,7 @@ Rules:
 - Each query must be something a real person would type into YouTube search
 - Be SPECIFIC — not "finance youtube" but "passive income investing beginner 2024"
 - Vary the angles: one niche topic, one format type, one pain-point angle, one trending sub-niche
-- NO generic terms like "youtube channel", "video editing tips", "content creation"${previousList}
+- NO generic terms like "youtube channel", "video editing tips", "content creation"${previousList}${wonNicheContext}${successfulPatternsContext}
 
 Return JSON: { "keywords": ["query1", "query2", "query3", "query4"], "niche": "main niche label" }`,
           },

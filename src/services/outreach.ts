@@ -138,8 +138,8 @@ export function buildExperienceInstruction(experiences: ExperienceLike[]): strin
     if (e.result) parts.push(`— ${e.result}`)
     return `- ${parts.join(" ")}`
   })
-  return `The sender has REAL past experience working with these channels:
+  return `The sender has worked with these real YouTube channels before:
 ${lines.join("\n")}
 
-If — and only if — it strengthens the pitch, naturally reference this as social proof (e.g. "I've previously worked with ..."). Choose the 1–2 most relevant or impressive; never list them all, and never fabricate or exaggerate. If none feel relevant to this channel, leave it out.`
+IMPORTANT: You MUST mention 1-2 of these in the email as social proof/credibility. Pick the most impressive or relevant ones. Weave it naturally into the pitch (e.g. "I've worked with X and helped them achieve Y" or "We recently helped X get Z results"). Never list all of them — just the best 1-2. Never fabricate or exaggerate beyond what's listed.`
 }

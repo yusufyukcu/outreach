@@ -193,6 +193,21 @@ export function LeadRow({ lead, selected, onSelect, onDelete, serviceType, needs
                 Follow-up
               </span>
             )}
+            {lead.tags?.includes("core") && (
+              <span className="hidden sm:inline-flex items-center rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] font-medium text-indigo-600">
+                🎯 Core Match
+              </span>
+            )}
+            {lead.tags?.includes("adjacent") && (
+              <span className="hidden sm:inline-flex items-center rounded-full bg-violet-50 border border-violet-200 px-2 py-0.5 text-[11px] font-medium text-violet-600">
+                🔗 Adjacent Match
+              </span>
+            )}
+            {lead.tags?.includes("wildcard") && (
+              <span className="hidden sm:inline-flex items-center rounded-full bg-orange-50 border border-orange-200 px-2 py-0.5 text-[11px] font-medium text-orange-600">
+                🔥 Experimental
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs text-muted-foreground">

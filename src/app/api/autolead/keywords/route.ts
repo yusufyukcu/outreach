@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
+export type DiscoveryTier = "core" | "adjacent" | "wildcard"
+
+export interface TierResult {
+  tier: DiscoveryTier
+  target: string
+  keywords: string[]
+}
+
+// Adjacent niches for common primary niches
+const ADJACENT_MAP: Record<string, string[]> = {
+  "Technology":       ["Coding", "SaaS", "Productivity", "Entrepreneurship", "Online Business"],
+  "Personal Finance": ["Real Estate", "Entrepreneurship", "Side Hustles", "Business", "Investing"],
+  "Health & Fitness": ["Nutrition", "Mental Health", "Wellness", "Yoga", "Running"],
+  "Food & Cooking":   ["Nutrition", "Lifestyle", "Travel", "Culture", "Homesteading"],
+  "Gaming":           ["Technology", "Animation", "Esports", "PC Building", "Streaming"],
+  "Travel & Vlogging":["Photography", "Lifestyle", "Outdoor Adventures", "Culture", "Food"],
+  "Beauty & Fashion": ["Lifestyle", "Wellness", "Self-Improvement", "Luxury", "DIY"],
+  "Business":         ["Personal Finance", "Marketing", "SaaS", "Entrepreneurship", "Freelancing"],
+  "Education":        ["Science", "History", "Self-Improvement", "Language Learning", "Productivity"],
+  "Music":            ["Entertainment", "Culture", "Dance", "Podcasting", "Audio Production"],
+  "Real Estate":      ["Personal Finance", "Entrepreneurship", "Business", "Home Improvement", "Interior Design"],
+  "Lifestyle":        ["Travel", "Self-Improvement", "Wellness", "Minimalism", "Relationships"],
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient()
@@ -9,11 +33,9 @@ export async function POST(req: NextRequest) {
 
     const { service_type, org_niche, previous_keywords = [], successful_patterns = [] } = await req.json()
 
-    // Fetch org_id from profile
     const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single()
     const orgId = profile?.org_id
 
-    // Fetch won/contacted leads to learn from successful niches
     let wonNiches: string[] = []
     if (orgId) {
       const { data: wonLeads } = await supabase
@@ -35,73 +57,70 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
-      // Fallback keywords without API key
-      const fallback: Record<string, string[]> = {
-        editing: ["faceless finance", "youtube editing tips", "video production"],
-        thumbnails: ["youtube thumbnails", "click-through rate", "channel growth"],
-        scripting: ["youtube scripts", "content writing", "video scripts"],
-        growth: ["youtube growth", "channel monetization", "subscriber growth"],
-        custom: ["youtube channels", "content creation", "video marketing"],
-      }
-      const keys = fallback[service_type as string] ?? fallback.custom
-      return NextResponse.json({ keywords: keys, niche: org_niche ?? "youtube" })
+      return NextResponse.json({
+        tiers: [
+          { tier: "core", target: org_niche ?? "youtube channels", keywords: ["faceless finance", "budget tech review"] },
+          { tier: "adjacent", target: "adjacent niche channels", keywords: ["online business tips"] },
+          { tier: "wildcard", target: "experimental discovery", keywords: ["motivational storytelling"] },
+        ],
+        niche: org_niche ?? "youtube",
+      })
     }
 
     const previousList = previous_keywords.length > 0
-      ? `\n\nAvoid these already-used keywords: ${previous_keywords.join(", ")}`
-      : ""
+      ? `\nAlready used (avoid): ${previous_keywords.join(", ")}` : ""
+    const wonNicheCtx = wonNiches.length > 0
+      ? `\nSuccessful niches so far: ${wonNiches.join(", ")}` : ""
+    const patternsCtx = successful_patterns.length > 0
+      ? `\nHigh-performing keyword patterns: ${successful_patterns.join(", ")}` : ""
 
-    const wonNicheContext = wonNiches.length > 0
-      ? `\n\nOur agency has had success with channels in these niches: ${wonNiches.join(", ")}. Generate keywords targeting similar niches.`
-      : ""
-
-    const successfulPatternsContext = successful_patterns.length > 0
-      ? `\n\nThese keyword patterns have worked well recently (produced high-scoring channels): ${successful_patterns.join(", ")}. Generate variations and expansions of these.`
-      : ""
+    const adjacentNiches = ADJACENT_MAP[org_niche ?? ""] ?? ["Entrepreneurship", "Self-Improvement", "Productivity"]
 
     const serviceDescriptions: Record<string, string> = {
-      editing: "video editing services for YouTube channels",
+      editing:    "video editing services for YouTube channels",
       thumbnails: "custom thumbnail design for YouTube channels",
-      scripting: "video script writing for YouTube creators",
-      growth: "YouTube channel growth consulting and strategy",
-      custom: "YouTube channel production services",
+      scripting:  "video script writing for YouTube creators",
+      growth:     "YouTube channel growth consulting and strategy",
+      custom:     "YouTube channel production services",
     }
-
     const serviceDesc = serviceDescriptions[service_type as string] ?? serviceDescriptions.custom
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-            content: `You are an expert at finding YouTube channels that need ${serviceDesc}. You think like a hunter — you know exactly what types of channels are underserved, growing fast, and likely to outsource production. You generate real YouTube search queries that surface these channels. Return JSON only.`,
+            content: `You are a YouTube channel hunter finding channels that need ${serviceDesc}. You think in three discovery tiers. Return JSON only.`,
           },
           {
             role: "user",
-            content: `Find YouTube channels that need ${serviceDesc}.
+            content: `Generate discovery keywords across 3 tiers for finding channels that need ${serviceDesc}.
 
-Context: org niche = "${org_niche ?? "general content"}"
+Primary niche: "${org_niche ?? "general content"}"
+Adjacent niches to consider: ${adjacentNiches.join(", ")}
+${previousList}${wonNicheCtx}${patternsCtx}
 
-STEP 1 — Internally invent a specific "target description": pick ONE concrete type of channel worth pitching to right now (a specific sub-niche + format + audience). Be imaginative and pick a different angle than before each time. Example targets: "small faceless channels narrating Reddit relationship stories", "mid-size UK personal finance creators doing talking-head advice", "growing channels reviewing budget tech gadgets with weak thumbnails".
+TIERS:
+1. CORE (70% of effort) — Channels squarely inside "${org_niche ?? "general content"}". Invent a specific sub-niche/format target, then 3 short search terms.
+2. ADJACENT (20%) — One step away from the primary niche (pick from adjacent niches above). Invent a target, then 2 short search terms.
+3. WILDCARD (10%) — Completely different niche, high potential but unexpected. Be bold. Invent a surprising target, then 1 short search term.
 
-STEP 2 — From that target description, derive 4 SHORT YouTube search terms (2-5 words max) that would actually surface those channels.
+All search terms: 2-5 words max, like real YouTube searches. NOT titles or sentences.
+Good: "faceless finance channel", "budget tech review", "reddit story narration"
+Bad: "AI tools for small businesses 2024" ❌
 
-Search terms must be SHORT — think what someone types into YouTube to find that TYPE of content.
-Good: "reddit story narration", "UK personal finance", "budget tech review", "faceless finance channel"
-Bad (too long/title-like): "AI tools for small businesses 2024" ❌, "how to make money online fast" ❌
-
-Rules:
-- MAX 5 words per term
-- Niche + format or niche + audience — that's it
-- All 4 terms should target the SAME specific channel type from your description (so the cycle stays focused), but vary the phrasing/angle${previousList}${wonNicheContext}${successfulPatternsContext}
-
-Return JSON: { "target": "your invented target description", "keywords": ["term1", "term2", "term3", "term4"], "niche": "main niche label" }`,
+Return JSON:
+{
+  "tiers": [
+    { "tier": "core", "target": "description of specific channel type", "keywords": ["term1", "term2", "term3"] },
+    { "tier": "adjacent", "target": "description", "keywords": ["term1", "term2"] },
+    { "tier": "wildcard", "target": "description", "keywords": ["term1"] }
+  ],
+  "niche": "primary niche label"
+}`,
           },
         ],
         temperature: 0.9,
@@ -109,17 +128,14 @@ Return JSON: { "target": "your invented target description", "keywords": ["term1
       }),
     })
 
-    if (!response.ok) {
-      throw new Error("OpenAI API error")
-    }
+    if (!response.ok) throw new Error("OpenAI API error")
 
     const data = await response.json()
     const content = JSON.parse(data.choices[0].message.content)
 
     return NextResponse.json({
-      keywords: content.keywords ?? [],
+      tiers: content.tiers ?? [],
       niche: content.niche ?? org_niche ?? "youtube",
-      target: content.target ?? "",
     })
   } catch (err) {
     console.error("Keyword generation error:", err)

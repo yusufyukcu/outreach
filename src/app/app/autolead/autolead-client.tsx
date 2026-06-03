@@ -90,81 +90,100 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     ])
   }
 
+  const TIER_LABELS: Record<string, string> = {
+    core:     "🎯 Core",
+    adjacent: "🔗 Adjacent",
+    wildcard: "🔥 Wildcard",
+  }
+
   const runCycle = useCallback(async () => {
     if (!runningRef.current) return
     try {
-      addLog("🔑 Generating new keywords...", "info")
+      addLog("🔑 Generating discovery plan...", "info")
       const kwRes = await fetch("/api/autolead/keywords", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ service_type: serviceType, org_niche: selectedNiche === "Any Niche" ? orgNiche : selectedNiche, previous_keywords: usedKeywords.slice(-20), successful_patterns: successfulPatterns.slice(-10) }),
       })
       if (!kwRes.ok) throw new Error("Failed to generate keywords")
-      const { keywords, niche, target } = await kwRes.json()
-      if (!keywords || keywords.length === 0) { addLog("No keywords generated, skipping cycle", "error"); return }
-      if (target) addLog(`🎯 Targeting: ${target}`, "info")
-      setUsedKeywords((prev) => [...prev, ...keywords])
+      const { tiers, niche } = await kwRes.json()
+      if (!tiers || tiers.length === 0) { addLog("No tiers generated, skipping cycle", "error"); return }
 
-      for (const keyword of keywords.slice(0, 2)) {
+      const allKeywords = tiers.flatMap((t: { keywords: string[] }) => t.keywords)
+      setUsedKeywords((prev) => [...prev, ...allKeywords])
+
+      for (const tierData of tiers) {
         if (!runningRef.current) return
-        addLog(`🔍 Searching: "${keyword}"`, "search")
-        const discoverRes = await fetch("/api/channels/discover", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keywords: [keyword], niche: selectedNiche === "Any Niche" ? (niche || "") : selectedNiche, service_type: serviceType, min_score: 60, min_subscribers: minSubs, max_subscribers: maxSubs, english_only: true, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
-        })
-        if (!discoverRes.ok) { addLog(`Failed to discover for "${keyword}"`, "error"); continue }
-        const discoverData = await discoverRes.json()
-        const channels = (discoverData.channels ?? [])
-          .filter((ch: { score?: number; youtube_channel_id?: string; id?: string }) => {
-            if ((ch.score ?? 0) < 60) return false
-            if (ch.id && seenChannelIds.current.has(ch.id)) return false
-            if (ch.youtube_channel_id && seenChannelIds.current.has(ch.youtube_channel_id)) return false
-            return true
-          })
-          .slice(0, 5)
-        if (channels.length === 0) { addLog(`No qualifying channels for "${keyword}"`, "info"); continue }
-        for (const ch of channels) {
-          if (ch.id) seenChannelIds.current.add(ch.id)
-          if (ch.youtube_channel_id) seenChannelIds.current.add(ch.youtube_channel_id)
-        }
-        addLog(`Found ${channels.length} qualifying channels`, "success")
-        setStats((prev) => ({ ...prev, found: prev.found + channels.length }))
-        if (channels.some((ch: { score?: number }) => (ch.score ?? 0) >= 75)) {
-          setSuccessfulPatterns((prev) => [...prev, keyword])
-        }
+        const tierLabel = TIER_LABELS[tierData.tier] ?? tierData.tier
+        addLog(`${tierLabel} — ${tierData.target}`, "info")
 
-        for (const ch of channels) {
+        // core: first 2 keywords, adjacent: first 1, wildcard: first 1
+        const kwLimit = tierData.tier === "core" ? 2 : 1
+        for (const keyword of (tierData.keywords as string[]).slice(0, kwLimit)) {
           if (!runningRef.current) return
-          const channelName = ch.name ?? "Unknown Channel"
-          const channelDbId: string | undefined = ch.id
-          const score = ch.score ?? 0
-          addLog(`✓ ${channelName} (score: ${score})`, "success")
+          addLog(`🔍 Searching: "${keyword}"`, "search")
+          const discoverNiche = tierData.tier === "core"
+            ? (selectedNiche === "Any Niche" ? (niche || "") : selectedNiche)
+            : ""  // adjacent/wildcard: don't constrain by niche
+          const discoverRes = await fetch("/api/channels/discover", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keywords: [keyword], niche: discoverNiche, service_type: serviceType, min_score: 60, min_subscribers: minSubs, max_subscribers: maxSubs, english_only: true, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
+          })
+          if (!discoverRes.ok) { addLog(`Failed to discover for "${keyword}"`, "error"); continue }
+          const discoverData = await discoverRes.json()
+          const channels = (discoverData.channels ?? [])
+            .filter((ch: { score?: number; youtube_channel_id?: string; id?: string }) => {
+              if ((ch.score ?? 0) < 60) return false
+              if (ch.id && seenChannelIds.current.has(ch.id)) return false
+              if (ch.youtube_channel_id && seenChannelIds.current.has(ch.youtube_channel_id)) return false
+              return true
+            })
+            .slice(0, 5)
+          if (channels.length === 0) { addLog(`No qualifying channels for "${keyword}"`, "info"); continue }
+          for (const ch of channels) {
+            if (ch.id) seenChannelIds.current.add(ch.id)
+            if (ch.youtube_channel_id) seenChannelIds.current.add(ch.youtube_channel_id)
+          }
+          addLog(`Found ${channels.length} qualifying channels`, "success")
+          setStats((prev) => ({ ...prev, found: prev.found + channels.length }))
+          if (channels.some((ch: { score?: number }) => (ch.score ?? 0) >= 75)) {
+            setSuccessfulPatterns((prev) => [...prev, keyword])
+          }
 
-          let leadId: string | null = null
-          try {
-            const leadRes = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel_id: channelDbId, score, score_breakdown: ch.quality_breakdown, source: "autolead" }) })
-            if (leadRes.ok) {
-              const leadData = await leadRes.json()
-              leadId = leadData.id
-              if (!leadData.already_exists) {
-                setStats((prev) => ({ ...prev, leadsAdded: prev.leadsAdded + 1 }))
-                addLog(`➕ Lead added: ${channelName}`, "success")
-                if (leadId) await fetch(`/api/leads/${leadId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crm_stage: "contacted" }) }).catch(() => {})
+          for (const ch of channels) {
+            if (!runningRef.current) return
+            const channelName = ch.name ?? "Unknown Channel"
+            const channelDbId: string | undefined = ch.id
+            const score = ch.score ?? 0
+            const tierTag = tierData.tier as string
+            addLog(`✓ ${channelName} (score: ${score}) [${tierLabel}]`, "success")
+
+            let leadId: string | null = null
+            try {
+              const leadRes = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel_id: channelDbId, score, score_breakdown: ch.quality_breakdown, source: "autolead", tags: [tierTag] }) })
+              if (leadRes.ok) {
+                const leadData = await leadRes.json()
+                leadId = leadData.id
+                if (!leadData.already_exists) {
+                  setStats((prev) => ({ ...prev, leadsAdded: prev.leadsAdded + 1 }))
+                  addLog(`➕ Lead added: ${channelName}`, "success")
+                  if (leadId) await fetch(`/api/leads/${leadId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ crm_stage: "contacted" }) }).catch(() => {})
+                }
               }
-            }
-          } catch { addLog(`Failed to add lead: ${channelName}`, "error") }
+            } catch { addLog(`Failed to add lead: ${channelName}`, "error") }
 
-          try {
-            const emailRes = await fetch("/api/outreach/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch, serviceType, tone: "professional", outreachChannel: "email", agencyName: orgName, agencyValueProp: "" }) })
-            if (emailRes.ok && leadId) {
-              const emailData = await emailRes.json()
-              const saveRes = await fetch("/api/outreach/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_id: leadId, channel: "email", subject: emailData.subject, body: emailData.body, status: "pending" }) })
-              if (saveRes.ok) { setStats((prev) => ({ ...prev, emailsQueued: prev.emailsQueued + 1 })); addLog(`📧 Email queued for ${channelName}`, "email") }
-            }
-          } catch { addLog(`Failed to generate email for ${channelName}`, "error") }
-        }
-      }
+            try {
+              const emailRes = await fetch("/api/outreach/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch, serviceType, tone: "professional", outreachChannel: "email", agencyName: orgName, agencyValueProp: "" }) })
+              if (emailRes.ok && leadId) {
+                const emailData = await emailRes.json()
+                const saveRes = await fetch("/api/outreach/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_id: leadId, channel: "email", subject: emailData.subject, body: emailData.body, status: "pending" }) })
+                if (saveRes.ok) { setStats((prev) => ({ ...prev, emailsQueued: prev.emailsQueued + 1 })); addLog(`📧 Email queued for ${channelName}`, "email") }
+              }
+            } catch { addLog(`Failed to generate email for ${channelName}`, "error") }
+          } // end for ch
+        } // end for keyword
+      } // end for tier
     } catch (err) {
       addLog(`Cycle error: ${err instanceof Error ? err.message : "Unknown error"}`, "error")
     }

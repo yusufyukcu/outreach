@@ -172,40 +172,86 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Center floating blocks */}
+          {/* 3D floating blocks */}
+
+          {/* Large indigo cube */}
           <div className="animate-block-1 absolute" style={{ left: "38%", top: "30%" }}>
             <div
-              className="w-20 h-20 rounded-3xl shadow-2xl"
+              className="w-20 h-20 rounded-3xl"
               style={{
                 background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(280 75% 65%))",
-                boxShadow: "0 24px 50px hsl(243 75% 59% / 0.4), inset 0 1px 0 hsl(0 0% 100% / 0.2)",
+                boxShadow: "0 24px 50px hsl(243 75% 59% / 0.4), inset 0 1px 0 hsl(0 0% 100% / 0.25), inset -2px -2px 8px hsl(243 75% 30% / 0.5)",
+                transform: "perspective(400px) rotateX(15deg) rotateY(-15deg)",
               }}
             />
           </div>
+
+          {/* Cyan sphere-ish */}
           <div className="animate-block-2 absolute" style={{ left: "22%", top: "52%" }}>
             <div
-              className="w-11 h-11 rounded-2xl shadow-xl"
+              className="w-12 h-12 rounded-full"
               style={{
-                background: "linear-gradient(135deg, hsl(190 85% 55%), hsl(210 85% 55%))",
-                boxShadow: "0 14px 28px hsl(190 85% 55% / 0.45)",
+                background: "radial-gradient(circle at 35% 35%, hsl(190 95% 75%), hsl(210 85% 45%))",
+                boxShadow: "0 14px 35px hsl(190 85% 55% / 0.5), inset 0 2px 4px hsl(0 0% 100% / 0.3)",
               }}
             />
           </div>
-          <div className="animate-block-3 absolute" style={{ right: "30%", bottom: "18%" }}>
+
+          {/* Orange small cube */}
+          <div className="animate-block-3 absolute" style={{ right: "28%", bottom: "16%" }}>
             <div
-              className="w-7 h-7 rounded-xl shadow-lg"
+              className="w-8 h-8 rounded-xl"
               style={{
                 background: "linear-gradient(135deg, hsl(38 95% 62%), hsl(20 90% 55%))",
-                boxShadow: "0 10px 20px hsl(38 95% 60% / 0.45)",
+                boxShadow: "0 10px 24px hsl(38 95% 60% / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.3), inset -1px -1px 4px hsl(20 90% 35% / 0.4)",
+                transform: "perspective(300px) rotateX(20deg) rotateY(20deg)",
               }}
             />
           </div>
+
+          {/* Pink tiny sphere */}
           <div className="animate-block-4 absolute" style={{ left: "28%", top: "12%" }}>
             <div
-              className="w-6 h-6 rounded-lg shadow-lg"
+              className="w-7 h-7 rounded-full"
               style={{
-                background: "linear-gradient(135deg, hsl(330 80% 65%), hsl(350 75% 60%))",
-                boxShadow: "0 8px 16px hsl(330 80% 65% / 0.45)",
+                background: "radial-gradient(circle at 35% 30%, hsl(330 90% 80%), hsl(350 80% 50%))",
+                boxShadow: "0 8px 20px hsl(330 80% 65% / 0.5), inset 0 2px 3px hsl(0 0% 100% / 0.4)",
+              }}
+            />
+          </div>
+
+          {/* Extra: teal pill */}
+          <div className="animate-block-2 absolute" style={{ right: "8%", top: "38%", animationDelay: "1s" }}>
+            <div
+              className="w-5 h-12 rounded-full"
+              style={{
+                background: "linear-gradient(180deg, hsl(170 80% 55%), hsl(190 85% 40%))",
+                boxShadow: "0 10px 24px hsl(170 80% 45% / 0.45), inset 0 1px 0 hsl(0 0% 100% / 0.3)",
+              }}
+            />
+          </div>
+
+          {/* Extra: violet ring/donut */}
+          <div className="animate-block-1 absolute" style={{ left: "10%", bottom: "22%", animationDelay: "0.6s" }}>
+            <div
+              className="w-10 h-10 rounded-full"
+              style={{
+                background: "transparent",
+                border: "4px solid hsl(270 80% 65%)",
+                boxShadow: "0 0 20px hsl(270 80% 65% / 0.6), inset 0 0 10px hsl(270 80% 65% / 0.2)",
+              }}
+            />
+          </div>
+
+          {/* Extra: emerald diamond */}
+          <div className="animate-block-3 absolute" style={{ right: "14%", top: "12%", animationDelay: "0.3s" }}>
+            <div
+              className="w-6 h-6"
+              style={{
+                background: "linear-gradient(135deg, hsl(150 80% 55%), hsl(170 85% 40%))",
+                boxShadow: "0 8px 20px hsl(150 80% 45% / 0.5)",
+                transform: "perspective(200px) rotateX(30deg) rotateZ(45deg)",
+                borderRadius: "4px",
               }}
             />
           </div>

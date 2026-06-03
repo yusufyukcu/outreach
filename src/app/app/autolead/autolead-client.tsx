@@ -49,6 +49,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [usedKeywords, setUsedKeywords] = useState<string[]>([])
   const [facelessMode, setFacelessMode] = useState(false)
   const [successfulPatterns, setSuccessfulPatterns] = useState<string[]>([])
+  const [minSubs, setMinSubs] = useState(1000)
+  const [maxSubs, setMaxSubs] = useState(500000)
 
   const runningRef = useRef(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -80,7 +82,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         const discoverRes = await fetch("/api/channels/discover", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keywords: [keyword], niche, service_type: serviceType, min_score: 60, min_subscribers: 1000, max_subscribers: 500000, english_only: true, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
+          body: JSON.stringify({ keywords: [keyword], niche, service_type: serviceType, min_score: 60, min_subscribers: minSubs, max_subscribers: maxSubs, english_only: true, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
         })
         if (!discoverRes.ok) { addLog(`Failed to discover for "${keyword}"`, "error"); continue }
         const discoverData = await discoverRes.json()
@@ -130,7 +132,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
       addLog(`⏳ Next cycle in ${selectedFrequency.label.toLowerCase().replace("every ", "")}...`, "info")
       timeoutRef.current = setTimeout(() => { if (runningRef.current) runCycle() }, selectedFrequency.value)
     }
-  }, [serviceType, orgNiche, orgName, usedKeywords, selectedFrequency, facelessMode, successfulPatterns])
+  }, [serviceType, orgNiche, orgName, usedKeywords, selectedFrequency, facelessMode, successfulPatterns, minSubs, maxSubs])
 
   function handleStart() { runningRef.current = true; setRunning(true); addLog("🚀 AutoLead started", "success"); runCycle() }
   function handleStop() {
@@ -266,6 +268,54 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             })}
           </div>
           {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change frequency</p>}
+        </div>
+
+        {/* Subscriber range */}
+        <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
+          <h3 className="text-sm font-bold text-foreground mb-3">Subscriber Range</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Min subscribers", value: minSubs, set: setMinSubs },
+              { label: "Max subscribers", value: maxSubs, set: setMaxSubs },
+            ].map(({ label, value, set }) => (
+              <div key={label}>
+                <label className="text-xs text-muted-foreground mb-1.5 block">{label}</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={value}
+                  disabled={running}
+                  onChange={(e) => set(Math.max(0, Number(e.target.value)))}
+                  className="w-full rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-3 flex-wrap">
+            {[
+              { label: "Nano (1K–10K)", min: 1000, max: 10000 },
+              { label: "Micro (10K–100K)", min: 10000, max: 100000 },
+              { label: "Mid (100K–500K)", min: 100000, max: 500000 },
+              { label: "Any", min: 1000, max: 500000 },
+            ].map((preset) => {
+              const active = minSubs === preset.min && maxSubs === preset.max
+              return (
+                <button
+                  key={preset.label}
+                  onClick={() => { if (!running) { setMinSubs(preset.min); setMaxSubs(preset.max) } }}
+                  disabled={running}
+                  className="text-xs px-2.5 py-1 rounded-lg font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={active
+                    ? { background: "hsl(243 75% 59% / 0.1)", border: "1px solid hsl(243 75% 59% / 0.3)", color: "hsl(243 75% 50%)" }
+                    : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                  }
+                >
+                  {preset.label}
+                </button>
+              )
+            })}
+          </div>
+          {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change range</p>}
         </div>
 
         {/* Activity log */}

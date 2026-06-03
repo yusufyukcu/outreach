@@ -13,6 +13,7 @@ import type { Lead, CRMStage, ServiceType } from "@/types"
 
 const STAGE_FILTERS = [
   { value: "all", label: "All Leads" },
+  { value: "autolead", label: "AutoLead", icon: "⚡" },
   { value: "followup", label: "Follow-up", icon: "🔔" },
   { value: "new", label: "New" },
   { value: "analyzed", label: "Analyzed" },
@@ -69,7 +70,11 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
   }, [leads, nowMs])
 
   const stageCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: leads.length, followup: followupLeads.length }
+    const counts: Record<string, number> = {
+      all: leads.length,
+      followup: followupLeads.length,
+      autolead: leads.filter((l) => l.source === "autolead").length,
+    }
     for (const l of leads) counts[l.crm_stage] = (counts[l.crm_stage] ?? 0) + 1
     return counts
   }, [leads, followupLeads])
@@ -77,6 +82,7 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
   const filteredLeads = useMemo(() => {
     if (activeFilter === "all") return leads
     if (activeFilter === "followup") return followupLeads
+    if (activeFilter === "autolead") return leads.filter((l) => l.source === "autolead")
     return leads.filter((l) => l.crm_stage === (activeFilter as CRMStage))
   }, [leads, followupLeads, activeFilter])
 

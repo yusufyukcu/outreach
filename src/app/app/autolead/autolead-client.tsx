@@ -133,7 +133,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
 
           let leadId: string | null = null
           try {
-            const leadRes = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel_id: channelDbId, score, score_breakdown: ch.quality_breakdown }) })
+            const leadRes = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel_id: channelDbId, score, score_breakdown: ch.quality_breakdown, source: "autolead" }) })
             if (leadRes.ok) {
               const leadData = await leadRes.json()
               leadId = leadData.id

@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single()
     if (!profile?.org_id) return NextResponse.json({ error: "No org" }, { status: 400 })
 
-    const { channel_id, score, score_breakdown } = await req.json()
+    const { channel_id, score, score_breakdown, source } = await req.json()
 
     // Check for existing
     const { data: existing } = await supabase
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         crm_stage: "new",
         lead_score: score ?? null,
         score_breakdown: score_breakdown ?? null,
-        source: "discovery",
+        source: source ?? "discovery",
       })
       .select()
       .single()

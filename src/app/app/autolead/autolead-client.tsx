@@ -61,6 +61,14 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [selectedDuration, setSelectedDuration] = useState<number | null>(null) // ms, null = unlimited
   const [remainingMs, setRemainingMs] = useState<number | null>(null)
   const [durationOpen, setDurationOpen] = useState(false)
+  const [subsOpen, setSubsOpen] = useState(false)
+
+  const SUB_PRESETS = [
+    { label: "Any", min: 1000, max: 500000 },
+    { label: "Nano (1K–10K)", min: 1000, max: 10000 },
+    { label: "Micro (10K–100K)", min: 10000, max: 100000 },
+    { label: "Mid (100K–500K)", min: 100000, max: 500000 },
+  ]
   const seenChannelIds = useRef<Set<string>>(new Set())
 
   const runningRef = useRef(false)
@@ -318,6 +326,64 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               )}
             </div>
 
+            {/* Subscriber range dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => !running && setSubsOpen((o) => !o)}
+                disabled={running}
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95"
+                style={SUB_PRESETS.some((p) => p.min === minSubs && p.max === maxSubs && p.label !== "Any")
+                  ? { background: "hsl(243 75% 59% / 0.1)", border: "1px solid hsl(243 75% 59% / 0.3)", color: "hsl(243 75% 50%)" }
+                  : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                }
+              >
+                <span className="text-xs">
+                  {minSubs >= 1000 ? `${minSubs / 1000}K` : minSubs}–{maxSubs >= 1000 ? `${maxSubs / 1000}K` : maxSubs} subs
+                </span>
+                {!running && <ChevronDown className={`h-3.5 w-3.5 transition-transform ${subsOpen ? "rotate-180" : ""}`} />}
+              </button>
+
+              {subsOpen && !running && (
+                <div className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-2xl border border-border shadow-lg p-3 w-64 animate-scale-in">
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    {[
+                      { label: "Min", value: minSubs, set: setMinSubs },
+                      { label: "Max", value: maxSubs, set: setMaxSubs },
+                    ].map(({ label, value, set }) => (
+                      <div key={label}>
+                        <label className="text-[11px] text-muted-foreground mb-1 block">{label}</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={value}
+                          onChange={(e) => set(Math.max(0, Number(e.target.value)))}
+                          className="w-full rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-primary/50 transition-all"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUB_PRESETS.map((preset) => {
+                      const active = minSubs === preset.min && maxSubs === preset.max
+                      return (
+                        <button
+                          key={preset.label}
+                          onClick={() => { setMinSubs(preset.min); setMaxSubs(preset.max) }}
+                          className="text-[11px] px-2.5 py-1 rounded-lg font-medium transition-all"
+                          style={active
+                            ? { background: "hsl(243 75% 59% / 0.1)", border: "1px solid hsl(243 75% 59% / 0.3)", color: "hsl(243 75% 50%)" }
+                            : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                          }
+                        >
+                          {preset.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={running ? () => handleStop() : handleStart}
               className="inline-flex items-center gap-2 px-7 py-3 rounded-xl font-bold text-sm transition-all active:scale-95"
@@ -405,54 +471,6 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             })}
           </div>
           {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change frequency</p>}
-        </div>
-
-        {/* Subscriber range */}
-        <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
-          <h3 className="text-sm font-bold text-foreground mb-3">Subscriber Range</h3>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "Min subscribers", value: minSubs, set: setMinSubs },
-              { label: "Max subscribers", value: maxSubs, set: setMaxSubs },
-            ].map(({ label, value, set }) => (
-              <div key={label}>
-                <label className="text-xs text-muted-foreground mb-1.5 block">{label}</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={value}
-                  disabled={running}
-                  onChange={(e) => set(Math.max(0, Number(e.target.value)))}
-                  className="w-full rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2 mt-3 flex-wrap">
-            {[
-              { label: "Nano (1K–10K)", min: 1000, max: 10000 },
-              { label: "Micro (10K–100K)", min: 10000, max: 100000 },
-              { label: "Mid (100K–500K)", min: 100000, max: 500000 },
-              { label: "Any", min: 1000, max: 500000 },
-            ].map((preset) => {
-              const active = minSubs === preset.min && maxSubs === preset.max
-              return (
-                <button
-                  key={preset.label}
-                  onClick={() => { if (!running) { setMinSubs(preset.min); setMaxSubs(preset.max) } }}
-                  disabled={running}
-                  className="text-xs px-2.5 py-1 rounded-lg font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={active
-                    ? { background: "hsl(243 75% 59% / 0.1)", border: "1px solid hsl(243 75% 59% / 0.3)", color: "hsl(243 75% 50%)" }
-                    : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
-                  }
-                >
-                  {preset.label}
-                </button>
-              )
-            })}
-          </div>
-          {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change range</p>}
         </div>
 
         {/* Activity log */}

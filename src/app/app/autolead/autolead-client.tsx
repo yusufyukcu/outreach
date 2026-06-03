@@ -58,6 +58,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [minSubs, setMinSubs] = useState(1000)
   const [maxSubs, setMaxSubs] = useState(500000)
   const [selectedNiche, setSelectedNiche] = useState("Any Niche")
+  const seenChannelIds = useRef<Set<string>>(new Set())
 
   const runningRef = useRef(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -93,8 +94,18 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         })
         if (!discoverRes.ok) { addLog(`Failed to discover for "${keyword}"`, "error"); continue }
         const discoverData = await discoverRes.json()
-        const channels = (discoverData.channels ?? []).filter((ch: { score?: number }) => (ch.score ?? 0) >= 60).slice(0, 5)
+        const channels = (discoverData.channels ?? [])
+          .filter((ch: { score?: number; youtube_channel_id?: string }) => {
+            if ((ch.score ?? 0) < 60) return false
+            const ytId = ch.youtube_channel_id
+            if (ytId && seenChannelIds.current.has(ytId)) return false
+            return true
+          })
+          .slice(0, 5)
         if (channels.length === 0) { addLog(`No qualifying channels for "${keyword}"`, "info"); continue }
+        for (const ch of channels) {
+          if (ch.youtube_channel_id) seenChannelIds.current.add(ch.youtube_channel_id)
+        }
         addLog(`Found ${channels.length} qualifying channels`, "success")
         setStats((prev) => ({ ...prev, found: prev.found + channels.length }))
         if (channels.some((ch: { score?: number }) => (ch.score ?? 0) >= 75)) {

@@ -93,31 +93,33 @@ export async function POST(req: NextRequest) {
         messages: [
           {
             role: "system",
-            content: `You are a YouTube channel hunter finding channels that need ${serviceDesc}. You think in three discovery tiers. Return JSON only.`,
+            content: `You are a YouTube channel hunter finding channels that need ${serviceDesc}. You think in three discovery tiers. Return JSON only. Search terms must be 1-4 words — the kind of short niche label someone types into YouTube to browse a content category, NOT a video title or sentence.`,
           },
           {
             role: "user",
-            content: `Generate discovery keywords across 3 tiers for finding channels that need ${serviceDesc}.
+            content: `Generate discovery search terms across 3 tiers for finding YouTube channels that need ${serviceDesc}.
 
 Primary niche: "${org_niche ?? "general content"}"
-Adjacent niches to consider: ${adjacentNiches.join(", ")}
+Adjacent niches: ${adjacentNiches.join(", ")}
 ${previousList}${wonNicheCtx}${patternsCtx}
 
-TIERS:
-1. CORE (70% of effort) — Channels squarely inside "${org_niche ?? "general content"}". Invent a specific sub-niche/format target, then 3 short search terms.
-2. ADJACENT (20%) — One step away from the primary niche (pick from adjacent niches above). Invent a target, then 2 short search terms.
-3. WILDCARD (10%) — Completely different niche, high potential but unexpected. Be bold. Invent a surprising target, then 1 short search term.
+CRITICAL RULE — search terms must be 1-4 words, niche/format labels ONLY:
+✅ GOOD: "faceless finance", "budget tech", "reddit stories", "UK personal finance", "cooking asmr", "stock market beginner"
+❌ BAD (too long / sentence-like): "AI tools for small businesses", "how to make money online", "best gaming channel tips 2024"
 
-All search terms: 2-5 words max, like real YouTube searches. NOT titles or sentences.
-Good: "faceless finance channel", "budget tech review", "reddit story narration"
-Bad: "AI tools for small businesses 2024" ❌
+Think: what 1-4 word phrase do people TYPE to browse a YouTube niche — not what they search for a specific video.
+
+TIERS:
+1. CORE — 3 terms squarely inside "${org_niche ?? "general content"}". Pick a specific underserved sub-niche or format angle.
+2. ADJACENT — 2 terms one step outside the primary niche (use adjacent niches list). Different audience, related intent.
+3. WILDCARD — 1 term from a completely unexpected niche. High upside, low competition for outreach.
 
 Return JSON:
 {
   "tiers": [
-    { "tier": "core", "target": "description of specific channel type", "keywords": ["term1", "term2", "term3"] },
-    { "tier": "adjacent", "target": "description", "keywords": ["term1", "term2"] },
-    { "tier": "wildcard", "target": "description", "keywords": ["term1"] }
+    { "tier": "core", "target": "one sentence describing the specific channel type you're hunting", "keywords": ["term1", "term2", "term3"] },
+    { "tier": "adjacent", "target": "one sentence", "keywords": ["term1", "term2"] },
+    { "tier": "wildcard", "target": "one sentence", "keywords": ["term1"] }
   ],
   "niche": "primary niche label"
 }`,

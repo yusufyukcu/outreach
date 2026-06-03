@@ -1,7 +1,7 @@
 import Link from "next/link"
 import {
   Search, BarChart3, KanbanSquare, Mail, TrendingUp,
-  ArrowRight, Sparkles, Ghost, Target, CheckCircle2,
+  ArrowRight, Sparkles, Ghost, Target, CheckCircle2, Zap,
 } from "lucide-react"
 import { Logo, LogoMark } from "@/components/ui/logo"
 
@@ -353,6 +353,120 @@ export default function Home() {
                 <p className="text-sm text-muted-foreground leading-relaxed">{item.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── AutoLead Showcase ────────────────────────────────────── */}
+      <section className="max-w-6xl mx-auto px-8 py-24">
+        <div className="rounded-3xl overflow-hidden relative" style={{
+          background: "linear-gradient(135deg, hsl(243 75% 12%), hsl(265 80% 10%), hsl(280 75% 12%))",
+          border: "1px solid hsl(243 75% 59% / 0.25)",
+          boxShadow: "0 40px 120px hsl(243 75% 20% / 0.4)",
+        }}>
+          {/* Background glow orbs */}
+          <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, hsl(243 75% 59% / 0.15), transparent 70%)", filter: "blur(40px)" }} />
+          <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, hsl(280 80% 60% / 0.12), transparent 70%)", filter: "blur(40px)" }} />
+
+          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-0">
+            {/* Left: copy */}
+            <div className="p-10 lg:p-14 flex flex-col justify-center">
+              <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-bold mb-6 w-fit" style={{ background: "hsl(243 75% 59% / 0.2)", border: "1px solid hsl(243 75% 59% / 0.4)", color: "hsl(243 90% 80%)" }}>
+                <Zap className="h-3.5 w-3.5 fill-current" />
+                NEW — AutoLead
+              </div>
+
+              <h2 className="text-4xl xl:text-5xl font-extrabold tracking-tight leading-[1.1] mb-5 text-white">
+                Your agency runs<br />
+                <span className="bg-clip-text text-transparent" style={{ backgroundImage: "linear-gradient(135deg, hsl(243 90% 80%), hsl(280 85% 80%), hsl(190 85% 70%))" }}>
+                  while you sleep
+                </span>
+              </h2>
+
+              <p className="text-white/55 text-lg leading-relaxed mb-8 max-w-md">
+                AutoLead runs 24/7 in the background — discovering new YouTube channels, scoring them, and sending personalized cold emails. Fully automatic.
+              </p>
+
+              <ul className="space-y-3 mb-10">
+                {[
+                  "AI generates fresh keywords every cycle",
+                  "Only contacts channels scoring 60+",
+                  "Personalized email per channel, not templates",
+                  "Choose your pace — 10 sec to 1 hour intervals",
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-3 text-sm text-white/70">
+                    <div className="h-5 w-5 rounded-full flex items-center justify-center shrink-0" style={{ background: "hsl(243 75% 59% / 0.25)", border: "1px solid hsl(243 75% 59% / 0.5)" }}>
+                      <svg className="h-3 w-3 text-indigo-300" fill="none" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </div>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+
+              <Link
+                href="/auth/register"
+                className="btn-glow inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-base text-white w-fit"
+                style={{ background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))" }}
+              >
+                <Zap className="h-4 w-4 fill-current" />
+                Try AutoLead Free
+              </Link>
+            </div>
+
+            {/* Right: live UI mockup */}
+            <div className="p-8 lg:p-10 flex items-center justify-center border-t lg:border-t-0 lg:border-l" style={{ borderColor: "hsl(0 0% 100% / 0.07)" }}>
+              <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{ background: "hsl(0 0% 0% / 0.4)", border: "1px solid hsl(0 0% 100% / 0.1)", backdropFilter: "blur(20px)" }}>
+                {/* Mockup header */}
+                <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid hsl(0 0% 100% / 0.07)" }}>
+                  <div className="flex items-center gap-2">
+                    <div className="h-6 w-6 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))" }}>
+                      <Zap className="h-3.5 w-3.5 text-white fill-current" />
+                    </div>
+                    <span className="text-xs font-bold text-white/80">AutoLead</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-semibold text-emerald-400">RUNNING</span>
+                  </div>
+                </div>
+
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-px" style={{ background: "hsl(0 0% 100% / 0.05)" }}>
+                  {[{ v: "24", l: "Found" }, { v: "18", l: "Emailed" }, { v: "18", l: "Leads" }].map((s) => (
+                    <div key={s.l} className="py-3 text-center" style={{ background: "hsl(0 0% 0% / 0.3)" }}>
+                      <p className="text-lg font-extrabold text-white">{s.v}</p>
+                      <p className="text-[10px] text-white/40">{s.l}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Activity log */}
+                <div className="p-3 space-y-1.5">
+                  {[
+                    { icon: "📧", text: "Email queued · FinanceHub Pro", time: "2s ago", color: "text-indigo-300" },
+                    { icon: "✓", text: "Found · TechExplained (92)", time: "4s ago", color: "text-emerald-300" },
+                    { icon: "✓", text: "Found · Africa Facts Daily (78)", time: "4s ago", color: "text-emerald-300" },
+                    { icon: "🔍", text: "Searching · \"faceless finance\"", time: "6s ago", color: "text-white/50" },
+                    { icon: "📧", text: "Email queued · Mega Projects", time: "18s ago", color: "text-indigo-300" },
+                    { icon: "✓", text: "Found · Invest Simplified (85)", time: "20s ago", color: "text-emerald-300" },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5" style={{ background: "hsl(0 0% 100% / 0.04)" }}>
+                      <span className="text-xs shrink-0">{item.icon}</span>
+                      <span className={`text-[11px] font-medium truncate flex-1 ${item.color}`}>{item.text}</span>
+                      <span className="text-[10px] text-white/25 shrink-0">{item.time}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Interval badge */}
+                <div className="px-3 pb-3">
+                  <div className="rounded-lg px-3 py-2 flex items-center justify-between" style={{ background: "hsl(150 70% 40% / 0.15)", border: "1px solid hsl(150 70% 40% / 0.3)" }}>
+                    <span className="text-[11px] text-emerald-300 font-medium">Every 10 minutes</span>
+                    <span className="text-[10px] font-bold text-emerald-400">✓ More Safe to Use</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

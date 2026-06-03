@@ -55,8 +55,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [usedKeywords, setUsedKeywords] = useState<string[]>([])
   const [facelessMode, setFacelessMode] = useState(false)
   const [successfulPatterns, setSuccessfulPatterns] = useState<string[]>([])
-  const [minSubs, setMinSubs] = useState(1000)
-  const [maxSubs, setMaxSubs] = useState(500000)
+  const [minSubs, setMinSubs] = useState(5000)
+  const [maxSubs, setMaxSubs] = useState(1000000)
   const [selectedNiche, setSelectedNiche] = useState("Any Niche")
   const [selectedDuration, setSelectedDuration] = useState<number | null>(null) // ms, null = unlimited
   const [remainingMs, setRemainingMs] = useState<number | null>(null)
@@ -64,10 +64,10 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [subsOpen, setSubsOpen] = useState(false)
 
   const SUB_PRESETS = [
-    { label: "Any", min: 1000, max: 500000 },
+    { label: "Any", min: 5000, max: 1000000 },
     { label: "Nano (1K–10K)", min: 1000, max: 10000 },
     { label: "Micro (10K–100K)", min: 10000, max: 100000 },
-    { label: "Mid (100K–500K)", min: 100000, max: 500000 },
+    { label: "Mid (100K–1M)", min: 100000, max: 1000000 },
   ]
   const seenChannelIds = useRef<Set<string>>(new Set())
 
@@ -128,7 +128,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
           const discoverRes = await fetch("/api/channels/discover", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ keywords: [keyword], niche: discoverNiche, service_type: serviceType, min_score: 60, min_subscribers: minSubs, max_subscribers: maxSubs, english_only: true, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
+            body: JSON.stringify({ keywords: [keyword], niche: discoverNiche, service_type: serviceType, min_score: 60, min_subscribers: minSubs, max_subscribers: maxSubs, english_only: true, min_recent_views: 1000, include_low_quality: false, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
           })
           if (!discoverRes.ok) { addLog(`Failed to discover for "${keyword}"`, "error"); continue }
           const discoverData = await discoverRes.json()

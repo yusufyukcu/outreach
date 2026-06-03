@@ -4,12 +4,12 @@ import {
   ArrowRight, Sparkles, Ghost, Target, CheckCircle2,
 } from "lucide-react"
 import { Logo, LogoMark } from "@/components/ui/logo"
-import { SplineBackground } from "@/components/ui/spline-background"
+import { ThreeBackground } from "@/components/ui/three-background"
 
 export default function Home() {
   return (
     <div className="relative min-h-screen overflow-x-hidden">
-      <SplineBackground />
+      <ThreeBackground />
       <div className="relative z-10">
 
       {/* ── Nav ──────────────────────────────────────────────────── */}

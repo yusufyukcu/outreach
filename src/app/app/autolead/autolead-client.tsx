@@ -103,7 +103,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
       const kwRes = await fetch("/api/autolead/keywords", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ service_type: serviceType, org_niche: selectedNiche === "Any Niche" ? orgNiche : selectedNiche, previous_keywords: usedKeywords.slice(-20), successful_patterns: successfulPatterns.slice(-10) }),
+        body: JSON.stringify({ service_type: serviceType, org_niche: selectedNiche === "Any Niche" ? orgNiche : selectedNiche, previous_keywords: usedKeywords.slice(-20), successful_patterns: successfulPatterns.slice(-10), faceless_mode: facelessMode }),
       })
       if (!kwRes.ok) throw new Error("Failed to generate keywords")
       const { tiers, niche } = await kwRes.json()

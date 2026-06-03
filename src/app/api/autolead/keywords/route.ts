@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { service_type, org_niche, previous_keywords = [], successful_patterns = [] } = await req.json()
+    const { service_type, org_niche, previous_keywords = [], successful_patterns = [], faceless_mode = false } = await req.json()
 
     const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single()
     const orgId = profile?.org_id
@@ -76,6 +76,16 @@ export async function POST(req: NextRequest) {
 
     const adjacentNiches = ADJACENT_MAP[org_niche ?? ""] ?? ["Entrepreneurship", "Self-Improvement", "Productivity"]
 
+    const facelessCtx = faceless_mode ? `
+FACELESS MODE IS ON — only target channels that are or could be faceless:
+- Stock footage + voiceover (e.g. "top 10 cities", "most dangerous animals", "luxury lifestyle")
+- Narrated list/documentary style (e.g. "iceberg explained", "dark history facts")
+- Reddit/text story narration (e.g. "reddit stories", "aita narrated")
+- Screen recordings, tutorials, software demos
+- Animated explainers, whiteboard videos
+- AI-generated or compiled footage channels
+Keywords should reflect these formats: "top 10 facts", "faceless documentary", "reddit narration", "stock footage travel", NOT talking head or vlog formats.` : ""
+
     const serviceDescriptions: Record<string, string> = {
       editing:    "video editing services for YouTube channels",
       thumbnails: "custom thumbnail design for YouTube channels",
@@ -101,7 +111,7 @@ export async function POST(req: NextRequest) {
 
 Primary niche: "${org_niche ?? "general content"}"
 Adjacent niches: ${adjacentNiches.join(", ")}
-${previousList}${wonNicheCtx}${patternsCtx}
+${previousList}${wonNicheCtx}${patternsCtx}${facelessCtx}
 
 CRITICAL RULE — search terms must be 1-4 words, niche/format labels ONLY:
 ✅ GOOD: "faceless finance", "budget tech", "reddit stories", "UK personal finance", "cooking asmr", "stock market beginner"

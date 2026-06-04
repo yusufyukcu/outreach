@@ -152,7 +152,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
           const discoverRes = await fetch("/api/channels/discover", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ keywords: [keyword], niche: discoverNiche, service_type: serviceType, min_score: 60, min_subscribers: minSubs, max_subscribers: maxSubs, english_only: true, min_recent_views: 1000, include_low_quality: false, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 50 } : {}) }),
+            body: JSON.stringify({ keywords: [keyword], niche: discoverNiche, service_type: serviceType, min_score: 50, min_subscribers: minSubs, max_subscribers: maxSubs, english_only: true, min_recent_views: 500, include_low_quality: false, ...(facelessMode ? { faceless_mode: true, min_faceless_score: 40 } : {}) }),
           })
           if (!discoverRes.ok) { addLog(`Failed to discover for "${keyword}"`, "error"); continue }
           const discoverData = await discoverRes.json()

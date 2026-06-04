@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     const signature = buildSignature(profile.full_name, resolvedAgency)
     const agencyLine = resolvedAgency
       ? `Agency Name: ${resolvedAgency}`
-      : `Note: Do not mention a specific agency name anywhere — refer to your side as "we" / "our team".`
+      : `Note: Do not mention a specific agency name anywhere — this is a solo freelancer, not an agency. Use "I" / "my" throughout, never "we" or "our team".`
 
     // Past work, shared across all generated emails as optional social proof.
     const { data: expRows } = await supabase
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
           }
 
           const channelContext = buildChannelContext(channel)
-          const systemPrompt = buildSystemPrompt(service_type)
+          const systemPrompt = buildSystemPrompt(service_type, !resolvedAgency)
           const toneInstruction = TONE_INSTRUCTIONS[tone]
 
           const userPrompt = `${toneInstruction}

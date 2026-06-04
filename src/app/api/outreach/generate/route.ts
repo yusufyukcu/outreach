@@ -59,11 +59,11 @@ export async function POST(req: NextRequest) {
     }
 
     const channelContext = buildChannelContext(channel)
-    const systemPrompt = buildSystemPrompt(serviceType)
+    const systemPrompt = buildSystemPrompt(serviceType, !resolvedAgency)
     const toneInstruction = TONE_INSTRUCTIONS[tone]
     const agencyLine = resolvedAgency
       ? `Agency Name: ${resolvedAgency}`
-      : `Note: Do not mention a specific agency name anywhere — refer to your side as "we" / "our team".`
+      : `Note: Do not mention a specific agency name anywhere — this is a solo freelancer, not an agency. Use "I" / "my" throughout, never "we" or "our team".`
 
     const userPrompt = `${toneInstruction}
 

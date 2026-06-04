@@ -45,14 +45,22 @@ export function buildChannelContext(channel: Channel): string {
   return lines.join("\n")
 }
 
-export function buildSystemPrompt(serviceType: ServiceType): string {
-  const serviceDescriptions: Record<ServiceType, string> = {
+export function buildSystemPrompt(serviceType: ServiceType, isSolo = false): string {
+  const agencyDescriptions: Record<ServiceType, string> = {
     editing: "video editing agency that helps YouTubers produce higher-quality, faster-paced, more engaging videos",
     thumbnails: "thumbnail design agency that creates high-CTR custom thumbnails that dramatically increase click-through rates",
     scripting: "scriptwriting agency that helps creators structure compelling, well-researched video scripts that retain viewers",
     growth: "YouTube channel growth agency that helps creators optimize their content strategy, SEO, and posting schedule",
     custom: "YouTube services agency offering custom production solutions",
   }
+  const soloDescriptions: Record<ServiceType, string> = {
+    editing: "freelance video editor who helps YouTubers produce higher-quality, faster-paced, more engaging videos",
+    thumbnails: "freelance thumbnail designer who creates high-CTR custom thumbnails that dramatically increase click-through rates",
+    scripting: "freelance scriptwriter who helps creators structure compelling, well-researched video scripts that retain viewers",
+    growth: "freelance YouTube growth consultant who helps creators optimize their content strategy, SEO, and posting schedule",
+    custom: "freelance YouTube production specialist",
+  }
+  const serviceDescriptions = isSolo ? soloDescriptions : agencyDescriptions
 
   const serviceOffer: Record<ServiceType, string> = {
     editing:    "handle the editing process while maintaining a clean, engaging style that keeps viewers watching",

@@ -199,13 +199,18 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
 
             if (autoSendRef.current && leadId) {
               const to = ch.business_email ?? null
-              if (!to) { addLog(`⚠️ No email found for ${channelName} — skipped`, "info"); continue }
               try {
                 const emailRes = await fetch("/api/outreach/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch, serviceType, tone: "professional", outreachChannel: "email", agencyName: orgName, agencyValueProp: "" }) })
                 if (emailRes.ok) {
                   const emailData = await emailRes.json()
-                  emailQueueRef.current.push({ leadId, channelName, to, subject: emailData.subject, body: emailData.body })
-                  addLog(`📬 Queued: ${channelName}`, "email")
+                  if (to) {
+                    emailQueueRef.current.push({ leadId, channelName, to, subject: emailData.subject, body: emailData.body })
+                    addLog(`📬 Queued: ${channelName}`, "email")
+                  } else {
+                    // No email found — save as draft so user can send manually
+                    await fetch("/api/outreach/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_id: leadId, channel: "email", subject: emailData.subject, body: emailData.body, status: "pending" }) }).catch(() => {})
+                    addLog(`📝 Draft saved for ${channelName} (no email found)`, "info")
+                  }
                 }
               } catch { addLog(`Failed to generate email for ${channelName}`, "error") }
             }

@@ -146,9 +146,6 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         for (const keyword of (tierData.keywords as string[]).slice(0, kwLimit)) {
           if (!runningRef.current) return
           addLog(`🔍 Searching: "${keyword}"`, "search")
-          // ~12 min between searches keeps daily usage under 10k quota units (100/search, 4 searches/cycle)
-          await new Promise((r) => setTimeout(r, 12 * 60_000))
-          if (!runningRef.current) return
           const discoverNiche = tierData.tier === "core"
             ? (selectedNiche === "Any Niche" ? (niche || "") : selectedNiche)
             : ""  // adjacent/wildcard: don't constrain by niche
@@ -213,6 +210,12 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               } catch { addLog(`Failed to generate email for ${channelName}`, "error") }
             }
           } // end for ch
+
+          // 3 min between searches (3 keys × 10k units = 300 searches/day = 1 per 4.8 min)
+          if (runningRef.current) {
+            addLog(`⏳ Waiting 3 min before next search...`, "info")
+            await new Promise((r) => setTimeout(r, 3 * 60_000))
+          }
         } // end for keyword
       } // end for tier
     } catch (err) {

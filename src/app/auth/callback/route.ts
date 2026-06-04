@@ -20,6 +20,20 @@ export async function GET(req: NextRequest) {
   }
 
   const session = data.session
+
+  console.log("[gmail-callback] provider_refresh_token:", !!session.provider_refresh_token)
+  console.log("[gmail-callback] provider_token:", !!session.provider_token)
+  console.log("[gmail-callback] provider:", session.user?.app_metadata?.provider)
+
+  if (!session.provider_refresh_token) {
+    // No refresh token — Google didn't grant offline access.
+    // This happens when: (1) gmail_send scope not in Supabase Google provider config,
+    // (2) user already granted access before and Google skipped consent.
+    console.warn("[gmail-callback] No refresh token received — redirecting with retry hint")
+    const retryNext = next.includes("gmail=") ? next : `${next}${next.includes("?") ? "&" : "?"}gmail=retry`
+    return NextResponse.redirect(new URL(retryNext, origin))
+  }
+
   if (session.provider_refresh_token && session.user) {
     try {
       const { data: profile } = await supabase
@@ -30,7 +44,7 @@ export async function GET(req: NextRequest) {
 
       if (profile?.org_id) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any).from("gmail_accounts").upsert(
+        const { error: upsertError } = await (supabase as any).from("gmail_accounts").upsert(
           {
             user_id: session.user.id,
             org_id: profile.org_id,
@@ -42,10 +56,14 @@ export async function GET(req: NextRequest) {
           },
           { onConflict: "user_id" },
         )
+        if (upsertError) {
+          console.error("[gmail-callback] upsert error:", upsertError)
+        } else {
+          console.log("[gmail-callback] gmail_accounts upserted successfully")
+        }
       }
     } catch (err) {
-      // Non-fatal: the user is still signed in, they just can't send yet.
-      console.error("Failed to store Gmail tokens:", err)
+      console.error("[gmail-callback] Failed to store Gmail tokens:", err)
     }
   }
 

@@ -23,6 +23,14 @@ interface LogEntry {
   type: "info" | "success" | "email" | "search" | "error"
 }
 
+interface EmailJob {
+  leadId: string
+  channelName: string
+  to: string
+  subject: string
+  body: string
+}
+
 interface FrequencyOption {
   label: string
   value: number
@@ -108,6 +116,10 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const dailyLimitRef = useRef(dailyLimit)
   useEffect(() => { dailyLimitRef.current = dailyLimit }, [dailyLimit])
 
+  // Email queue — discovery pushes here, a separate interval drains it
+  const emailQueueRef = useRef<EmailJob[]>([])
+  const mailIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const runCycle = useCallback(async () => {
     if (!runningRef.current) return
     try {
@@ -185,32 +197,15 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               }
             } catch { addLog(`Failed to add lead: ${channelName}`, "error") }
 
-            if (autoSendRef.current) {
-              if (emailsSentRef.current >= dailyLimitRef.current) {
-                addLog(`🚫 Daily limit of ${dailyLimitRef.current} emails reached — stopping`, "error")
-                handleStop()
-                return
-              }
+            if (autoSendRef.current && leadId) {
+              const to = ch.business_email ?? null
+              if (!to) { addLog(`⚠️ No email found for ${channelName} — skipped`, "info"); continue }
               try {
                 const emailRes = await fetch("/api/outreach/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch, serviceType, tone: "professional", outreachChannel: "email", agencyName: orgName, agencyValueProp: "" }) })
-                if (emailRes.ok && leadId) {
+                if (emailRes.ok) {
                   const emailData = await emailRes.json()
-                  // Wait for mail frequency delay before sending (except the very first)
-                  if (emailsSentRef.current > 0) {
-                    addLog(`⏳ Waiting ${mailFreqRef.current.label.toLowerCase().replace("every ", "")} before next send...`, "info")
-                    await new Promise((r) => setTimeout(r, mailFreqRef.current.value))
-                    if (!runningRef.current) return
-                  }
-                  const sendRes = await fetch("/api/gmail/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: ch.contact_email ?? ch.email ?? null, subject: emailData.subject, body: emailData.body, lead_id: leadId }) })
-                  if (sendRes.ok) {
-                    emailsSentRef.current += 1
-                    setStats((prev) => ({ ...prev, emailsQueued: prev.emailsQueued + 1 }))
-                    addLog(`📧 Email sent to ${channelName}`, "email")
-                  } else {
-                    // Fallback: save as queued if send fails
-                    await fetch("/api/outreach/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_id: leadId, channel: "email", subject: emailData.subject, body: emailData.body, status: "pending" }) }).catch(() => {})
-                    addLog(`⚠️ Send failed for ${channelName} — saved as draft`, "error")
-                  }
+                  emailQueueRef.current.push({ leadId, channelName, to, subject: emailData.subject, body: emailData.body })
+                  addLog(`📬 Queued: ${channelName}`, "email")
                 }
               } catch { addLog(`Failed to generate email for ${channelName}`, "error") }
             }
@@ -244,15 +239,42 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
       }, selectedDuration)
     }
     runCycle()
+
+    // Start mail drainer — sends one email from the queue every mailFreq interval
+    if (autoSendRef.current) {
+      emailQueueRef.current = []
+      mailIntervalRef.current = setInterval(async () => {
+        if (emailsSentRef.current >= dailyLimitRef.current) {
+          addLog(`🚫 Daily limit of ${dailyLimitRef.current} emails reached — stopping`, "error")
+          handleStop()
+          return
+        }
+        const job = emailQueueRef.current.shift()
+        if (!job) return
+        try {
+          const sendRes = await fetch("/api/gmail/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: job.to, subject: job.subject, body: job.body, lead_id: job.leadId }) })
+          if (sendRes.ok) {
+            emailsSentRef.current += 1
+            setStats((prev) => ({ ...prev, emailsQueued: prev.emailsQueued + 1 }))
+            addLog(`📧 Email sent to ${job.channelName}`, "email")
+          } else {
+            await fetch("/api/outreach/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_id: job.leadId, channel: "email", subject: job.subject, body: job.body, status: "pending" }) }).catch(() => {})
+            addLog(`⚠️ Send failed for ${job.channelName} — saved as draft`, "error")
+          }
+        } catch { addLog(`Send error for ${job.channelName}`, "error") }
+      }, mailFreqRef.current.value)
+    }
   }
   function handleStop(timedOut = false) {
     runningRef.current = false
     setRunning(false)
     setRemainingMs(null)
     emailsSentRef.current = 0
+    emailQueueRef.current = []
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }
     if (durationTimerRef.current) { clearTimeout(durationTimerRef.current); durationTimerRef.current = null }
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
+    if (mailIntervalRef.current) { clearInterval(mailIntervalRef.current); mailIntervalRef.current = null }
     addLog(timedOut ? "⏱ Duration reached — AutoLead stopped" : "⏹ AutoLead stopped", "info")
   }
 
@@ -261,6 +283,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     if (durationTimerRef.current) clearTimeout(durationTimerRef.current)
     if (tickRef.current) clearInterval(tickRef.current)
+    if (mailIntervalRef.current) clearInterval(mailIntervalRef.current)
   }, [])
 
   function formatRemaining(ms: number) {

@@ -23,7 +23,11 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
       grant_type: "refresh_token",
     }),
   })
-  if (!res.ok) throw new Error(`Token refresh failed: ${await res.text()}`)
+  if (!res.ok) {
+    const body = await res.text()
+    console.error("[gmail] Token refresh failed:", body)
+    throw new Error(`Token refresh failed: ${body}`)
+  }
   return res.json()
 }
 

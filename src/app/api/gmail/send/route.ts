@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, sent_from: account.email })
   } catch (err) {
-    console.error("Gmail send error:", err)
-    return NextResponse.json({ error: "Failed to send email" }, { status: 500 })
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error("Gmail send error:", msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

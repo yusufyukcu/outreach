@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle, Ghost, Clock, ChevronDown } from "lucide-react"
+import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle, Ghost, Clock, ChevronDown, SendHorizonal } from "lucide-react"
 import type { ServiceType } from "@/types"
 
 const NICHES = [
@@ -49,7 +49,6 @@ let logIdCounter = 0
 
 export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClientProps) {
   const [running, setRunning] = useState(false)
-  const [selectedFrequency, setSelectedFrequency] = useState(FREQUENCY_OPTIONS[3])
   const [log, setLog] = useState<LogEntry[]>([])
   const [stats, setStats] = useState({ found: 0, emailsQueued: 0, leadsAdded: 0 })
   const [usedKeywords, setUsedKeywords] = useState<string[]>([])
@@ -62,6 +61,9 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [remainingMs, setRemainingMs] = useState<number | null>(null)
   const [durationOpen, setDurationOpen] = useState(false)
   const [subsOpen, setSubsOpen] = useState(false)
+  const [autoSend, setAutoSend] = useState(false)
+  const [mailFreqOpen, setMailFreqOpen] = useState(false)
+  const [selectedMailFreq, setSelectedMailFreq] = useState(FREQUENCY_OPTIONS[3]) // Every 10 minutes default
 
   const SUB_PRESETS = [
     { label: "Any", min: 5000, max: 1000000 },
@@ -95,6 +97,12 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     adjacent: "🔗 Adjacent",
     wildcard: "🔥 Wildcard",
   }
+
+  const autoSendRef = useRef(autoSend)
+  useEffect(() => { autoSendRef.current = autoSend }, [autoSend])
+  const mailFreqRef = useRef(selectedMailFreq)
+  useEffect(() => { mailFreqRef.current = selectedMailFreq }, [selectedMailFreq])
+  const emailsSentRef = useRef(0)
 
   const runCycle = useCallback(async () => {
     if (!runningRef.current) return
@@ -173,14 +181,30 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               }
             } catch { addLog(`Failed to add lead: ${channelName}`, "error") }
 
-            try {
-              const emailRes = await fetch("/api/outreach/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch, serviceType, tone: "professional", outreachChannel: "email", agencyName: orgName, agencyValueProp: "" }) })
-              if (emailRes.ok && leadId) {
-                const emailData = await emailRes.json()
-                const saveRes = await fetch("/api/outreach/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_id: leadId, channel: "email", subject: emailData.subject, body: emailData.body, status: "pending" }) })
-                if (saveRes.ok) { setStats((prev) => ({ ...prev, emailsQueued: prev.emailsQueued + 1 })); addLog(`📧 Email queued for ${channelName}`, "email") }
-              }
-            } catch { addLog(`Failed to generate email for ${channelName}`, "error") }
+            if (autoSendRef.current) {
+              try {
+                const emailRes = await fetch("/api/outreach/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch, serviceType, tone: "professional", outreachChannel: "email", agencyName: orgName, agencyValueProp: "" }) })
+                if (emailRes.ok && leadId) {
+                  const emailData = await emailRes.json()
+                  // Wait for mail frequency delay before sending (except the very first)
+                  if (emailsSentRef.current > 0) {
+                    addLog(`⏳ Waiting ${mailFreqRef.current.label.toLowerCase().replace("every ", "")} before next send...`, "info")
+                    await new Promise((r) => setTimeout(r, mailFreqRef.current.value))
+                    if (!runningRef.current) return
+                  }
+                  const sendRes = await fetch("/api/gmail/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ to: ch.contact_email ?? ch.email ?? null, subject: emailData.subject, body: emailData.body, lead_id: leadId }) })
+                  if (sendRes.ok) {
+                    emailsSentRef.current += 1
+                    setStats((prev) => ({ ...prev, emailsQueued: prev.emailsQueued + 1 }))
+                    addLog(`📧 Email sent to ${channelName}`, "email")
+                  } else {
+                    // Fallback: save as queued if send fails
+                    await fetch("/api/outreach/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_id: leadId, channel: "email", subject: emailData.subject, body: emailData.body, status: "pending" }) }).catch(() => {})
+                    addLog(`⚠️ Send failed for ${channelName} — saved as draft`, "error")
+                  }
+                }
+              } catch { addLog(`Failed to generate email for ${channelName}`, "error") }
+            }
           } // end for ch
         } // end for keyword
       } // end for tier
@@ -189,10 +213,10 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     }
 
     if (runningRef.current) {
-      addLog(`⏳ Next cycle in ${selectedFrequency.label.toLowerCase().replace("every ", "")}...`, "info")
-      timeoutRef.current = setTimeout(() => { if (runningRef.current) runCycle() }, selectedFrequency.value)
+      addLog("🔄 Starting next cycle...", "info")
+      timeoutRef.current = setTimeout(() => { if (runningRef.current) runCycle() }, 2000)
     }
-  }, [serviceType, orgNiche, orgName, usedKeywords, selectedFrequency, facelessMode, successfulPatterns, minSubs, maxSubs, selectedNiche])
+  }, [serviceType, orgNiche, orgName, usedKeywords, facelessMode, successfulPatterns, minSubs, maxSubs, selectedNiche])
 
   function handleStart() {
     runningRef.current = true
@@ -216,6 +240,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     runningRef.current = false
     setRunning(false)
     setRemainingMs(null)
+    emailsSentRef.current = 0
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }
     if (durationTimerRef.current) { clearTimeout(durationTimerRef.current); durationTimerRef.current = null }
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
@@ -282,7 +307,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                 </span>
               </div>
               <p className="text-xs text-muted-foreground/60 mt-0.5">
-                {running ? `Cycling ${selectedFrequency.label.toLowerCase()}` : "Click Start to begin"}
+                {running ? (autoSend ? `Auto sending · ${selectedMailFreq.label.toLowerCase()}` : "Adding leads only") : "Click Start to begin"}
               </p>
             </div>
           </div>
@@ -300,6 +325,59 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               <Ghost className="h-4 w-4" />
               Faceless
             </button>
+
+            {/* Auto Send toggle */}
+            <button
+              onClick={() => !running && setAutoSend((v) => !v)}
+              disabled={running}
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95"
+              style={autoSend
+                ? { background: "hsl(150 60% 40% / 0.1)", border: "1px solid hsl(150 60% 40% / 0.3)", color: "hsl(150 60% 32%)" }
+                : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+              }
+            >
+              <SendHorizonal className="h-4 w-4" />
+              {autoSend ? "Auto Send" : "Lead Only"}
+            </button>
+
+            {/* Mail Frequency dropdown — only shown when autoSend is ON */}
+            {autoSend && (
+              <div className="relative">
+                <button
+                  onClick={() => !running && setMailFreqOpen((o) => !o)}
+                  disabled={running}
+                  className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95"
+                  style={{ background: "hsl(150 60% 40% / 0.08)", border: "1px solid hsl(150 60% 40% / 0.25)", color: "hsl(150 60% 32%)" }}
+                >
+                  <Mail className="h-4 w-4" />
+                  <span className="text-xs">{selectedMailFreq.label.replace("Every ", "")}</span>
+                  {!running && <ChevronDown className={`h-3.5 w-3.5 transition-transform ${mailFreqOpen ? "rotate-180" : ""}`} />}
+                </button>
+
+                {mailFreqOpen && !running && (
+                  <div className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-2xl border border-border shadow-lg p-2 min-w-[210px] animate-scale-in">
+                    <p className="text-[11px] font-semibold text-muted-foreground px-3 pt-1 pb-2">Mail Frequency</p>
+                    {FREQUENCY_OPTIONS.map((opt) => {
+                      const active = selectedMailFreq.value === opt.value
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => { setSelectedMailFreq(opt); setMailFreqOpen(false) }}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all"
+                          style={active
+                            ? { background: "hsl(150 60% 40% / 0.08)", color: "hsl(150 60% 32%)", fontWeight: 600 }
+                            : { color: "hsl(220 9% 40%)" }
+                          }
+                        >
+                          <span>{opt.label}</span>
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${BADGE_STYLES[opt.badge]}`}>{opt.badgeText}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Timer toggle button */}
             <div className="relative">
@@ -458,28 +536,28 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
           {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change niche</p>}
         </div>
 
-        {/* Frequency selector */}
-        <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
-          <h3 className="text-sm font-bold text-foreground mb-3">Frequency</h3>
+        {/* Mail Frequency selector — only shown when Auto Send is on */}
+        {autoSend && <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
+          <h3 className="text-sm font-bold text-foreground mb-3">Mail Frequency</h3>
           <div className="space-y-1.5">
             {FREQUENCY_OPTIONS.map((opt) => {
-              const isSelected = selectedFrequency.value === opt.value
+              const isSelected = selectedMailFreq.value === opt.value
               return (
                 <button
                   key={opt.value}
-                  onClick={() => !running && setSelectedFrequency(opt)}
+                  onClick={() => !running && setSelectedMailFreq(opt)}
                   disabled={running}
                   className="w-full flex items-center justify-between rounded-xl px-4 py-2.5 text-sm transition-all duration-150"
                   style={{
-                    background: isSelected ? "hsl(243 75% 59% / 0.06)" : "transparent",
-                    border: isSelected ? "1px solid hsl(243 75% 59% / 0.25)" : "1px solid transparent",
+                    background: isSelected ? "hsl(150 60% 40% / 0.06)" : "transparent",
+                    border: isSelected ? "1px solid hsl(150 60% 40% / 0.25)" : "1px solid transparent",
                     cursor: running ? "not-allowed" : "pointer",
                     opacity: running && !isSelected ? 0.4 : 1,
                   }}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0" style={{ borderColor: isSelected ? "hsl(243 75% 59%)" : "hsl(220 9% 70%)" }}>
-                      {isSelected && <div className="h-1.5 w-1.5 rounded-full" style={{ background: "hsl(243 75% 59%)" }} />}
+                    <div className="h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center shrink-0" style={{ borderColor: isSelected ? "hsl(150 60% 40%)" : "hsl(220 9% 70%)" }}>
+                      {isSelected && <div className="h-1.5 w-1.5 rounded-full" style={{ background: "hsl(150 60% 40%)" }} />}
                     </div>
                     <span className={isSelected ? "text-foreground font-semibold" : "text-muted-foreground"}>{opt.label}</span>
                   </div>
@@ -490,8 +568,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               )
             })}
           </div>
-          {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change frequency</p>}
-        </div>
+          {running && <p className="text-xs text-muted-foreground/50 mt-3">Stop AutoLead to change mail frequency</p>}
+        </div>}
 
         {/* Activity log */}
         <div className="bg-white rounded-2xl overflow-hidden border border-border shadow-sm">

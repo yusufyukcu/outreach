@@ -2,6 +2,53 @@ import type { RecentVideoMetrics } from "@/types"
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
 
+// ─── API key rotation ────────────────────────────────────────────────────────
+// Loads YOUTUBE_API_KEY, YOUTUBE_API_KEY_2, YOUTUBE_API_KEY_3 … from env.
+// On a 403 (quota exceeded) the current key is blacklisted for the rest of
+// the process lifetime and the next key is tried automatically.
+
+function loadApiKeys(): string[] {
+  const keys: string[] = []
+  if (process.env.YOUTUBE_API_KEY) keys.push(process.env.YOUTUBE_API_KEY)
+  for (let i = 2; i <= 10; i++) {
+    const k = process.env[`YOUTUBE_API_KEY_${i}`]
+    if (k) keys.push(k)
+  }
+  return keys
+}
+
+let _keys: string[] = []
+let _keyIndex = 0
+
+function getApiKey(): string {
+  if (_keys.length === 0) _keys = loadApiKeys()
+  if (_keys.length === 0) throw new Error("YouTube API key not configured")
+  if (_keyIndex >= _keys.length) throw new Error("All YouTube API keys exhausted (quota exceeded)")
+  return _keys[_keyIndex]
+}
+
+function rotateApiKey(): void {
+  _keyIndex++
+  if (_keyIndex < _keys.length) {
+    console.warn(`[youtube] Key ${_keyIndex} quota exceeded — switching to key ${_keyIndex + 1}`)
+  } else {
+    console.error("[youtube] All API keys exhausted")
+  }
+}
+
+// Drop-in replacement for fetch() on YouTube API URLs.
+// Automatically appends the current key, retries once with the next key on 403.
+async function youtubeApiFetch(url: URL): Promise<Response> {
+  url.searchParams.set("key", getApiKey())
+  let res = await fetch(url.toString())
+  if (res.status === 403) {
+    rotateApiKey()
+    url.searchParams.set("key", getApiKey()) // throws if all exhausted
+    res = await fetch(url.toString())
+  }
+  return res
+}
+
 // ─── Raw API shapes ──────────────────────────────────────────────────────────
 
 interface YouTubeChannelItem {
@@ -71,9 +118,6 @@ export async function searchYouTubeChannels(params: {
   regionCode?: string
   relevanceLanguage?: string
 }): Promise<{ channelId: string; title: string; description: string; thumbnailUrl?: string }[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY
-  if (!apiKey) throw new Error("YouTube API key not configured")
-
   const query = params.keywords.join(" ")
   const url = new URL(`${YOUTUBE_API_BASE}/search`)
   url.searchParams.set("part", "snippet")
@@ -83,9 +127,8 @@ export async function searchYouTubeChannels(params: {
   url.searchParams.set("maxResults", String(params.maxResults ?? 30))
   if (params.regionCode) url.searchParams.set("regionCode", params.regionCode)
   if (params.relevanceLanguage) url.searchParams.set("relevanceLanguage", params.relevanceLanguage)
-  url.searchParams.set("key", apiKey)
 
-  const res = await fetch(url.toString())
+  const res = await youtubeApiFetch(url)
   if (!res.ok) throw new Error(`YouTube API error: ${res.statusText}`)
   const data = await res.json()
 
@@ -104,9 +147,6 @@ export async function searchYouTubeVideos(params: {
   maxResults?: number
   relevanceLanguage?: string
 }): Promise<{ channelId: string; videoTitle: string }[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY
-  if (!apiKey) throw new Error("YouTube API key not configured")
-
   const query = params.keywords.join(" ")
   const url = new URL(`${YOUTUBE_API_BASE}/search`)
   url.searchParams.set("part", "snippet")
@@ -116,9 +156,8 @@ export async function searchYouTubeVideos(params: {
   url.searchParams.set("videoDuration", "medium") // 4-20 min, filters out Shorts
   url.searchParams.set("maxResults", String(params.maxResults ?? 25))
   if (params.relevanceLanguage) url.searchParams.set("relevanceLanguage", params.relevanceLanguage)
-  url.searchParams.set("key", apiKey)
 
-  const res = await fetch(url.toString())
+  const res = await youtubeApiFetch(url)
   if (!res.ok) throw new Error(`YouTube API error: ${res.statusText}`)
   const data = await res.json()
 
@@ -237,8 +276,6 @@ export function scoreFaceless(
 // ─── Channel details (batched, up to 50 ids) ──────────────────────────────────
 
 export async function fetchChannelDetails(channelIds: string[]): Promise<RawChannel[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY
-  if (!apiKey) throw new Error("YouTube API key not configured")
   if (channelIds.length === 0) return []
 
   const out: RawChannel[] = []
@@ -250,9 +287,8 @@ export async function fetchChannelDetails(channelIds: string[]): Promise<RawChan
     url.searchParams.set("part", "snippet,statistics,brandingSettings,contentDetails")
     url.searchParams.set("id", batch.join(","))
     url.searchParams.set("maxResults", "50")
-    url.searchParams.set("key", apiKey)
 
-    const res = await fetch(url.toString())
+    const res = await youtubeApiFetch(url)
     if (!res.ok) throw new Error(`YouTube API error: ${res.statusText}`)
     const data = await res.json()
 
@@ -299,9 +335,6 @@ export async function fetchRecentVideos(
   channelId: string,
   maxResults = 15
 ): Promise<RecentVideo[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY
-  if (!apiKey) throw new Error("YouTube API key not configured")
-
   const playlistId =
     uploadsPlaylistId ??
     (channelId.startsWith("UC") ? "UU" + channelId.slice(2) : null)
@@ -312,9 +345,8 @@ export async function fetchRecentVideos(
   plUrl.searchParams.set("part", "contentDetails")
   plUrl.searchParams.set("playlistId", playlistId)
   plUrl.searchParams.set("maxResults", String(maxResults))
-  plUrl.searchParams.set("key", apiKey)
 
-  const plRes = await fetch(plUrl.toString())
+  const plRes = await youtubeApiFetch(plUrl)
   if (!plRes.ok) return []
   const plData = await plRes.json()
   const videoIds: string[] = (plData.items ?? [])
@@ -327,9 +359,8 @@ export async function fetchRecentVideos(
   vUrl.searchParams.set("part", "snippet,contentDetails,statistics")
   vUrl.searchParams.set("id", videoIds.join(","))
   vUrl.searchParams.set("maxResults", String(maxResults))
-  vUrl.searchParams.set("key", apiKey)
 
-  const vRes = await fetch(vUrl.toString())
+  const vRes = await youtubeApiFetch(vUrl)
   if (!vRes.ok) return []
   const vData = await vRes.json()
 
@@ -565,8 +596,7 @@ export async function mineChannelsFromListVideos(
   keywords: string[],
   maxVideos = 5
 ): Promise<{ channelIds: string[]; handles: string[] }> {
-  const apiKey = process.env.YOUTUBE_API_KEY
-  if (!apiKey) return { channelIds: [], handles: [] }
+  try { getApiKey() } catch { return { channelIds: [], handles: [] } }
 
   // Search for compilation/list videos about the topic
   const listQueries = [
@@ -585,9 +615,8 @@ export async function mineChannelsFromListVideos(
       url.searchParams.set("type", "video")
       url.searchParams.set("order", "relevance")
       url.searchParams.set("maxResults", String(maxVideos))
-      url.searchParams.set("key", apiKey)
 
-      const res = await fetch(url.toString())
+      const res = await youtubeApiFetch(url)
       if (!res.ok) continue
       const data = await res.json()
       const videoIds: string[] = (data.items ?? []).map(
@@ -600,9 +629,8 @@ export async function mineChannelsFromListVideos(
       const vUrl = new URL(`${YOUTUBE_API_BASE}/videos`)
       vUrl.searchParams.set("part", "snippet")
       vUrl.searchParams.set("id", videoIds.join(","))
-      vUrl.searchParams.set("key", apiKey)
 
-      const vRes = await fetch(vUrl.toString())
+      const vRes = await youtubeApiFetch(vUrl)
       if (!vRes.ok) continue
       const vData = await vRes.json()
 
@@ -638,8 +666,8 @@ export async function mineChannelsFromListVideos(
 
 // Resolve @handles to channel IDs using YouTube channels.list?forHandle
 export async function resolveHandlesToChannelIds(handles: string[]): Promise<string[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY
-  if (!apiKey || handles.length === 0) return []
+  if (handles.length === 0) return []
+  try { getApiKey() } catch { return [] }
 
   const channelIds: string[] = []
 
@@ -651,8 +679,7 @@ export async function resolveHandlesToChannelIds(handles: string[]): Promise<str
       const url = new URL(`${YOUTUBE_API_BASE}/channels`)
       url.searchParams.set("part", "id")
       url.searchParams.set("forHandle", handle.startsWith("@") ? handle : `@${handle}`)
-      url.searchParams.set("key", apiKey)
-      const res = await fetch(url.toString())
+      const res = await youtubeApiFetch(url)
       if (!res.ok) return null
       const data = await res.json()
       return (data.items?.[0]?.id as string) ?? null
@@ -759,8 +786,7 @@ export async function fetchVideoTranscript(videoId: string): Promise<string | nu
 // ─── Comment fetching ──────────────────────────────────────────────────────────
 
 export async function fetchVideoComments(videoId: string, maxResults = 25): Promise<string[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY
-  if (!apiKey) return []
+  try { getApiKey() } catch { return [] }
 
   try {
     const url = new URL(`${YOUTUBE_API_BASE}/commentThreads`)
@@ -768,9 +794,8 @@ export async function fetchVideoComments(videoId: string, maxResults = 25): Prom
     url.searchParams.set("videoId", videoId)
     url.searchParams.set("maxResults", String(maxResults))
     url.searchParams.set("order", "relevance")
-    url.searchParams.set("key", apiKey)
 
-    const res = await fetch(url.toString())
+    const res = await youtubeApiFetch(url)
     if (!res.ok) return []
     const data = await res.json()
 

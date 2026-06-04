@@ -211,10 +211,14 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             }
           } // end for ch
 
-          // 3 min between searches (3 keys × 10k units = 300 searches/day = 1 per 4.8 min)
+          // Delay between searches: Lead Only = 10s, Auto Send = match mail frequency
           if (runningRef.current) {
-            addLog(`⏳ Waiting 3 min before next search...`, "info")
-            await new Promise((r) => setTimeout(r, 3 * 60_000))
+            const delayMs = autoSendRef.current ? mailFreqRef.current.value : 10_000
+            const delayLabel = autoSendRef.current
+              ? mailFreqRef.current.label.toLowerCase().replace("every ", "")
+              : "10 seconds"
+            addLog(`⏳ Waiting ${delayLabel} before next search...`, "info")
+            await new Promise((r) => setTimeout(r, delayMs))
           }
         } // end for keyword
       } // end for tier
@@ -223,8 +227,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     }
 
     if (runningRef.current) {
-      addLog("🔄 Starting next cycle in 5 min...", "info")
-      timeoutRef.current = setTimeout(() => { if (runningRef.current) runCycle() }, 5 * 60_000)
+      addLog("🔄 Starting next cycle...", "info")
+      timeoutRef.current = setTimeout(() => { if (runningRef.current) runCycle() }, 2000)
     }
   }, [serviceType, orgNiche, orgName, usedKeywords, facelessMode, successfulPatterns, minSubs, maxSubs, selectedNiche])
 

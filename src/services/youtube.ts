@@ -17,19 +17,24 @@ function loadApiKeys(): string[] {
   return keys
 }
 
-let _keys: string[] = []
 let _keyIndex = 0
 
+function getKeys(): string[] {
+  return loadApiKeys() // always re-read so newly added env vars are picked up
+}
+
 function getApiKey(): string {
-  if (_keys.length === 0) _keys = loadApiKeys()
-  if (_keys.length === 0) throw new Error("YouTube API key not configured")
-  if (_keyIndex >= _keys.length) throw new Error("All YouTube API keys exhausted (quota exceeded)")
-  return _keys[_keyIndex]
+  const keys = getKeys()
+  if (keys.length === 0) throw new Error("YouTube API key not configured")
+  // Reset index if new keys were added since last exhaustion
+  if (_keyIndex >= keys.length) _keyIndex = 0
+  return keys[_keyIndex]
 }
 
 function rotateApiKey(): void {
+  const keys = getKeys()
   _keyIndex++
-  if (_keyIndex < _keys.length) {
+  if (_keyIndex < keys.length) {
     console.warn(`[youtube] Key ${_keyIndex} quota exceeded — switching to key ${_keyIndex + 1}`)
   } else {
     console.error("[youtube] All API keys exhausted")

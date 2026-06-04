@@ -146,8 +146,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         for (const keyword of (tierData.keywords as string[]).slice(0, kwLimit)) {
           if (!runningRef.current) return
           addLog(`🔍 Searching: "${keyword}"`, "search")
-          // 8s between searches to protect YouTube API quota (100 units/search, 10k/day limit)
-          await new Promise((r) => setTimeout(r, 8000))
+          // ~12 min between searches keeps daily usage under 10k quota units (100/search, 4 searches/cycle)
+          await new Promise((r) => setTimeout(r, 12 * 60_000))
           if (!runningRef.current) return
           const discoverNiche = tierData.tier === "core"
             ? (selectedNiche === "Any Niche" ? (niche || "") : selectedNiche)
@@ -220,8 +220,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     }
 
     if (runningRef.current) {
-      addLog("🔄 Starting next cycle in 30s...", "info")
-      timeoutRef.current = setTimeout(() => { if (runningRef.current) runCycle() }, 30_000)
+      addLog("🔄 Starting next cycle in 5 min...", "info")
+      timeoutRef.current = setTimeout(() => { if (runningRef.current) runCycle() }, 5 * 60_000)
     }
   }, [serviceType, orgNiche, orgName, usedKeywords, facelessMode, successfulPatterns, minSubs, maxSubs, selectedNiche])
 

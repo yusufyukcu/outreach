@@ -313,17 +313,20 @@ export function LeadRow({ lead, selected, onSelect, onDelete, serviceType, needs
                 <Button size="sm" variant="outline" onClick={handleCopy} className="flex-1 rounded-xl">
                   {copied ? <><Check className="h-3.5 w-3.5 mr-1.5" />Copied!</> : <><Copy className="h-3.5 w-3.5 mr-1.5" />Copy</>}
                 </Button>
-                {gmailConnected && contact?.email ? (
+                {contact?.email ? (
                   <Button
                     size="sm"
-                    onClick={handleSend}
+                    onClick={gmailConnected ? handleSend : () => window.location.href = "/app/settings"}
                     disabled={sending}
                     className="flex-1 rounded-xl btn-glow text-white"
                     style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(280 75% 60%))" }}
+                    title={gmailConnected ? undefined : "Connect Gmail in Settings to send"}
                   >
                     {sending
                       ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Sending…</>
-                      : <><Send className="h-3.5 w-3.5 mr-1.5" />Send Email</>}
+                      : gmailConnected
+                        ? <><Send className="h-3.5 w-3.5 mr-1.5" />Send Email</>
+                        : <><Send className="h-3.5 w-3.5 mr-1.5" />Connect Gmail</>}
                   </Button>
                 ) : (
                   <Button size="sm" onClick={handleMarkSent} disabled={marking} className="flex-1 rounded-xl">

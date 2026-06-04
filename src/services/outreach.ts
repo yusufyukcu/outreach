@@ -30,19 +30,18 @@ export async function generateOutreachMessage(params: GenerateOutreachParams): P
 
 export function buildChannelContext(channel: Channel): string {
   const lines: string[] = [
-    `Channel: ${channel.name}`,
-    `Niche: ${channel.niche_primary ?? "General"}`,
+    `Channel name: ${channel.name}`,
+    `Niche / content type: ${channel.niche_primary ?? "General"}`,
     `Subscribers: ${formatNumber(channel.subscriber_count)}`,
-    `Avg Monthly Views: ${channel.avg_views_30d ? formatNumber(channel.avg_views_30d) : "Unknown"}`,
-    `Upload Frequency: ${channel.upload_frequency_per_week ? `${channel.upload_frequency_per_week}x/week` : "Unknown"}`,
-    `Growth Trend (30d): ${channel.growth_trend_30d ? `${channel.growth_trend_30d > 0 ? "+" : ""}${channel.growth_trend_30d}%` : "Unknown"}`,
-    `Estimated Monthly Revenue: $${channel.estimated_monthly_revenue_min?.toLocaleString() ?? "?"} – $${channel.estimated_monthly_revenue_max?.toLocaleString() ?? "?"}`,
-    `Editing Quality Score: ${channel.editing_quality_score ?? "?"}/100`,
-    `Thumbnail Quality Score: ${channel.thumbnail_quality_score ?? "?"}/100`,
-    `Monetization: ${channel.monetization_enabled ? "Yes" : "No"}`,
-    `Sponsorships Detected: ${channel.sponsorship_detected ? "Yes" : "No"}`,
+    `Upload frequency: ${channel.upload_frequency_per_week ? `${channel.upload_frequency_per_week}x/week` : "Unknown"}`,
+    `Avg views per video (30d): ${channel.avg_views_30d ? formatNumber(channel.avg_views_30d) : "Unknown"}`,
   ]
-  if (channel.analysis_summary) lines.push(`Analysis: ${channel.analysis_summary}`)
+  if (channel.description) {
+    // Trim to first 400 chars so model can infer content topics from it
+    lines.push(`Channel description: ${channel.description.slice(0, 400)}`)
+  }
+  if (channel.analysis_summary) lines.push(`Content analysis: ${channel.analysis_summary}`)
+  if (channel.sponsorship_detected) lines.push(`Has brand sponsorships: yes`)
   return lines.join("\n")
 }
 
@@ -55,20 +54,47 @@ export function buildSystemPrompt(serviceType: ServiceType): string {
     custom: "YouTube services agency offering custom production solutions",
   }
 
-  return `You are an expert cold outreach copywriter for a ${serviceDescriptions[serviceType]}.
+  const serviceOffer: Record<ServiceType, string> = {
+    editing:    "handle the editing process while maintaining a clean, engaging style that keeps viewers watching",
+    thumbnails: "design custom thumbnails that dramatically increase click-through rate",
+    scripting:  "write structured, compelling scripts that retain viewers and improve watch time",
+    growth:     "optimize content strategy, SEO, and posting schedule to break through growth plateaus",
+    custom:     "handle YouTube production so creators can focus on what they do best",
+  }
 
-Your job is to write highly personalized, compelling cold outreach messages to YouTube channel owners.
+  return `You are writing a cold outreach email on behalf of a ${serviceDescriptions[serviceType]}.
 
-Rules:
-- Reference SPECIFIC details about the channel (not generic)
-- Lead with value, not your agency
-- Identify one specific problem or opportunity for this channel
-- Keep subject lines under 8 words and curiosity-driven
-- Keep email body under 150 words
-- End with a low-friction CTA (not "schedule a call" — use "would this be useful?")
-- Never use: "I hope this finds you well", "I came across your channel", "synergy", "leverage"
-- Sound like a smart human, not a sales robot
-- Match the requested tone`
+Write exactly like this real example — study the structure and tone carefully:
+
+---
+Hi,
+
+I came across [Channel Name] and noticed your consistent uploads covering [specific content topics from their description/niche].
+
+I currently work with YouTube channels in [sender's niche/space], including channels such as [past client 1], [past client 2], and [past client 3].
+
+I ${serviceOffer[serviceType]}.
+
+Looking at your recent content, I believe I could [specific benefit relevant to this channel] if that's something you're looking for.
+
+If you're interested, I'd be happy to [low-commitment offer — e.g. edit a sample video / design a sample thumbnail / write a sample script] so you can evaluate the quality before making any commitment.
+
+Best regards,
+[Name]
+[Role]
+---
+
+Rules (strictly follow):
+- Start with "Hi," — never "Hi [Name]," — we don't know their name
+- Paragraph 1: mention the channel name + describe their content topics specifically (infer from description and niche — e.g. "tech products, gadgets, and buying guides" NOT just "tech content")
+- Paragraph 2: mention past clients by name (use provided experience list). If no past clients provided, skip this paragraph entirely — do NOT invent names
+- Paragraph 3: one sentence on what you do / how you help
+- Paragraph 4: one sentence on the specific opportunity you see for THIS channel
+- Paragraph 5: low-commitment offer (sample video / sample thumbnail / sample script)
+- Sign-off: exactly as provided
+- Length: 100-160 words total. Short paragraphs. No filler sentences.
+- Never use: "I hope", "I wanted to reach out", "synergy", "leverage", "game-changer", "revolutionize"
+- Sound like a real human freelancer, not a marketing agency`
 }
 
 export const TONE_INSTRUCTIONS = {

@@ -206,6 +206,12 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                   if (to) {
                     emailQueueRef.current.push({ leadId, channelName, to, subject: emailData.subject, body: emailData.body })
                     addLog(`📬 Queued: ${channelName}`, "email")
+                    // Wait mail frequency only after a real email is queued
+                    if (runningRef.current) {
+                      const delayLabel = mailFreqRef.current.label.toLowerCase().replace("every ", "")
+                      addLog(`⏳ Waiting ${delayLabel} before next search...`, "info")
+                      await new Promise((r) => setTimeout(r, mailFreqRef.current.value))
+                    }
                   } else {
                     // No email found — save as draft so user can send manually
                     await fetch("/api/outreach/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_id: leadId, channel: "email", subject: emailData.subject, body: emailData.body, status: "pending" }) }).catch(() => {})
@@ -216,14 +222,9 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             }
           } // end for ch
 
-          // Delay between searches: Lead Only = 10s, Auto Send = match mail frequency
-          if (runningRef.current) {
-            const delayMs = autoSendRef.current ? mailFreqRef.current.value : 10_000
-            const delayLabel = autoSendRef.current
-              ? mailFreqRef.current.label.toLowerCase().replace("every ", "")
-              : "10 seconds"
-            addLog(`⏳ Waiting ${delayLabel} before next search...`, "info")
-            await new Promise((r) => setTimeout(r, delayMs))
+          // Lead Only: small delay between searches to avoid hammering the API
+          if (runningRef.current && !autoSendRef.current) {
+            await new Promise((r) => setTimeout(r, 10_000))
           }
         } // end for keyword
       } // end for tier

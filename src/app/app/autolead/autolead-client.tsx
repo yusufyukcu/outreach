@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle, Ghost, Clock, ChevronDown, SendHorizonal } from "lucide-react"
+import { Zap, Square, Play, CheckCircle2, Mail, Search, AlertTriangle, Ghost, Clock, ChevronDown, SendHorizonal, Info, X } from "lucide-react"
 import type { ServiceType } from "@/types"
 
 const NICHES = [
@@ -64,6 +64,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const [autoSend, setAutoSend] = useState(false)
   const [mailFreqOpen, setMailFreqOpen] = useState(false)
   const [selectedMailFreq, setSelectedMailFreq] = useState(FREQUENCY_OPTIONS[3]) // Every 10 minutes default
+  const [dailyLimit, setDailyLimit] = useState(50)
+  const [showInfo, setShowInfo] = useState(false)
 
   const SUB_PRESETS = [
     { label: "Any", min: 5000, max: 1000000 },
@@ -103,6 +105,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   const mailFreqRef = useRef(selectedMailFreq)
   useEffect(() => { mailFreqRef.current = selectedMailFreq }, [selectedMailFreq])
   const emailsSentRef = useRef(0)
+  const dailyLimitRef = useRef(dailyLimit)
+  useEffect(() => { dailyLimitRef.current = dailyLimit }, [dailyLimit])
 
   const runCycle = useCallback(async () => {
     if (!runningRef.current) return
@@ -182,6 +186,11 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             } catch { addLog(`Failed to add lead: ${channelName}`, "error") }
 
             if (autoSendRef.current) {
+              if (emailsSentRef.current >= dailyLimitRef.current) {
+                addLog(`🚫 Daily limit of ${dailyLimitRef.current} emails reached — stopping`, "error")
+                handleStop()
+                return
+              }
               try {
                 const emailRes = await fetch("/api/outreach/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel: ch, serviceType, tone: "professional", outreachChannel: "email", agencyName: orgName, agencyValueProp: "" }) })
                 if (emailRes.ok && leadId) {
@@ -283,15 +292,93 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
       <div className="max-w-3xl mx-auto space-y-5">
 
         {/* Header */}
-        <div className="flex items-center gap-3 mb-8">
-          <div className="h-10 w-10 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))" }}>
-            <Zap className="h-5 w-5 text-white fill-white" />
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))" }}>
+              <Zap className="h-5 w-5 text-white fill-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-extrabold text-foreground">AutoLead</h1>
+              <p className="text-xs text-muted-foreground">Automatically discovers and contacts YouTube channels</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-extrabold text-foreground">AutoLead</h1>
-            <p className="text-xs text-muted-foreground">Automatically discovers and contacts YouTube channels</p>
-          </div>
+          <button
+            onClick={() => setShowInfo(true)}
+            className="h-8 w-8 rounded-full flex items-center justify-center transition-colors hover:bg-muted"
+            title="Spam protection guide"
+          >
+            <Info className="h-4.5 w-4.5 text-muted-foreground" />
+          </button>
         </div>
+
+        {/* Info modal */}
+        {showInfo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowInfo(false)}>
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+            <div className="relative bg-white rounded-2xl shadow-2xl border border-border w-full max-w-lg p-6 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Info className="h-4 w-4 text-primary" />
+                  <h2 className="text-sm font-bold text-foreground">Spam Protection Guide</h2>
+                </div>
+                <button onClick={() => setShowInfo(false)} className="h-7 w-7 rounded-full flex items-center justify-center hover:bg-muted transition-colors">
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-sm">
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  Gmail has a daily sending limit of <strong>500 emails</strong> for personal accounts. Exceeding it or sending too fast will get your account flagged. Follow these guidelines to stay safe.
+                </p>
+
+                {/* Table */}
+                <div className="rounded-xl overflow-hidden border border-border">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-muted/50">
+                        <th className="text-left px-4 py-2.5 font-semibold text-foreground">Account Age</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-foreground">Daily Limit</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-foreground">Mail Frequency</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { age: "New account (<1 month)", limit: "20 emails", freq: "Every 1 hour", safe: false },
+                        { age: "Normal account", limit: "50 emails", freq: "Every 30 min", safe: true },
+                        { age: "Trusted account", limit: "100 emails", freq: "Every 10 min", safe: true },
+                      ].map((row, i) => (
+                        <tr key={i} className="border-t border-border">
+                          <td className="px-4 py-2.5 text-muted-foreground">{row.age}</td>
+                          <td className="px-4 py-2.5 font-semibold text-foreground">{row.limit}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${row.safe ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-amber-50 text-amber-600 border border-amber-200"}`}>
+                              {row.freq}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="space-y-2">
+                  {[
+                    { icon: "✓", text: "Each email is AI-personalized — no copy-paste duplicates", good: true },
+                    { icon: "✓", text: "Subjects vary per channel", good: true },
+                    { icon: "✓", text: "Sending via your own Gmail improves deliverability", good: true },
+                    { icon: "⚠", text: "Warm up a new account gradually before using Auto Send", good: false },
+                    { icon: "⚠", text: "Revoke & reconnect Gmail if you notice sending failures", good: false },
+                  ].map((tip, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className={`text-xs font-bold shrink-0 mt-0.5 ${tip.good ? "text-emerald-500" : "text-amber-500"}`}>{tip.icon}</span>
+                      <span className="text-xs text-muted-foreground">{tip.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Status + Start/Stop card */}
         <div className="bg-white rounded-2xl p-5 flex items-center justify-between border border-border shadow-sm">
@@ -538,7 +625,22 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
 
         {/* Mail Frequency selector — only shown when Auto Send is on */}
         {autoSend && <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
-          <h3 className="text-sm font-bold text-foreground mb-3">Mail Frequency</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-foreground">Mail Frequency</h3>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Daily limit:</span>
+              <input
+                type="number"
+                min={1}
+                max={500}
+                disabled={running}
+                value={dailyLimit}
+                onChange={(e) => setDailyLimit(Math.min(500, Math.max(1, Number(e.target.value))))}
+                className="w-16 rounded-lg border border-border bg-muted/40 px-2 py-1 text-xs text-foreground text-center outline-none focus:border-primary/50 transition-all disabled:opacity-50"
+              />
+              <span className="text-xs text-muted-foreground">emails/day</span>
+            </div>
+          </div>
           <div className="space-y-1.5">
             {FREQUENCY_OPTIONS.map((opt) => {
               const isSelected = selectedMailFreq.value === opt.value

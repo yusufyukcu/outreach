@@ -1,3 +1,4 @@
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -289,6 +290,112 @@
   -webkit-mask-composite: xor;
   mask-composite: exclude;
 }
+
+/* ── Stitch design system ─────────────────────────────────────────── */
+
+.liquid-glass {
+  background: rgba(255, 255, 255, 0.01);
+  background-blend-mode: luminosity;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.liquid-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.4px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+@keyframes marquee {
+  0%   { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 20s linear infinite;
+}
+
+@keyframes stitch-fade-up {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stagger-item {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: stitch-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── StuckLead Design System tokens ─────────────────────────────── */
+:root {
+  --sl-brand-gradient: linear-gradient(135deg, hsl(243 75% 62%), hsl(280 75% 62%));
+  --sl-bg-0: hsl(225 30% 5%);
+  --sl-bg-1: hsl(224 26% 7.5%);
+  --sl-bg-2: hsl(225 22% 10%);
+  --sl-bg-3: hsl(225 20% 13%);
+  --sl-sidebar-bg: hsl(224 71% 4%);
+  --sl-fg-1: hsl(210 20% 98%);
+  --sl-fg-2: hsl(220 14% 66%);
+  --sl-fg-3: hsl(220 11% 46%);
+  --sl-border: hsl(0 0% 100% / 0.08);
+  --sl-border-soft: hsl(0 0% 100% / 0.05);
+  --sl-border-strong: hsl(0 0% 100% / 0.16);
+  --sl-shadow-md: 0 4px 16px hsl(225 40% 2% / 0.45);
+  --sl-shadow-lg: 0 12px 40px hsl(225 40% 2% / 0.55);
+  --sl-inner-hi: inset 0 1px 0 hsl(0 0% 100% / 0.08);
+  --sl-glow-brand: 0 0 28px hsl(243 75% 59% / 0.45);
+  --sl-emerald: hsl(158 64% 52%);
+  --sl-amber: hsl(43 96% 56%);
+  --sl-rose: hsl(0 84% 68%);
+  --sl-sky: hsl(213 90% 68%);
+  --sl-score-high: linear-gradient(135deg, hsl(158 64% 52%), hsl(172 66% 50%));
+  --sl-score-mid: linear-gradient(135deg, hsl(243 75% 62%), hsl(265 80% 64%));
+  --sl-score-low: linear-gradient(135deg, hsl(43 96% 56%), hsl(25 95% 58%));
+  --sl-score-cold: linear-gradient(135deg, hsl(215 16% 55%), hsl(215 14% 42%));
+  /* CRM stage colors */
+  --sl-stage-new: #94a3b8;
+  --sl-stage-analyzed: #60a5fa;
+  --sl-stage-contacted: #fbbf24;
+  --sl-stage-replied: #a78bfa;
+  --sl-stage-interested: #818cf8;
+  --sl-stage-meeting: #fb923c;
+  --sl-stage-proposal: #f472b6;
+  --sl-stage-won: #34d399;
+  --sl-stage-lost: #f87171;
+}
+
+/* ── App shell ───────────────────────────────────────────────────── */
+.sl-app-bg {
+  position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+}
+.sl-orb {
+  position: absolute; border-radius: 999px; filter: blur(90px); opacity: 0.55;
+}
+.sl-orb-1 { width: 600px; height: 600px; background: radial-gradient(circle, hsl(270 80% 55% / 0.6), transparent 65%); top: -200px; left: 160px; }
+.sl-orb-2 { width: 550px; height: 550px; background: radial-gradient(circle, hsl(280 85% 50% / 0.55), transparent 65%); bottom: -180px; right: -40px; }
+.sl-orb-3 { width: 420px; height: 420px; background: radial-gradient(circle, hsl(255 80% 58% / 0.4), transparent 65%); top: 38%; left: 42%; }
+.sl-orb-4 { width: 340px; height: 340px; background: radial-gradient(circle, hsl(290 75% 52% / 0.35), transparent 70%); top: 10%; right: 20%; }
+.sl-grid-overlay {
+  position: absolute; inset: 0; opacity: 0.4;
+  background-image: linear-gradient(hsl(0 0% 100% / 0.05) 1px, transparent 1px),
+                    linear-gradient(90deg, hsl(0 0% 100% / 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 30%, transparent 75%);
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────── */
+.sl-scroll-area::-webkit-scrollbar { width: 10px; }
+.sl-scroll-area::-webkit-scrollbar-thumb { background: var(--sl-bg-3); border-radius: 999px; border: 3px solid var(--sl-bg-0); }
+.sl-scroll-area::-webkit-scrollbar-track { background: transparent; }
 
 /* ── Accessibility: respect reduced motion ─────────────────────────── */
 @media (prefers-reduced-motion: reduce) {

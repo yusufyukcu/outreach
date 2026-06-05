@@ -2,13 +2,13 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react"
-import { Logo } from "@/components/ui/logo"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Eye, EyeOff, Loader2, X } from "lucide-react"
 import { GoogleButton } from "@/components/auth/google-button"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "@/hooks/use-toast"
+
+const VIDEO_URL =
+  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260506_081238_406ed0e3-5d83-436e-a512-0bbff7ec5b95.mp4"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -34,113 +34,187 @@ export default function LoginPage() {
     router.refresh()
   }
 
-  const features = [
-    "AI-powered channel discovery",
-    "Semantic content matching",
-    "Faceless channel detection",
-    "One-click email generation",
-  ]
-
   return (
-    <div className="flex min-h-screen">
-      {/* Left panel */}
-      <div
-        className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, hsl(224 71% 4%), hsl(243 60% 20%))" }}
-      >
-        {/* Floating blocks */}
-        <div className="animate-block-1 absolute top-1/3 left-1/3 w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-violet-600 opacity-60" />
-        <div className="animate-block-2 absolute top-1/2 left-1/5 w-12 h-12 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-500 opacity-50" />
-        <div className="animate-block-3 absolute top-1/4 right-1/4 w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-sky-500 opacity-50" />
+    <div
+      className="h-screen w-full overflow-hidden flex flex-col lg:flex-row"
+      style={{ backgroundColor: "#000000", color: "white" }}
+    >
+      {/* ── Left: video hero ──────────────────────────────────────────── */}
+      <div className="hidden lg:flex w-1/2 relative h-full flex-col justify-center items-center overflow-hidden m-4 rounded-[32px]">
+        <video
+          className="absolute inset-0 w-full h-full object-cover z-0"
+          autoPlay muted loop playsInline
+          src={VIDEO_URL}
+        />
+        <div className="absolute inset-0 z-0 bg-gradient-to-t from-black/80 via-black/20 to-black/80" />
+        <div className="absolute inset-0 z-0" style={{ background: "rgba(139,92,246,0.2)", mixBlendMode: "overlay" }} />
 
-        {/* Bottom content */}
-        <div className="relative z-10 mt-auto">
-          <div className="mb-6">
-            <Logo variant="dark" size="lg" />
+        <div className="relative z-10 flex flex-col h-full justify-center items-center text-center w-full max-w-sm px-6">
+          <div className="flex items-center gap-2 mb-8 stagger-item" style={{ animationDelay: "0.2s" }}>
+            <span
+              className="font-bold text-xl tracking-tight text-white"
+              style={{ fontFamily: "'General Sans', sans-serif" }}
+            >
+              StuckLead
+            </span>
           </div>
-          <p className="text-white/70 text-sm mb-6">AI-powered lead generation for YouTube agencies</p>
-          <ul className="space-y-3">
-            {features.map(f => (
-              <li key={f} className="flex items-center gap-2 text-sm text-white/80">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                {f}
-              </li>
-            ))}
-          </ul>
+          <div className="w-full">
+            <h1
+              className="text-4xl font-semibold mb-2 stagger-item"
+              style={{ fontFamily: "'General Sans', sans-serif", color: "#e7e0ed", animationDelay: "0.35s" }}
+            >
+              Access your dashboard
+            </h1>
+            <p
+              className="text-base leading-relaxed stagger-item"
+              style={{ color: "rgba(203,195,215,0.7)", animationDelay: "0.5s" }}
+            >
+              Securely log in to manage your workspace and leads.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Right panel */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
-        <div className="w-full max-w-sm">
-          {/* Logo */}
-          <div className="mb-8">
-            <Logo variant="light" size="md" />
+      {/* ── Right: form ───────────────────────────────────────────────── */}
+      <div className="flex-1 h-full overflow-y-auto flex items-center justify-center p-4 lg:p-10 relative">
+        {/* Close button */}
+        <Link
+          href="/"
+          className="absolute top-8 right-8 w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+          style={{
+            background: "#1A1A1A",
+            border: "1px solid rgba(255,255,255,0.05)",
+            color: "rgba(203,195,215,0.7)",
+          }}
+        >
+          <X className="h-5 w-5" />
+        </Link>
+
+        <div className="w-full max-w-[400px]">
+          {/* Header */}
+          <div className="mb-12 text-center stagger-item" style={{ animationDelay: "0.2s" }}>
+            <h2
+              className="text-3xl font-semibold mb-2"
+              style={{ fontFamily: "'General Sans', sans-serif", color: "#e7e0ed" }}
+            >
+              Sign In
+            </h2>
+            <p className="text-sm" style={{ color: "rgba(203,195,215,0.7)" }}>
+              Welcome back! Please enter your credentials to access your workspace.
+            </p>
           </div>
 
-          <h2 className="text-2xl font-bold mb-1">Welcome back</h2>
-          <p className="text-sm text-muted-foreground mb-6">Sign in to your account</p>
-
-          <GoogleButton next="/app/dashboard" label="Continue with Google" />
-
-          <div className="my-5 flex items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">or</span>
-            <div className="h-px flex-1 bg-border" />
+          {/* Google login */}
+          <div className="mb-6 stagger-item" style={{ animationDelay: "0.3s" }}>
+            <GoogleButton next="/app/dashboard" label="Continue with Google" />
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
+          {/* Divider */}
+          <div className="relative flex items-center mb-6 stagger-item" style={{ animationDelay: "0.4s" }}>
+            <div className="flex-grow border-t" style={{ borderColor: "rgba(255,255,255,0.1)" }} />
+            <span
+              className="flex-shrink-0 mx-6 text-[11px] tracking-widest uppercase"
+              style={{ color: "rgba(203,195,215,0.5)" }}
+            >
+              Or
+            </span>
+            <div className="flex-grow border-t" style={{ borderColor: "rgba(255,255,255,0.1)" }} />
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5 stagger-item" style={{ animationDelay: "0.5s" }}>
+            <div>
+              <label className="block text-[13px] font-medium mb-2" style={{ color: "white" }}>
+                Email Address
+              </label>
+              <input
                 type="email"
-                placeholder="you@agency.com"
+                placeholder="ex. alex.s@stucklead.io"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="rounded-xl"
                 required
+                className="w-full rounded-[12px] px-4 py-3 text-white text-[14px] transition-colors focus:outline-none"
+                style={{
+                  background: "#1A1A1A",
+                  border: "1px solid transparent",
+                  color: "white",
+                }}
+                onFocus={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)")}
+                onBlur={e => (e.currentTarget.style.borderColor = "transparent")}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+            <div>
+              <label className="block text-[13px] font-medium mb-2" style={{ color: "white" }}>
+                Password
+              </label>
               <div className="relative">
-                <Input
-                  id="password"
+                <input
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="Secure your account"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="rounded-xl"
                   required
+                  className="w-full rounded-[12px] px-4 py-3 pr-12 text-[14px] transition-colors focus:outline-none"
+                  style={{
+                    background: "#1A1A1A",
+                    border: "1px solid transparent",
+                    color: "white",
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)")}
+                  onBlur={e => (e.currentTarget.style.borderColor = "transparent")}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors"
+                  style={{ color: "rgba(255,255,255,0.3)" }}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
+              </div>
+              <div className="flex items-center justify-between mt-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded"
+                    style={{ borderColor: "rgba(255,255,255,0.1)", background: "#1A1A1A" }}
+                  />
+                  <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>Remember me</span>
+                </label>
+                <a
+                  href="#"
+                  className="text-[11px] hover:text-white transition-colors"
+                  style={{ color: "rgba(255,255,255,0.5)" }}
+                >
+                  Forgot Password?
+                </a>
               </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white font-semibold btn-glow disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+              className="w-full text-black font-semibold py-3.5 rounded-[12px] transition-colors mt-8 flex items-center justify-center gap-2 hover:bg-gray-200 disabled:opacity-60"
+              style={{ background: "white", fontSize: "14px" }}
             >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               Sign In
             </button>
           </form>
 
-          <p className="mt-5 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/auth/register" className="font-medium text-primary hover:underline">
-              Create one free
-            </Link>
-          </p>
+          {/* Register link */}
+          <div className="mt-8 text-center stagger-item" style={{ animationDelay: "0.6s" }}>
+            <p className="text-[13px]" style={{ color: "rgba(255,255,255,0.5)" }}>
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/auth/register"
+                className="text-white hover:text-gray-300 transition-colors font-medium"
+              >
+                Sign Up
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

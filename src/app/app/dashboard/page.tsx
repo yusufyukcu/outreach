@@ -21,13 +21,20 @@ const STAGE_COLORS: Record<CRMStage, string> = {
 }
 
 const STAT_CONFIG = [
-  { title: "Total Leads",       icon: Users,      gradient: "from-indigo-500 to-violet-500",  glow: "hsl(243 75% 59% / 0.3)" },
-  { title: "Hot Leads",         icon: Flame,       gradient: "from-rose-500 to-orange-400",    glow: "hsl(350 80% 60% / 0.3)" },
-  { title: "Contacted / Week",  icon: Mail,        gradient: "from-sky-500 to-cyan-400",       glow: "hsl(199 90% 55% / 0.3)" },
-  { title: "Pipeline Value",    icon: DollarSign,  gradient: "from-emerald-500 to-teal-400",   glow: "hsl(158 64% 50% / 0.3)" },
+  { title: "Total Leads",      icon: Users,      gradient: "linear-gradient(135deg, hsl(243 75% 62%), hsl(280 75% 62%))",  glow: "hsl(243 75% 59% / 0.35)" },
+  { title: "Hot Leads",        icon: Flame,      gradient: "linear-gradient(135deg, hsl(0 84% 60%), hsl(25 95% 58%))",     glow: "hsl(0 84% 60% / 0.35)" },
+  { title: "Contacted / Week", icon: Mail,       gradient: "linear-gradient(135deg, hsl(213 90% 60%), hsl(189 90% 50%))",  glow: "hsl(213 90% 60% / 0.35)" },
+  { title: "Pipeline Value",   icon: DollarSign, gradient: "linear-gradient(135deg, hsl(158 64% 52%), hsl(172 66% 50%))",  glow: "hsl(158 64% 52% / 0.35)" },
 ]
 
 const PIPELINE_STAGES: CRMStage[] = ["new", "analyzed", "contacted", "replied", "interested", "won"]
+
+const CARD_STYLE = {
+  background: "#0d1117",
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 20,
+  boxShadow: "0 4px 16px hsl(225 40% 2% / 0.45)",
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -82,7 +89,7 @@ export default async function DashboardPage() {
   const convRate = stats.total > 0 ? Math.round((stats.wonThisMonth / stats.total) * 100) : 0
 
   return (
-    <div className="flex flex-col overflow-auto">
+    <div className="flex flex-col overflow-auto sl-scroll-area" style={{ color: "var(--sl-fg-1)" }}>
       <Header
         title={firstName ? `Hey, ${firstName} 👋` : "Dashboard"}
         subtitle={profile?.organizations?.name ?? "Your Agency"}
@@ -100,31 +107,33 @@ export default async function DashboardPage() {
             return (
               <div
                 key={cfg.title}
-                className="animate-fade-in-up card-hover relative rounded-2xl bg-white border p-5 overflow-hidden group"
+                className="animate-fade-in-up relative overflow-hidden group"
+                style={{ ...CARD_STYLE, padding: "20px" }}
               >
-                {/* subtle gradient tint top-right */}
+                {/* subtle glow on hover */}
                 <div
-                  className={`absolute -top-6 -right-6 h-20 w-20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br ${cfg.gradient} blur-2xl`}
+                  className="absolute -top-8 -right-8 h-24 w-24 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl"
+                  style={{ background: cfg.gradient }}
                 />
 
                 <div className="relative flex items-start justify-between mb-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">{cfg.title}</p>
-                    <p className="text-4xl font-extrabold tracking-tight leading-none">{display}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--sl-fg-3)" }}>{cfg.title}</p>
+                    <p className="text-4xl font-extrabold tracking-tight leading-none" style={{ color: "var(--sl-fg-1)" }}>{display}</p>
                   </div>
                   <div
-                    className={`h-11 w-11 rounded-2xl bg-gradient-to-br ${cfg.gradient} flex items-center justify-center shadow-lg shrink-0`}
-                    style={{ boxShadow: `0 8px 24px ${cfg.glow}` }}
+                    className="h-11 w-11 rounded-2xl flex items-center justify-center shrink-0"
+                    style={{ background: cfg.gradient, boxShadow: `0 8px 24px ${cfg.glow}` }}
                   >
                     <cfg.icon className="h-5 w-5 text-white" />
                   </div>
                 </div>
 
                 {/* Progress bar */}
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
                   <div
-                    className={`h-full rounded-full bg-gradient-to-r ${cfg.gradient} transition-all duration-1000`}
-                    style={{ width: `${pct}%` }}
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{ width: `${pct}%`, background: cfg.gradient }}
                   />
                 </div>
               </div>
@@ -137,17 +146,18 @@ export default async function DashboardPage() {
 
           {/* Pipeline funnel */}
           <div
-            className="lg:col-span-3 animate-fade-in-up rounded-2xl bg-white border p-6 shadow-sm"
-            style={{ animationDelay: "120ms" }}
+            className="lg:col-span-3 animate-fade-in-up p-6"
+            style={{ ...CARD_STYLE, animationDelay: "120ms" }}
           >
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="font-bold text-base">Pipeline Funnel</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{allLeads.length} total leads across stages</p>
+                <h2 className="font-bold text-base" style={{ color: "var(--sl-fg-1)" }}>Pipeline Funnel</h2>
+                <p className="text-xs mt-0.5" style={{ color: "var(--sl-fg-3)" }}>{allLeads.length} total leads across stages</p>
               </div>
               <Link
                 href="/app/pipeline"
-                className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                className="flex items-center gap-1.5 text-xs font-semibold transition-colors"
+                style={{ color: "hsl(243 75% 68%)" }}
               >
                 <KanbanSquare className="h-3.5 w-3.5" />
                 Open Board
@@ -164,10 +174,10 @@ export default async function DashboardPage() {
                       className="h-2.5 w-2.5 rounded-full shrink-0 transition-transform group-hover:scale-125"
                       style={{ background: STAGE_COLORS[stage] }}
                     />
-                    <span className="w-20 text-xs font-medium text-muted-foreground shrink-0 group-hover:text-foreground transition-colors">
+                    <span className="w-20 text-xs font-medium shrink-0 transition-colors" style={{ color: "var(--sl-fg-3)" }}>
                       {STAGE_LABELS[stage]}
                     </span>
-                    <div className="flex-1 h-6 rounded-xl bg-muted/60 overflow-hidden">
+                    <div className="flex-1 h-6 rounded-xl overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
                       <div
                         className="h-full rounded-xl flex items-center px-3 transition-all duration-700"
                         style={{
@@ -180,7 +190,7 @@ export default async function DashboardPage() {
                         )}
                       </div>
                     </div>
-                    <span className="text-xs text-muted-foreground w-6 text-right shrink-0">{count}</span>
+                    <span className="text-xs w-6 text-right shrink-0" style={{ color: "var(--sl-fg-3)" }}>{count}</span>
                   </Link>
                 )
               })}
@@ -188,13 +198,13 @@ export default async function DashboardPage() {
 
             {/* Won this month badge */}
             {stats.wonThisMonth > 0 && (
-              <div className="mt-5 flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5">
-                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center shrink-0">
+              <div className="mt-5 flex items-center gap-2 rounded-xl px-4 py-2.5" style={{ background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)" }}>
+                <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg, hsl(158 64% 52%), hsl(172 66% 50%))" }}>
                   <Zap className="h-3.5 w-3.5 text-white" fill="white" />
                 </div>
-                <p className="text-sm font-semibold text-emerald-800">
+                <p className="text-sm font-semibold" style={{ color: "#34d399" }}>
                   {stats.wonThisMonth} deal{stats.wonThisMonth > 1 ? "s" : ""} won this month
-                  {convRate > 0 && <span className="ml-1 font-normal text-emerald-600">({convRate}% conversion)</span>}
+                  {convRate > 0 && <span className="ml-1 font-normal" style={{ color: "rgba(52,211,153,0.75)" }}>({convRate}% conversion)</span>}
                 </p>
               </div>
             )}
@@ -202,63 +212,65 @@ export default async function DashboardPage() {
 
           {/* Hot leads */}
           <div
-            className="lg:col-span-2 animate-fade-in-up rounded-2xl bg-white border overflow-hidden shadow-sm"
-            style={{ animationDelay: "180ms" }}
+            className="lg:col-span-2 animate-fade-in-up overflow-hidden"
+            style={{ ...CARD_STYLE, animationDelay: "180ms", padding: 0 }}
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h2 className="font-bold text-base flex items-center gap-2">
-                <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-rose-500 to-orange-400 flex items-center justify-center shadow-sm">
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <h2 className="font-bold text-base flex items-center gap-2" style={{ color: "var(--sl-fg-1)" }}>
+                <div className="h-7 w-7 rounded-lg flex items-center justify-center shadow-sm" style={{ background: "linear-gradient(135deg, hsl(0 84% 60%), hsl(25 95% 58%))" }}>
                   <Flame className="h-3.5 w-3.5 text-white" />
                 </div>
                 Hot Leads
               </h2>
-              <Link href="/app/leads" className="text-xs font-semibold text-primary hover:underline flex items-center gap-1">
+              <Link href="/app/leads" className="text-xs font-semibold flex items-center gap-1 transition-colors" style={{ color: "hsl(243 75% 68%)" }}>
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
 
             {hotLeads.length === 0 ? (
               <div className="px-5 py-12 text-center">
-                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-rose-500 to-orange-400 flex items-center justify-center mx-auto mb-3 animate-float opacity-70">
+                <div className="h-12 w-12 rounded-2xl flex items-center justify-center mx-auto mb-3 animate-float opacity-70" style={{ background: "linear-gradient(135deg, hsl(0 84% 60%), hsl(25 95% 58%))" }}>
                   <Flame className="h-6 w-6 text-white" />
                 </div>
-                <p className="text-sm font-medium mb-1">No hot leads yet</p>
-                <Link href="/app/discover" className="text-xs text-primary hover:underline">
+                <p className="text-sm font-medium mb-1" style={{ color: "var(--sl-fg-2)" }}>No hot leads yet</p>
+                <Link href="/app/discover" className="text-xs transition-colors" style={{ color: "hsl(243 75% 68%)" }}>
                   Discover channels →
                 </Link>
               </div>
             ) : (
-              <div className="divide-y stagger-children">
+              <div className="stagger-children">
                 {hotLeads.map((lead) => {
                   const score = lead.lead_score ?? 0
-                  const scoreGradient =
-                    score >= 90 ? "from-emerald-500 to-teal-400" :
-                    score >= 75 ? "from-indigo-500 to-violet-500" :
-                    "from-amber-400 to-orange-400"
+                  const scoreGrad =
+                    score >= 90 ? "linear-gradient(135deg, hsl(158 64% 52%), hsl(172 66% 50%))" :
+                    score >= 75 ? "linear-gradient(135deg, hsl(243 75% 62%), hsl(280 75% 62%))" :
+                    "linear-gradient(135deg, hsl(43 96% 56%), hsl(25 95% 58%))"
 
                   return (
                     <Link
                       key={lead.id}
                       href={`/app/leads/${lead.id}`}
-                      className="animate-fade-in flex items-center gap-3 px-5 py-3.5 hover:bg-muted/30 transition-colors group"
+                      className="animate-fade-in flex items-center gap-3 px-5 py-3.5 transition-colors group hover:bg-white/[0.03]"
+                      style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
                     >
                       {/* Score bubble */}
                       <div
-                        className={`h-9 w-9 rounded-xl bg-gradient-to-br ${scoreGradient} flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform`}
+                        className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm group-hover:scale-105 transition-transform"
+                        style={{ background: scoreGrad }}
                       >
                         <span className="text-xs font-extrabold text-white leading-none">{score}</span>
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                        <p className="text-sm font-semibold truncate transition-colors" style={{ color: "var(--sl-fg-1)" }}>
                           {lead.channel?.name ?? "—"}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">
+                        <p className="text-xs truncate" style={{ color: "var(--sl-fg-3)" }}>
                           {lead.channel?.niche_primary ?? "Unknown niche"}
                         </p>
                       </div>
 
-                      <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all shrink-0" />
+                      <ArrowRight className="h-3.5 w-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all shrink-0" style={{ color: "var(--sl-fg-3)" }} />
                     </Link>
                   )
                 })}
@@ -272,50 +284,57 @@ export default async function DashboardPage() {
           className="animate-fade-in-up grid grid-cols-1 sm:grid-cols-2 gap-4"
           style={{ animationDelay: "240ms" }}
         >
-          <Link href="/app/discover" className="card-hover group rounded-2xl border bg-white p-5 flex items-center gap-4 shadow-sm">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform"
-              style={{ boxShadow: "0 8px 24px hsl(243 75% 59% / 0.3)" }}>
+          <Link
+            href="/app/discover"
+            className="group flex items-center gap-4 p-5 transition-all duration-200 hover:bg-[#101520]"
+            style={{ ...CARD_STYLE }}
+          >
+            <div className="h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform"
+              style={{ background: "linear-gradient(135deg, hsl(243 75% 62%), hsl(280 75% 62%))", boxShadow: "0 8px 24px hsl(243 75% 59% / 0.3)" }}>
               <Search className="h-5 w-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm group-hover:text-primary transition-colors">Find New Leads</p>
-              <p className="text-xs text-muted-foreground mt-0.5">AI-powered YouTube channel discovery</p>
+              <p className="font-bold text-sm" style={{ color: "var(--sl-fg-1)" }}>Find New Leads</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--sl-fg-3)" }}>AI-powered YouTube channel discovery</p>
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all shrink-0" />
+            <ArrowRight className="h-4 w-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all shrink-0" style={{ color: "var(--sl-fg-3)" }} />
           </Link>
 
-          <Link href="/app/pipeline" className="card-hover group rounded-2xl border bg-white p-5 flex items-center gap-4 shadow-sm">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-400 flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform"
-              style={{ boxShadow: "0 8px 24px hsl(38 90% 55% / 0.3)" }}>
+          <Link
+            href="/app/pipeline"
+            className="group flex items-center gap-4 p-5 transition-all duration-200 hover:bg-[#101520]"
+            style={{ ...CARD_STYLE }}
+          >
+            <div className="h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform"
+              style={{ background: "linear-gradient(135deg, hsl(43 96% 56%), hsl(25 95% 58%))", boxShadow: "0 8px 24px hsl(38 90% 55% / 0.3)" }}>
               <KanbanSquare className="h-5 w-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm group-hover:text-primary transition-colors">Manage Pipeline</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Drag & drop CRM across 9 stages</p>
+              <p className="font-bold text-sm" style={{ color: "var(--sl-fg-1)" }}>Manage Pipeline</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--sl-fg-3)" }}>Drag & drop CRM across 9 stages</p>
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all shrink-0" />
+            <ArrowRight className="h-4 w-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all shrink-0" style={{ color: "var(--sl-fg-3)" }} />
           </Link>
         </div>
 
         {/* ── Empty state ───────────────────────────────────────── */}
         {allLeads.length === 0 && (
           <div className="animate-fade-in-up rounded-3xl overflow-hidden relative" style={{ animationDelay: "300ms" }}>
-            {/* gradient background */}
             <div
               className="absolute inset-0"
-              style={{ background: "linear-gradient(135deg, hsl(243 75% 59% / 0.06), hsl(280 75% 60% / 0.10))" }}
+              style={{ background: "linear-gradient(135deg, hsl(243 75% 59% / 0.08), hsl(280 75% 60% / 0.12))" }}
             />
-            <div className="relative border-2 border-dashed border-primary/20 rounded-3xl p-14 text-center">
+            <div className="relative rounded-3xl p-14 text-center" style={{ border: "2px dashed rgba(99,102,241,0.25)" }}>
               {/* floating blocks decoration */}
               <div className="flex justify-center gap-3 mb-7 select-none">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 animate-block-1 shadow-lg opacity-80" />
-                <div className="w-7 h-7 mt-4 rounded-lg bg-gradient-to-br from-rose-500 to-orange-400 animate-block-2 shadow-md opacity-70" />
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-cyan-400 animate-block-3 shadow-lg opacity-80" />
-                <div className="w-6 h-6 mt-5 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-400 animate-block-4 shadow-md opacity-70" />
+                <div className="w-10 h-10 rounded-xl animate-block-1 shadow-lg opacity-80" style={{ background: "linear-gradient(135deg, hsl(243 75% 62%), hsl(280 75% 62%))" }} />
+                <div className="w-7 h-7 mt-4 rounded-lg animate-block-2 shadow-md opacity-70" style={{ background: "linear-gradient(135deg, hsl(0 84% 60%), hsl(25 95% 58%))" }} />
+                <div className="w-10 h-10 rounded-xl animate-block-3 shadow-lg opacity-80" style={{ background: "linear-gradient(135deg, hsl(213 90% 60%), hsl(189 90% 50%))" }} />
+                <div className="w-6 h-6 mt-5 rounded-lg animate-block-4 shadow-md opacity-70" style={{ background: "linear-gradient(135deg, hsl(158 64% 52%), hsl(172 66% 50%))" }} />
               </div>
 
-              <h3 className="text-2xl font-extrabold mb-2">Start finding leads</h3>
-              <p className="text-muted-foreground mb-7 max-w-sm mx-auto leading-relaxed">
+              <h3 className="text-2xl font-extrabold mb-2" style={{ color: "var(--sl-fg-1)" }}>Start finding leads</h3>
+              <p className="mb-7 max-w-sm mx-auto leading-relaxed text-sm" style={{ color: "var(--sl-fg-3)" }}>
                 Discover YouTube channels in your niche, score them automatically, and fill your pipeline today.
               </p>
 
@@ -331,8 +350,8 @@ export default async function DashboardPage() {
 
               <div className="flex items-center justify-center gap-5 mt-6">
                 {["AI scoring", "Faceless detection", "Auto outreach"].map((f) => (
-                  <span key={f} className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Target className="h-3 w-3 text-primary" /> {f}
+                  <span key={f} className="text-xs flex items-center gap-1" style={{ color: "var(--sl-fg-3)" }}>
+                    <Target className="h-3 w-3" style={{ color: "hsl(243 75% 68%)" }} /> {f}
                   </span>
                 ))}
               </div>

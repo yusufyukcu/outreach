@@ -10,21 +10,16 @@ import { toast } from "@/hooks/use-toast"
 import type { Lead, CRMStage } from "@/types"
 
 const STAGE_STYLES: Record<CRMStage, { bg: string; color: string; dot: string }> = {
-  new:               { bg: "rgba(148,163,184,0.12)", color: "#94a3b8",  dot: "bg-slate-400" },
-  analyzed:          { bg: "rgba(96,165,250,0.12)",  color: "#60a5fa",  dot: "bg-blue-400" },
-  contacted:         { bg: "rgba(251,191,36,0.12)",  color: "#fbbf24",  dot: "bg-amber-400" },
-  replied:           { bg: "rgba(167,139,250,0.12)", color: "#a78bfa",  dot: "bg-violet-400" },
-  interested:        { bg: "rgba(129,140,248,0.12)", color: "#818cf8",  dot: "bg-indigo-400" },
-  meeting_scheduled: { bg: "rgba(251,146,60,0.12)",  color: "#fb923c",  dot: "bg-orange-400" },
-  proposal_sent:     { bg: "rgba(244,114,182,0.12)", color: "#f472b6",  dot: "bg-pink-400" },
-  won:               { bg: "rgba(52,211,153,0.12)",  color: "#34d399",  dot: "bg-emerald-400" },
-  lost:              { bg: "rgba(248,113,113,0.12)", color: "#f87171",  dot: "bg-red-400" },
+  new:       { bg: "rgba(148,163,184,0.12)", color: "#94a3b8", dot: "bg-slate-400" },
+  analyzed:  { bg: "rgba(96,165,250,0.12)",  color: "#60a5fa", dot: "bg-blue-400" },
+  contacted: { bg: "rgba(251,191,36,0.12)",  color: "#fbbf24", dot: "bg-amber-400" },
+  replied:   { bg: "rgba(167,139,250,0.12)", color: "#a78bfa", dot: "bg-violet-400" },
+  lost:      { bg: "rgba(248,113,113,0.12)", color: "#f87171", dot: "bg-red-400" },
 }
 
 const STAGE_LABELS: Record<CRMStage, string> = {
-  new: "New", analyzed: "Analyzed", contacted: "Contacted", replied: "Replied",
-  interested: "Interested", meeting_scheduled: "Meeting", proposal_sent: "Proposal",
-  won: "Won", lost: "Lost",
+  new: "New", analyzed: "Analyzed", contacted: "Contacted",
+  replied: "Replied", lost: "Lost",
 }
 
 function ScoreDot({ score }: { score: number | null }) {

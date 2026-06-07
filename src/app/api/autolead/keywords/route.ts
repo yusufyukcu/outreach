@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
         .from("leads")
         .select("channel:channels(niche_primary, niche_secondary, description)")
         .eq("org_id", orgId)
-        .in("crm_stage", ["won", "contacted", "interested", "replied"])
+        .in("crm_stage", ["contacted", "replied"])
         .limit(20)
       if (wonLeads) {
         const nicheSet = new Set<string>()

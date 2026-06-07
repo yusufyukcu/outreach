@@ -9,15 +9,13 @@ import { formatCurrency } from "@/lib/utils"
 import type { CRMStage, Lead } from "@/types"
 
 const STAGE_LABELS: Record<CRMStage, string> = {
-  new: "New", analyzed: "Analyzed", contacted: "Contacted", replied: "Replied",
-  interested: "Interested", meeting_scheduled: "Meeting", proposal_sent: "Proposal",
-  won: "Won", lost: "Lost",
+  new: "New", analyzed: "Analyzed", contacted: "Contacted",
+  replied: "Replied", lost: "Lost",
 }
 
 const STAGE_COLORS: Record<CRMStage, string> = {
   new: "#94a3b8", analyzed: "#60a5fa", contacted: "#fbbf24",
-  replied: "#a78bfa", interested: "#818cf8", meeting_scheduled: "#fb923c",
-  proposal_sent: "#f472b6", won: "#34d399", lost: "#f87171",
+  replied: "#a78bfa", lost: "#f87171",
 }
 
 const STAT_CONFIG = [
@@ -27,7 +25,7 @@ const STAT_CONFIG = [
   { title: "Pipeline Value",   icon: DollarSign, gradient: "linear-gradient(135deg, hsl(158 64% 52%), hsl(172 66% 50%))",  glow: "hsl(158 64% 52% / 0.35)" },
 ]
 
-const PIPELINE_STAGES: CRMStage[] = ["new", "analyzed", "contacted", "replied", "interested", "won"]
+const PIPELINE_STAGES: CRMStage[] = ["new", "analyzed", "contacted", "replied", "lost"]
 
 const CARD_STYLE = {
   background: "#0d1117",
@@ -66,7 +64,7 @@ export default async function DashboardPage() {
     hotLeads:           allLeads.filter(l => (l.lead_score ?? 0) >= 85).length,
     contactedThisWeek:  allLeads.filter(l => l.last_contacted_at && new Date(l.last_contacted_at) > weekAgo).length,
     pipelineValue:      allLeads.reduce((s, l) => s + (l.deal_value_estimate ?? 0), 0),
-    wonThisMonth:       allLeads.filter(l => l.crm_stage === "won" && new Date(l.created_at) > monthAgo).length,
+    repliedThisMonth:   allLeads.filter(l => l.crm_stage === "replied" && new Date(l.updated_at) > monthAgo).length,
   }
 
   const stageCounts = allLeads.reduce((acc, l) => {
@@ -85,8 +83,7 @@ export default async function DashboardPage() {
     stats.pipelineValue,
   ]
 
-  /* won conversion rate (0-100) */
-  const convRate = stats.total > 0 ? Math.round((stats.wonThisMonth / stats.total) * 100) : 0
+  const convRate = stats.total > 0 ? Math.round((stats.repliedThisMonth / stats.total) * 100) : 0
 
   return (
     <div className="flex flex-col overflow-auto sl-scroll-area" style={{ color: "var(--sl-fg-1)" }}>
@@ -196,15 +193,15 @@ export default async function DashboardPage() {
               })}
             </div>
 
-            {/* Won this month badge */}
-            {stats.wonThisMonth > 0 && (
-              <div className="mt-5 flex items-center gap-2 rounded-xl px-4 py-2.5" style={{ background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)" }}>
-                <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg, hsl(158 64% 52%), hsl(172 66% 50%))" }}>
+            {/* Replied this month badge */}
+            {stats.repliedThisMonth > 0 && (
+              <div className="mt-5 flex items-center gap-2 rounded-xl px-4 py-2.5" style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)" }}>
+                <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))" }}>
                   <Zap className="h-3.5 w-3.5 text-white" fill="white" />
                 </div>
-                <p className="text-sm font-semibold" style={{ color: "#34d399" }}>
-                  {stats.wonThisMonth} deal{stats.wonThisMonth > 1 ? "s" : ""} won this month
-                  {convRate > 0 && <span className="ml-1 font-normal" style={{ color: "rgba(52,211,153,0.75)" }}>({convRate}% conversion)</span>}
+                <p className="text-sm font-semibold" style={{ color: "#a78bfa" }}>
+                  {stats.repliedThisMonth} repl{stats.repliedThisMonth > 1 ? "ies" : "y"} this month
+                  {convRate > 0 && <span className="ml-1 font-normal" style={{ color: "rgba(167,139,250,0.75)" }}>({convRate}% reply rate)</span>}
                 </p>
               </div>
             )}

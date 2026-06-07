@@ -16,15 +16,11 @@ import { toast } from "@/hooks/use-toast"
 import type { Lead, Activity, CRMStage, ScoreBreakdown, ServiceType, OutreachMessage } from "@/types"
 
 const STAGE_OPTIONS: { value: CRMStage; label: string }[] = [
-  { value: "new", label: "New" },
-  { value: "analyzed", label: "Analyzed" },
+  { value: "new",       label: "New" },
+  { value: "analyzed",  label: "Analyzed" },
   { value: "contacted", label: "Contacted" },
-  { value: "replied", label: "Replied" },
-  { value: "interested", label: "Interested" },
-  { value: "meeting_scheduled", label: "Meeting Scheduled" },
-  { value: "proposal_sent", label: "Proposal Sent" },
-  { value: "won", label: "Won ✓" },
-  { value: "lost", label: "Lost" },
+  { value: "replied",   label: "Replied" },
+  { value: "lost",      label: "Lost" },
 ]
 
 const ACTIVITY_ICONS: Record<string, React.ReactNode> = {

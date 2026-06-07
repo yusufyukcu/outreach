@@ -54,10 +54,10 @@ async function getStats(orgId: string) {
   const replyRate = totalSent > 0 ? (totalReplied / totalSent) * 100 : 0
 
   const positiveClasses = new Set(["positive", "interested", "sample_request", "pricing_request", "meeting_request"])
-  const positiveReplies = repliedMessages.filter(
+  const positiveCount = repliedMessages.filter(
     (m: { reply_classification: string | null }) => m.reply_classification && positiveClasses.has(m.reply_classification)
   ).length
-  const positiveRate = totalReplied > 0 ? (positiveReplies / totalReplied) * 100 : 0
+  const positiveRate = totalReplied > 0 ? (positiveCount / totalReplied) * 100 : 0
 
   const avgResponseHours = (() => {
     const withTime = repliedMessages.filter((m: { response_time_hours: number | null }) => m.response_time_hours != null)
@@ -67,7 +67,7 @@ async function getStats(orgId: string) {
   })()
 
   // ── Conversion funnel ───────────────────────────────────────────────────────
-  const FUNNEL_STAGES = ["new", "analyzed", "contacted", "replied", "interested", "meeting_scheduled", "proposal_sent", "won", "lost"] as const
+  const FUNNEL_STAGES = ["new", "analyzed", "contacted", "replied", "lost"] as const
   const stageCounts: Record<string, number> = {}
   for (const l of leads) stageCounts[l.crm_stage] = (stageCounts[l.crm_stage] ?? 0) + 1
 
@@ -130,7 +130,7 @@ async function getStats(orgId: string) {
   })
 
   return {
-    overview: { totalLeads, totalSent, totalReplied, replyRate, positiveReplies, positiveRate, avgResponseHours },
+    overview: { totalLeads, totalSent, totalReplied, replyRate, positiveCount, positiveRate, avgResponseHours },
     stageCounts,
     classificationCounts: sortedClassifications,
     topKeywords,
@@ -167,11 +167,9 @@ export default async function IntelligencePage() {
 
   const STAGE_LABELS: Record<string, string> = {
     new: "New", analyzed: "Analyzed", contacted: "Contacted",
-    replied: "Replied", interested: "Interested",
-    meeting_scheduled: "Meeting", proposal_sent: "Proposal",
-    won: "Won", lost: "Lost",
+    replied: "Replied", lost: "Lost",
   }
-  const FUNNEL_STAGES = ["new", "analyzed", "contacted", "replied", "interested", "meeting_scheduled", "proposal_sent", "won"]
+  const FUNNEL_STAGES = ["new", "analyzed", "contacted", "replied", "lost"]
   const maxStageCount = Math.max(1, ...FUNNEL_STAGES.map((s) => stats.stageCounts[s] ?? 0))
 
   return (

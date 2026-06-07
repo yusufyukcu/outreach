@@ -72,10 +72,6 @@ export type CRMStage =
   | "analyzed"
   | "contacted"
   | "replied"
-  | "interested"
-  | "meeting_scheduled"
-  | "proposal_sent"
-  | "won"
   | "lost"
 
 export type ServiceType =

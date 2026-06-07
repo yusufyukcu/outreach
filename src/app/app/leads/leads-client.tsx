@@ -12,15 +12,14 @@ import { Toaster } from "@/components/ui/toaster"
 import type { Lead, CRMStage, ServiceType } from "@/types"
 
 const STAGE_FILTERS = [
-  { value: "all", label: "All Leads" },
-  { value: "autolead", label: "AutoLead", icon: "⚡" },
-  { value: "followup", label: "Follow-up", icon: "🔔" },
-  { value: "new", label: "New" },
-  { value: "analyzed", label: "Analyzed" },
+  { value: "all",       label: "All Leads" },
+  { value: "autolead",  label: "AutoLead", icon: "⚡" },
+  { value: "followup",  label: "Follow-up", icon: "🔔" },
+  { value: "new",       label: "New" },
+  { value: "analyzed",  label: "Analyzed" },
   { value: "contacted", label: "Contacted" },
-  { value: "replied", label: "Replied" },
-  { value: "interested", label: "Interested" },
-  { value: "won", label: "Won" },
+  { value: "replied",   label: "Replied" },
+  { value: "lost",      label: "Lost" },
 ]
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000
@@ -129,7 +128,7 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
   }
 
   const hotCount = leads.filter((l) => (l.lead_score ?? 0) >= 85).length
-  const wonCount = leads.filter((l) => l.crm_stage === "won").length
+  const repliedCount = leads.filter((l) => l.crm_stage === "replied").length
 
   return (
     <>
@@ -165,13 +164,13 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
             filter: "followup",
           },
           {
-            label: "Won",
-            value: wonCount,
+            label: "Replied",
+            value: repliedCount,
             icon: Trophy,
-            gradient: "from-emerald-500 to-teal-400",
-            glow: "hsl(160 80% 45% / 0.25)",
-            bg: "from-emerald-500/10 to-teal-400/10",
-            filter: "won",
+            gradient: "from-violet-500 to-indigo-400",
+            glow: "hsl(270 70% 55% / 0.25)",
+            bg: "from-violet-500/10 to-indigo-400/10",
+            filter: "replied",
           },
         ].map((card) => {
           const Icon = card.icon

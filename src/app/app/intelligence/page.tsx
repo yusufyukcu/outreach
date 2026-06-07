@@ -67,7 +67,7 @@ async function getStats(orgId: string) {
   })()
 
   // ── Conversion funnel ───────────────────────────────────────────────────────
-  const FUNNEL_STAGES = ["new", "analyzed", "contacted", "replied", "lost"] as const
+  const FUNNEL_STAGES = ["new", "analyzed", "contacted", "replied"] as const
   const stageCounts: Record<string, number> = {}
   for (const l of leads) stageCounts[l.crm_stage] = (stageCounts[l.crm_stage] ?? 0) + 1
 
@@ -167,9 +167,9 @@ export default async function IntelligencePage() {
 
   const STAGE_LABELS: Record<string, string> = {
     new: "New", analyzed: "Analyzed", contacted: "Contacted",
-    replied: "Replied", lost: "Lost",
+    replied: "Replied",
   }
-  const FUNNEL_STAGES = ["new", "analyzed", "contacted", "replied", "lost"]
+  const FUNNEL_STAGES = ["new", "analyzed", "contacted", "replied"]
   const maxStageCount = Math.max(1, ...FUNNEL_STAGES.map((s) => stats.stageCounts[s] ?? 0))
 
   return (
@@ -263,11 +263,6 @@ export default async function IntelligencePage() {
                 )
               })}
             </div>
-            {stats.stageCounts["lost"] > 0 && (
-              <p className="text-[11px] text-muted-foreground/50 mt-3">
-                + {stats.stageCounts["lost"]} lost
-              </p>
-            )}
           </div>
 
           {/* ── Reply Classification ────────────────────────────────────────── */}

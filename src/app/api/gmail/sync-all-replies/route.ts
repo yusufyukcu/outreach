@@ -77,9 +77,6 @@ export async function POST(req: NextRequest) {
 
           totalFound++
           const now = new Date().toISOString()
-          const classification = classifyReply(reply.body)
-          const isNegative = ["not_interested", "hired_editor_already", "negative"].includes(classification)
-          const newStage = isNegative ? "lost" : "replied"
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await (supabase as any)
@@ -89,14 +86,14 @@ export async function POST(req: NextRequest) {
               replied_at:           reply.receivedAt,
               reply_from:           reply.from,
               reply_body:           reply.body,
-              reply_classification: classification,
+              reply_classification: classifyReply(reply.body),
               response_time_hours:  computeResponseHours(msg.sent_at ?? null, reply.receivedAt),
             })
             .eq("id", msg.id)
 
           await supabase
             .from("leads")
-            .update({ crm_stage: newStage, updated_at: now })
+            .update({ crm_stage: "replied", updated_at: now })
             .eq("id", msg.lead_id)
             .eq("crm_stage", "contacted")
 

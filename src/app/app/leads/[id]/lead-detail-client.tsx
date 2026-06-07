@@ -19,10 +19,9 @@ const STAGE_STYLES: Record<string, React.CSSProperties> = {
   analyzed:  { background: "rgba(96,165,250,0.12)",  color: "#60a5fa", border: "1px solid rgba(96,165,250,0.25)" },
   contacted: { background: "rgba(251,191,36,0.12)",  color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" },
   replied:   { background: "rgba(167,139,250,0.12)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.25)" },
-  lost:      { background: "rgba(248,113,113,0.12)", color: "#f87171", border: "1px solid rgba(248,113,113,0.25)" },
 }
 const STAGE_LABELS: Record<string, string> = {
-  new: "New", analyzed: "Analyzed", contacted: "Contacted", replied: "Replied", lost: "Lost",
+  new: "New", analyzed: "Analyzed", contacted: "Contacted", replied: "Replied",
 }
 
 const ACTIVITY_ICONS: Record<string, React.ReactNode> = {

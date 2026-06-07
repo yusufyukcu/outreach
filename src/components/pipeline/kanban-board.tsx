@@ -7,7 +7,6 @@ const STAGES: { id: CRMStage; label: string; color: string }[] = [
   { id: "analyzed",  label: "Analyzed",  color: "#60a5fa" },
   { id: "contacted", label: "Contacted", color: "#fbbf24" },
   { id: "replied",   label: "Replied",   color: "#a78bfa" },
-  { id: "lost",      label: "Lost",      color: "#f87171" },
 ]
 
 export function KanbanBoard({ leads }: { leads: Lead[] }) {

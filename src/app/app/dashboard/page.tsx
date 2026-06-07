@@ -10,12 +10,12 @@ import type { CRMStage, Lead } from "@/types"
 
 const STAGE_LABELS: Record<CRMStage, string> = {
   new: "New", analyzed: "Analyzed", contacted: "Contacted",
-  replied: "Replied", lost: "Lost",
+  replied: "Replied",
 }
 
 const STAGE_COLORS: Record<CRMStage, string> = {
   new: "#94a3b8", analyzed: "#60a5fa", contacted: "#fbbf24",
-  replied: "#a78bfa", lost: "#f87171",
+  replied: "#a78bfa",
 }
 
 const STAT_CONFIG = [
@@ -25,7 +25,7 @@ const STAT_CONFIG = [
   { title: "Pipeline Value",   icon: DollarSign, gradient: "linear-gradient(135deg, hsl(158 64% 52%), hsl(172 66% 50%))",  glow: "hsl(158 64% 52% / 0.35)" },
 ]
 
-const PIPELINE_STAGES: CRMStage[] = ["new", "analyzed", "contacted", "replied", "lost"]
+const PIPELINE_STAGES: CRMStage[] = ["new", "analyzed", "contacted", "replied"]
 
 const CARD_STYLE = {
   background: "#0d1117",
@@ -308,7 +308,7 @@ export default async function DashboardPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-sm" style={{ color: "var(--sl-fg-1)" }}>Manage Pipeline</p>
-              <p className="text-xs mt-0.5" style={{ color: "var(--sl-fg-3)" }}>Drag & drop CRM across 9 stages</p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--sl-fg-3)" }}>Automatic CRM pipeline</p>
             </div>
             <ArrowRight className="h-4 w-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all shrink-0" style={{ color: "var(--sl-fg-3)" }} />
           </Link>

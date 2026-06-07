@@ -19,7 +19,6 @@ const STAGE_FILTERS = [
   { value: "analyzed",  label: "Analyzed" },
   { value: "contacted", label: "Contacted" },
   { value: "replied",   label: "Replied" },
-  { value: "lost",      label: "Lost" },
 ]
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000

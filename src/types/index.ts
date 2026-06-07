@@ -175,6 +175,12 @@ export interface Lead {
   next_follow_up_at: string | null
   created_at: string
   updated_at: string
+  // Discovery / intelligence
+  discovery_keyword: string | null
+  discovery_target: string | null
+  autolead_session_id: string | null
+  email_found: boolean | null
+  email_source: string | null
   // Joined
   channel?: Channel
   contact?: Contact
@@ -233,12 +239,51 @@ export interface OutreachMessage {
   ai_generated: boolean
   created_at: string
   // Gmail thread tracking
-  gmail_message_id?: string | null
-  gmail_thread_id?: string | null
-  reply_from?: string | null
-  reply_body?: string | null
+  gmail_message_id: string | null
+  gmail_thread_id: string | null
+  reply_from: string | null
+  reply_body: string | null
+  // Intelligence
+  email_variant: string | null
+  reply_classification: string | null
+  response_time_hours: number | null
   // Joined
   lead?: Lead
+}
+
+export interface AutoleadSession {
+  id: string
+  org_id: string
+  started_at: string
+  ended_at: string | null
+  niche: string | null
+  faceless_mode: boolean
+  min_subs: number | null
+  max_subs: number | null
+  auto_send: boolean
+  leads_found: number
+  emails_sent: number
+}
+
+export interface ConversionEvent {
+  id: string
+  org_id: string
+  lead_id: string
+  event_type: string
+  occurred_at: string
+  notes: string | null
+  metadata: Record<string, unknown>
+}
+
+export interface EditorialFeedback {
+  id: string
+  org_id: string
+  lead_id: string
+  feedback_tags: string[]
+  custom_tags: string[]
+  notes: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Activity {

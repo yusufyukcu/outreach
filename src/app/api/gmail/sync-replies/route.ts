@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { refreshAccessToken, fetchThreadReply } from "@/services/gmail"
+import { classifyReply, computeResponseHours } from "@/services/intelligence"
 
 export async function POST() {
   try {
@@ -36,7 +37,7 @@ export async function POST() {
     // Fetch email messages that have a thread ID and haven't been marked replied
     const { data: messages } = await supabase
       .from("outreach_messages")
-      .select("id, lead_id, gmail_thread_id, gmail_message_id, status")
+      .select("id, lead_id, gmail_thread_id, gmail_message_id, status, sent_at")
       .eq("org_id", profile.org_id)
       .eq("channel", "email")
       .not("gmail_thread_id", "is", null)
@@ -64,15 +65,17 @@ export async function POST() {
         found++
         const now = new Date().toISOString()
 
-        // Update the outreach message
+        // Update the outreach message with reply + intelligence data
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (supabase as any)
           .from("outreach_messages")
           .update({
-            status: "replied",
-            replied_at: reply.receivedAt,
-            reply_from: reply.from,
-            reply_body: reply.body,
+            status:               "replied",
+            replied_at:           reply.receivedAt,
+            reply_from:           reply.from,
+            reply_body:           reply.body,
+            reply_classification: classifyReply(reply.body),
+            response_time_hours:  computeResponseHours(msg.sent_at ?? null, reply.receivedAt),
           })
           .eq("id", msg.id)
 

@@ -55,7 +55,11 @@ export async function POST(req: NextRequest) {
     const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single()
     if (!profile?.org_id) return NextResponse.json({ error: "No org" }, { status: 400 })
 
-    const { channel_id, score, score_breakdown, source, tags } = await req.json()
+    const {
+      channel_id, score, score_breakdown, source, tags,
+      discovery_keyword, discovery_target, autolead_session_id,
+      email_found, email_source,
+    } = await req.json()
 
     // Check for existing
     const { data: existing } = await supabase
@@ -70,13 +74,18 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from("leads")
       .insert({
-        org_id: profile.org_id,
+        org_id:               profile.org_id,
         channel_id,
-        crm_stage: "new",
-        lead_score: score ?? null,
-        score_breakdown: score_breakdown ?? null,
-        source: source ?? "discovery",
-        tags: tags ?? [],
+        crm_stage:            "new",
+        lead_score:           score ?? null,
+        score_breakdown:      score_breakdown ?? null,
+        source:               source ?? "discovery",
+        tags:                 tags ?? [],
+        discovery_keyword:    discovery_keyword ?? null,
+        discovery_target:     discovery_target ?? null,
+        autolead_session_id:  autolead_session_id ?? null,
+        email_found:          email_found ?? null,
+        email_source:         email_source ?? null,
       })
       .select()
       .single()

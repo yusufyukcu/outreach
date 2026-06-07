@@ -82,6 +82,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     { label: "Mid (100K–1M)", min: 100000, max: 1000000 },
   ]
   const seenChannelIds = useRef<Set<string>>(new Set())
+  const sessionIdRef = useRef<string | null>(null)
 
   const runningRef = useRef(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -183,9 +184,10 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             const tierTag = tierData.tier as string
             addLog(`✓ ${channelName} (score: ${score}) [${tierLabel}]`, "success")
 
+            const emailFound = !!(ch.business_email)
             let leadId: string | null = null
             try {
-              const leadRes = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel_id: channelDbId, score, score_breakdown: ch.quality_breakdown, source: "autolead", tags: [tierTag] }) })
+              const leadRes = await fetch("/api/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ channel_id: channelDbId, score, score_breakdown: ch.quality_breakdown, source: "autolead", tags: [tierTag], discovery_keyword: keyword, discovery_target: tierData.target ?? null, autolead_session_id: sessionIdRef.current ?? null, email_found: emailFound }) })
               if (leadRes.ok) {
                 const leadData = await leadRes.json()
                 leadId = leadData.id
@@ -242,6 +244,22 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     runningRef.current = true
     setRunning(true)
     addLog("🚀 AutoLead started", "success")
+
+    // Create a data-intelligence session (fire-and-forget — failure doesn't block AutoLead)
+    fetch("/api/autolead/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        niche: selectedNiche === "Any Niche" ? null : selectedNiche,
+        faceless_mode: facelessMode,
+        min_subs: minSubs,
+        max_subs: maxSubs,
+        auto_send: autoSend,
+      }),
+    })
+      .then((r) => r.json())
+      .then((d) => { if (d.id) sessionIdRef.current = d.id })
+      .catch(() => {})
     if (selectedDuration) {
       setRemainingMs(selectedDuration)
       tickRef.current = setInterval(() => {
@@ -285,6 +303,21 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
     runningRef.current = false
     setRunning(false)
     setRemainingMs(null)
+
+    // Close the intelligence session (fire-and-forget)
+    if (sessionIdRef.current) {
+      fetch("/api/autolead/session", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: sessionIdRef.current,
+          leads_found: stats.leadsAdded,
+          emails_sent: emailsSentRef.current,
+        }),
+      }).catch(() => {})
+      sessionIdRef.current = null
+    }
+
     emailsSentRef.current = 0
     emailQueueRef.current = []
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }

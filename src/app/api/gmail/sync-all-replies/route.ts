@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { refreshAccessToken, fetchThreadReply } from "@/services/gmail"
+import { classifyReply, computeResponseHours } from "@/services/intelligence"
 
 // Service-role client — bypasses RLS, safe for server-only cron use.
 function adminClient() {
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: messages } = await (supabase as any)
         .from("outreach_messages")
-        .select("id, lead_id, gmail_thread_id, gmail_message_id, status")
+        .select("id, lead_id, gmail_thread_id, gmail_message_id, status, sent_at")
         .eq("org_id", account.org_id)
         .eq("channel", "email")
         .not("gmail_thread_id", "is", null)
@@ -81,10 +82,12 @@ export async function POST(req: NextRequest) {
           await (supabase as any)
             .from("outreach_messages")
             .update({
-              status: "replied",
-              replied_at: reply.receivedAt,
-              reply_from: reply.from,
-              reply_body: reply.body,
+              status:               "replied",
+              replied_at:           reply.receivedAt,
+              reply_from:           reply.from,
+              reply_body:           reply.body,
+              reply_classification: classifyReply(reply.body),
+              response_time_hours:  computeResponseHours(msg.sent_at ?? null, reply.receivedAt),
             })
             .eq("id", msg.id)
 

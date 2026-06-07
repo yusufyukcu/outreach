@@ -1,18 +1,19 @@
 "use client"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Search, Users, KanbanSquare, Mail, Settings, LogOut, Briefcase, Zap, LayoutDashboard } from "lucide-react"
+import { Search, Users, KanbanSquare, Mail, Settings, LogOut, Briefcase, Zap, LayoutDashboard, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 
 const NAV_ITEMS = [
-  { href: "/app/dashboard", label: "Dashboard",  icon: LayoutDashboard },
-  { href: "/app/autolead",  label: "AutoLead",   icon: Zap },
-  { href: "/app/discover",  label: "Discover",   icon: Search },
-  { href: "/app/leads",     label: "Leads",      icon: Users },
-  { href: "/app/pipeline",  label: "Pipeline",   icon: KanbanSquare },
-  { href: "/app/outreach",  label: "Outreach",   icon: Mail },
-  { href: "/app/career",    label: "My Career",  icon: Briefcase },
+  { href: "/app/dashboard",     label: "Dashboard",     icon: LayoutDashboard },
+  { href: "/app/autolead",      label: "AutoLead",      icon: Zap },
+  { href: "/app/discover",      label: "Discover",      icon: Search },
+  { href: "/app/leads",         label: "Leads",         icon: Users },
+  { href: "/app/pipeline",      label: "Pipeline",      icon: KanbanSquare },
+  { href: "/app/outreach",      label: "Outreach",      icon: Mail },
+  { href: "/app/intelligence",  label: "Intelligence",  icon: BarChart3 },
+  { href: "/app/career",        label: "My Career",     icon: Briefcase },
 ]
 
 function LogoMark() {

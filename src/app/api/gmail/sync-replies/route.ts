@@ -64,6 +64,9 @@ export async function POST() {
 
         found++
         const now = new Date().toISOString()
+        const classification = classifyReply(reply.body)
+        const isNegative = ["not_interested", "hired_editor_already", "negative"].includes(classification)
+        const newStage = isNegative ? "lost" : "replied"
 
         // Update the outreach message with reply + intelligence data
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,15 +77,15 @@ export async function POST() {
             replied_at:           reply.receivedAt,
             reply_from:           reply.from,
             reply_body:           reply.body,
-            reply_classification: classifyReply(reply.body),
+            reply_classification: classification,
             response_time_hours:  computeResponseHours(msg.sent_at ?? null, reply.receivedAt),
           })
           .eq("id", msg.id)
 
-        // Advance lead stage to "replied" if it's still "contacted"
+        // Advance lead stage automatically based on reply sentiment
         await supabase
           .from("leads")
-          .update({ crm_stage: "replied", updated_at: now })
+          .update({ crm_stage: newStage, updated_at: now })
           .eq("id", msg.lead_id)
           .eq("crm_stage", "contacted")
 

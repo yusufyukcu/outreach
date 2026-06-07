@@ -7,21 +7,23 @@ import {
   Globe, DollarSign, BarChart3, MessageSquare,
   Clock, Reply,
 } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ScoreBreakdownPanel } from "@/components/leads/score-breakdown-panel"
 import { OutreachGenerator } from "@/components/outreach/outreach-generator"
 import { formatNumber, formatCurrency, timeAgo } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
-import type { Lead, Activity, CRMStage, ScoreBreakdown, ServiceType, OutreachMessage } from "@/types"
+import type { Lead, Activity, ScoreBreakdown, ServiceType, OutreachMessage } from "@/types"
 
-const STAGE_OPTIONS: { value: CRMStage; label: string }[] = [
-  { value: "new",       label: "New" },
-  { value: "analyzed",  label: "Analyzed" },
-  { value: "contacted", label: "Contacted" },
-  { value: "replied",   label: "Replied" },
-  { value: "lost",      label: "Lost" },
-]
+const STAGE_STYLES: Record<string, React.CSSProperties> = {
+  new:       { background: "rgba(148,163,184,0.12)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.25)" },
+  analyzed:  { background: "rgba(96,165,250,0.12)",  color: "#60a5fa", border: "1px solid rgba(96,165,250,0.25)" },
+  contacted: { background: "rgba(251,191,36,0.12)",  color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" },
+  replied:   { background: "rgba(167,139,250,0.12)", color: "#a78bfa", border: "1px solid rgba(167,139,250,0.25)" },
+  lost:      { background: "rgba(248,113,113,0.12)", color: "#f87171", border: "1px solid rgba(248,113,113,0.25)" },
+}
+const STAGE_LABELS: Record<string, string> = {
+  new: "New", analyzed: "Analyzed", contacted: "Contacted", replied: "Replied", lost: "Lost",
+}
 
 const ACTIVITY_ICONS: Record<string, React.ReactNode> = {
   lead_created: <Users className="h-3.5 w-3.5" />,
@@ -59,28 +61,8 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
   const [activities, setActivities] = useState(initialActivities)
   const [note, setNote] = useState(lead.notes ?? "")
   const [savingNote, setSavingNote] = useState(false)
-  const [updatingStage, setUpdatingStage] = useState(false)
-
   const channel = lead.channel!
   const contact = lead.contact
-
-  async function handleStageChange(newStage: CRMStage) {
-    setUpdatingStage(true)
-    try {
-      const res = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ crm_stage: newStage }),
-      })
-      if (!res.ok) throw new Error()
-      setLead(prev => ({ ...prev, crm_stage: newStage }))
-      toast({ title: "Stage updated" })
-    } catch {
-      toast({ title: "Failed to update stage", variant: "destructive" })
-    } finally {
-      setUpdatingStage(false)
-    }
-  }
 
   async function handleSaveNote() {
     setSavingNote(true)
@@ -166,16 +148,9 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
           <div className={`text-2xl font-bold bg-gradient-to-br ${scoreColor} bg-clip-text text-transparent`}>
             {lead.lead_score}
           </div>
-          <Select value={lead.crm_stage} onValueChange={v => handleStageChange(v as CRMStage)} disabled={updatingStage}>
-            <SelectTrigger className="w-44 rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STAGE_OPTIONS.map(s => (
-                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <span className="text-xs font-semibold px-3 py-1.5 rounded-full" style={STAGE_STYLES[lead.crm_stage] ?? STAGE_STYLES.new}>
+            {STAGE_LABELS[lead.crm_stage] ?? lead.crm_stage}
+          </span>
         </div>
       </div>
 

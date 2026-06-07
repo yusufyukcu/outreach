@@ -1,16 +1,9 @@
 "use client"
 import Link from "next/link"
 import Image from "next/image"
-import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import { PlayCircle, GripVertical } from "lucide-react"
-import { formatNumber, formatCurrency, cn } from "@/lib/utils"
+import { PlayCircle } from "lucide-react"
+import { formatNumber } from "@/lib/utils"
 import type { Lead } from "@/types"
-
-interface KanbanCardProps {
-  lead: Lead
-  isDragging?: boolean
-}
 
 function ScorePill({ score }: { score: number | null }) {
   const gradient =
@@ -25,26 +18,15 @@ function ScorePill({ score }: { score: number | null }) {
   )
 }
 
-export function KanbanCard({ lead, isDragging }: KanbanCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortableDragging } = useSortable({ id: lead.id })
-
-  const style = { transform: CSS.Transform.toString(transform), transition }
+export function KanbanCard({ lead }: { lead: Lead }) {
   const channel = lead.channel
-
   return (
-    <div
-      ref={setNodeRef}
-      style={{ ...style, background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}
-      className={cn(
-        "card-hover rounded-xl p-2.5 cursor-grab active:cursor-grabbing",
-        (isDragging || isSortableDragging) && "opacity-40 shadow-xl rotate-2 scale-105"
-      )}
+    <Link
+      href={`/app/leads/${lead.id}`}
+      className="block rounded-xl p-2.5 transition-colors"
+      style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}
     >
       <div className="flex items-start gap-2">
-        <div {...attributes} {...listeners} className="mt-0.5 shrink-0 cursor-grab text-muted-foreground/30 hover:text-muted-foreground transition-colors">
-          <GripVertical className="h-4 w-4" />
-        </div>
-
         <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg border bg-muted">
           {channel?.thumbnail_url ? (
             <Image src={channel.thumbnail_url} alt={channel.name} fill className="object-cover" unoptimized />
@@ -54,28 +36,14 @@ export function KanbanCard({ lead, isDragging }: KanbanCardProps) {
             </div>
           )}
         </div>
-
         <div className="flex-1 min-w-0">
-          <Link href={`/app/leads/${lead.id}`} onClick={e => e.stopPropagation()}>
-            <p className="text-xs font-semibold truncate hover:text-primary transition-colors">
-              {channel?.name ?? "Unknown"}
-            </p>
-          </Link>
+          <p className="text-xs font-semibold truncate text-foreground">{channel?.name ?? "Unknown"}</p>
           {channel && (
             <p className="text-[11px] text-muted-foreground">{formatNumber(channel.subscriber_count)} subs</p>
           )}
         </div>
-
         <ScorePill score={lead.lead_score} />
       </div>
-
-      {lead.deal_value_estimate && (
-        <div className="mt-2 flex justify-end">
-          <span className="inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-semibold" style={{ background: "rgba(52,211,153,0.12)", color: "#34d399" }}>
-            {formatCurrency(lead.deal_value_estimate)}
-          </span>
-        </div>
-      )}
-    </div>
+    </Link>
   )
 }

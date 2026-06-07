@@ -203,14 +203,14 @@ export default function DiscoverPage() {
       <div className="flex-1 overflow-auto p-6 space-y-5">
 
         {/* ── Search card ─────────────────────────────────────────────── */}
-        <div className="animate-fade-in-up rounded-2xl border bg-white shadow-sm overflow-hidden">
+        <div className="animate-fade-in-up rounded-2xl overflow-hidden" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
 
           {/* Search bar row */}
           <div className="p-4 flex items-center gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <input
-                className="w-full h-11 rounded-xl border border-input bg-muted/40 pl-10 pr-4 text-sm outline-none transition-all duration-150 focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/15 placeholder:text-muted-foreground/60"
+                className="w-full h-11 rounded-xl border border-input bg-muted/40 pl-10 pr-4 text-sm outline-none transition-all duration-150 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/15 placeholder:text-muted-foreground/60"
                 placeholder="e.g. africa facts, megaprojects, history explained..."
                 value={keywords}
                 onChange={(e) => setKeywords(e.target.value)}
@@ -234,9 +234,10 @@ export default function DiscoverPage() {
             {/* Filters toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`pressable inline-flex items-center gap-1.5 rounded-xl px-3 h-11 text-sm font-medium transition-all duration-150 border whitespace-nowrap ${
-                showFilters ? "border-indigo-400 text-indigo-700 bg-indigo-50" : "border-input text-muted-foreground hover:text-foreground"
+              className={`pressable inline-flex items-center gap-1.5 rounded-xl px-3 h-11 text-sm font-medium transition-all duration-150 whitespace-nowrap ${
+                showFilters ? "" : "border border-input text-muted-foreground hover:text-foreground"
               }`}
+              style={showFilters ? { border: "1px solid rgba(96,165,250,0.4)", color: "#60a5fa", background: "rgba(96,165,250,0.08)" } : {}}
             >
               <SlidersHorizontal className="h-3.5 w-3.5" />
               Filters
@@ -259,7 +260,7 @@ export default function DiscoverPage() {
 
           {/* Expanded filters */}
           {showFilters && (
-            <div className="animate-fade-in border-t px-4 py-4 bg-muted/20 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="animate-fade-in px-4 py-4 grid grid-cols-2 sm:grid-cols-4 gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.03)" }}>
               <div className="space-y-1">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Niche</p>
                 <Select value={niche} onValueChange={setNiche}>
@@ -308,7 +309,7 @@ export default function DiscoverPage() {
           )}
 
           {/* Bottom button strip */}
-          <div className="border-t px-4 py-3 flex items-center gap-2">
+          <div className="px-4 py-3 flex items-center gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
             <button
               onClick={() => { setShowIdeaBar(!showIdeaBar); setShowSuggestions(false) }}
               className={`pressable inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold shadow-sm transition-all ${showIdeaBar ? "bg-violet-600 text-white" : "bg-gradient-to-r from-violet-500 to-purple-500 text-white"}`}
@@ -327,7 +328,7 @@ export default function DiscoverPage() {
 
           {/* AI idea bar */}
           {showIdeaBar && (
-            <div className="animate-fade-in border-t overflow-hidden" style={{ background: "linear-gradient(135deg, hsl(270 75% 97%) 0%, hsl(243 75% 97%) 100%)" }}>
+            <div className="animate-fade-in overflow-hidden" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "linear-gradient(135deg, rgba(120,87,255,0.08) 0%, rgba(88,80,236,0.08) 100%)" }}>
               {/* Header strip */}
               <div className="flex items-center justify-between px-5 pt-4 pb-3">
                 <div className="flex items-center gap-2.5">
@@ -335,11 +336,11 @@ export default function DiscoverPage() {
                     <Wand2 className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-violet-900">AI Keyword Ideas</p>
-                    <p className="text-[11px] text-violet-500">Describe what you&apos;re looking for, AI writes the keywords</p>
+                    <p className="text-sm font-bold" style={{ color: "#c4b5fd" }}>AI Keyword Ideas</p>
+                    <p className="text-[11px]" style={{ color: "#a78bfa" }}>Describe what you&apos;re looking for, AI writes the keywords</p>
                   </div>
                 </div>
-                <button onClick={() => setShowIdeaBar(false)} className="pressable h-7 w-7 rounded-lg flex items-center justify-center text-violet-400 hover:text-violet-700 hover:bg-violet-100 transition-colors">
+                <button onClick={() => setShowIdeaBar(false)} className="pressable h-7 w-7 rounded-lg flex items-center justify-center transition-colors" style={{ color: "#a78bfa" }}>
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -349,7 +350,8 @@ export default function DiscoverPage() {
                 <div className="relative flex-1">
                   <Sparkles className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-violet-400 pointer-events-none" />
                   <input
-                    className="w-full h-11 rounded-xl border border-violet-200 bg-white pl-10 pr-4 text-sm outline-none transition-all duration-150 placeholder:text-violet-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-500/15 text-violet-900"
+                    className="w-full h-11 rounded-xl pl-10 pr-4 text-sm outline-none transition-all duration-150 focus:ring-2 focus:ring-violet-500/15"
+                    style={{ border: "1px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.07)", color: "#e2d9f3" }}
                     placeholder='e.g. "faceless channels about top 10 lists in Africa"'
                     value={ideaPrompt}
                     onChange={(e) => setIdeaPrompt(e.target.value)}
@@ -381,7 +383,8 @@ export default function DiscoverPage() {
                   <button
                     key={example}
                     onClick={() => setIdeaPrompt(example)}
-                    className="pressable inline-flex items-center rounded-full border border-violet-200 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-violet-600 hover:bg-white hover:border-violet-300 transition-all"
+                    className="pressable inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium transition-all"
+                    style={{ border: "1px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.1)", color: "#a78bfa" }}
                   >
                     {example}
                   </button>
@@ -392,18 +395,18 @@ export default function DiscoverPage() {
 
           {/* Suggestions panel */}
           {showSuggestions && (
-            <div className="animate-fade-in border-t overflow-hidden" style={{ background: "linear-gradient(135deg, hsl(225 75% 97%) 0%, hsl(243 75% 97%) 100%)" }}>
+            <div className="animate-fade-in overflow-hidden" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "linear-gradient(135deg, rgba(88,80,236,0.08) 0%, rgba(56,189,248,0.06) 100%)" }}>
               <div className="flex items-center justify-between px-5 pt-4 pb-3">
                 <div className="flex items-center gap-2.5">
                   <div className="h-8 w-8 rounded-xl flex items-center justify-center shadow-md shrink-0" style={{ background: "linear-gradient(135deg, hsl(243 75% 59%), hsl(199 90% 55%))" }}>
                     <Sparkles className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-indigo-900">Keyword Suggestions</p>
+                    <p className="text-sm font-bold" style={{ color: "#a5b4fc" }}>Keyword Suggestions</p>
                     <p className="text-[11px] text-indigo-400">Pick a niche to auto-fill keywords and start searching</p>
                   </div>
                 </div>
-                <button onClick={() => setShowSuggestions(false)} className="pressable h-7 w-7 rounded-lg flex items-center justify-center text-indigo-400 hover:text-indigo-700 hover:bg-indigo-100 transition-colors">
+                <button onClick={() => setShowSuggestions(false)} className="pressable h-7 w-7 rounded-lg flex items-center justify-center text-indigo-400 transition-colors">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -412,7 +415,8 @@ export default function DiscoverPage() {
                   <button
                     key={p.label}
                     onClick={() => { setKeywords(p.keywords); if (p.faceless) setFacelessMode(true); setShowSuggestions(false) }}
-                    className="pressable group relative flex items-center gap-3 rounded-xl bg-white border border-indigo-100 px-3 py-2.5 text-left hover:border-indigo-300 hover:shadow-sm transition-all duration-150 overflow-hidden"
+                    className="pressable group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-150 overflow-hidden"
+                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}
                   >
                     <span className={`h-8 w-8 rounded-lg bg-gradient-to-br ${p.color} shrink-0 flex items-center justify-center text-base shadow-sm`}>
                       {p.label.split(" ")[0]}
@@ -430,13 +434,13 @@ export default function DiscoverPage() {
 
         {/* ── AI-expanded concepts ─────────────────────────────────────── */}
         {!loading && expandedConcepts.length > 0 && (
-          <div className="animate-fade-in flex items-start gap-3 rounded-2xl border border-violet-200/60 bg-gradient-to-r from-violet-50 to-purple-50 px-4 py-3">
-            <Sparkles className="h-4 w-4 text-violet-500 mt-0.5 shrink-0" />
+          <div className="animate-fade-in flex items-start gap-3 rounded-2xl px-4 py-3" style={{ background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.2)" }}>
+            <Sparkles className="h-4 w-4 mt-0.5 shrink-0" style={{ color: "#a78bfa" }} />
             <div>
-              <p className="text-xs font-bold text-violet-700 mb-2">AI expanded your search to:</p>
+              <p className="text-xs font-bold mb-2" style={{ color: "#c4b5fd" }}>AI expanded your search to:</p>
               <div className="flex flex-wrap gap-1.5">
                 {expandedConcepts.map((c) => (
-                  <span key={c} className="inline-block rounded-full bg-white border border-violet-200 px-2.5 py-0.5 text-xs text-violet-700 font-medium shadow-sm">
+                  <span key={c} className="inline-block rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", color: "#c4b5fd" }}>
                     {c}
                   </span>
                 ))}
@@ -474,7 +478,7 @@ export default function DiscoverPage() {
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <ArrowUpDown className="h-3.5 w-3.5" />
                 <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-                  <SelectTrigger className="w-40 h-8 rounded-xl text-xs border-transparent bg-white hover:border-input"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-40 h-8 rounded-xl text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="score">Lead Score</SelectItem>
                     <SelectItem value="relevance">Content Relevance</SelectItem>
@@ -556,7 +560,7 @@ function DiscoverLoadingScene({ faceless }: { faceless: boolean }) {
 
       <div className="w-full max-w-sm space-y-2">
         {STEPS.map((step, i) => (
-          <div key={step.label} className="animate-fade-in-up flex items-center gap-3 rounded-xl bg-white border px-4 py-2.5 shadow-sm" style={{ animationDelay: `${i * 100}ms` }}>
+          <div key={step.label} className="animate-fade-in-up flex items-center gap-3 rounded-xl px-4 py-2.5" style={{ animationDelay: `${i * 100}ms`, background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
             <div className={`h-2 w-2 rounded-full bg-gradient-to-br ${step.color} shrink-0`} />
             <p className="text-xs font-medium text-foreground flex-1">{step.label}</p>
             <div className="h-1 w-16 rounded-full bg-muted overflow-hidden">
@@ -602,12 +606,12 @@ function DiscoverHeroScene() {
 
       <div className="flex flex-wrap justify-center gap-2 mt-5">
         {[
-          { label: "AI keyword expansion", color: "text-violet-700 bg-violet-50 border-violet-200" },
-          { label: "Content analysis",     color: "text-blue-700 bg-blue-50 border-blue-200" },
-          { label: "Faceless detection",   color: "text-indigo-700 bg-indigo-50 border-indigo-200" },
-          { label: "Auto lead scoring",    color: "text-rose-700 bg-rose-50 border-rose-200" },
+          { label: "AI keyword expansion", style: { background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", color: "#c4b5fd" } },
+          { label: "Content analysis",     style: { background: "rgba(96,165,250,0.12)",  border: "1px solid rgba(96,165,250,0.25)",  color: "#93c5fd" } },
+          { label: "Faceless detection",   style: { background: "rgba(129,140,248,0.12)", border: "1px solid rgba(129,140,248,0.25)", color: "#a5b4fc" } },
+          { label: "Auto lead scoring",    style: { background: "rgba(251,113,133,0.12)", border: "1px solid rgba(251,113,133,0.25)", color: "#fda4af" } },
         ].map((pill) => (
-          <span key={pill.label} className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${pill.color}`}>
+          <span key={pill.label} className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium" style={pill.style}>
             {pill.label}
           </span>
         ))}

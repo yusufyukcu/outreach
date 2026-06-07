@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
-import { signInWithGoogle } from "@/lib/google-signin"
 import { toast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import type { ServiceType } from "@/types"
@@ -79,10 +78,8 @@ export function SettingsClient({ userId, email, fullName, orgId, orgName, servic
     if (status) window.history.replaceState({}, "", "/app/settings")
   }, [])
 
-  async function handleConnectGmail() {
-    const error = await signInWithGoogle("/app/settings?gmail=connected")
-    if (error) toast({ title: "Couldn't start Google sign-in", description: error.message, variant: "destructive" })
-    // On success the browser redirects to Google's consent screen.
+  function handleConnectGmail() {
+    window.location.href = "/api/gmail/connect"
   }
 
   async function handleDisconnectGmail() {

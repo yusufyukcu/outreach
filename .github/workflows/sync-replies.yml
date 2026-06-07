@@ -1,0 +1,17 @@
+name: Sync Gmail Replies
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"   # every 20 minutes
+  workflow_dispatch:           # manual trigger from GitHub UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sync-all-replies endpoint
+        run: |
+          curl -s -X POST "${{ secrets.APP_URL }}/api/gmail/sync-all-replies" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail-with-body

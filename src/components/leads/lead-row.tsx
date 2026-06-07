@@ -9,16 +9,16 @@ import { formatNumber, timeAgo } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
 import type { Lead, CRMStage } from "@/types"
 
-const STAGE_STYLES: Record<CRMStage, { bg: string; text: string; dot: string }> = {
-  new:               { bg: "bg-slate-100",   text: "text-slate-600",   dot: "bg-slate-400" },
-  analyzed:          { bg: "bg-blue-50",     text: "text-blue-700",    dot: "bg-blue-400" },
-  contacted:         { bg: "bg-amber-50",    text: "text-amber-700",   dot: "bg-amber-400" },
-  replied:           { bg: "bg-violet-50",   text: "text-violet-700",  dot: "bg-violet-400" },
-  interested:        { bg: "bg-indigo-50",   text: "text-indigo-700",  dot: "bg-indigo-400" },
-  meeting_scheduled: { bg: "bg-orange-50",   text: "text-orange-700",  dot: "bg-orange-400" },
-  proposal_sent:     { bg: "bg-pink-50",     text: "text-pink-700",    dot: "bg-pink-400" },
-  won:               { bg: "bg-emerald-50",  text: "text-emerald-700", dot: "bg-emerald-400" },
-  lost:              { bg: "bg-red-50",      text: "text-red-700",     dot: "bg-red-400" },
+const STAGE_STYLES: Record<CRMStage, { bg: string; color: string; dot: string }> = {
+  new:               { bg: "rgba(148,163,184,0.12)", color: "#94a3b8",  dot: "bg-slate-400" },
+  analyzed:          { bg: "rgba(96,165,250,0.12)",  color: "#60a5fa",  dot: "bg-blue-400" },
+  contacted:         { bg: "rgba(251,191,36,0.12)",  color: "#fbbf24",  dot: "bg-amber-400" },
+  replied:           { bg: "rgba(167,139,250,0.12)", color: "#a78bfa",  dot: "bg-violet-400" },
+  interested:        { bg: "rgba(129,140,248,0.12)", color: "#818cf8",  dot: "bg-indigo-400" },
+  meeting_scheduled: { bg: "rgba(251,146,60,0.12)",  color: "#fb923c",  dot: "bg-orange-400" },
+  proposal_sent:     { bg: "rgba(244,114,182,0.12)", color: "#f472b6",  dot: "bg-pink-400" },
+  won:               { bg: "rgba(52,211,153,0.12)",  color: "#34d399",  dot: "bg-emerald-400" },
+  lost:              { bg: "rgba(248,113,113,0.12)", color: "#f87171",  dot: "bg-red-400" },
 }
 
 const STAGE_LABELS: Record<CRMStage, string> = {
@@ -152,8 +152,8 @@ export function LeadRow({ lead, selected, onSelect, onDelete, serviceType, needs
     : null
 
   return (
-    <div className={`border-b last:border-0 transition-colors ${needsFollowup ? "bg-amber-50/50" : ""}`}>
-      <div className="flex items-center gap-3 px-4 py-3 hover:bg-muted/20 transition-colors group">
+    <div className={`last:border-0 transition-colors ${needsFollowup ? "" : ""}`} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", background: needsFollowup ? "rgba(251,191,36,0.04)" : undefined }}>
+      <div className="flex items-center gap-3 px-4 py-3 transition-colors group" style={{ cursor: "default" }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)" }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "" }}>
         {/* Checkbox */}
         {onSelect && (
           <input
@@ -229,7 +229,7 @@ export function LeadRow({ lead, selected, onSelect, onDelete, serviceType, needs
 
         {/* Stage */}
         <div className="hidden md:block w-28 text-right">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${stage.bg} ${stage.text}`}>
+          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: stage.bg, color: stage.color }}>
             <span className={`h-1.5 w-1.5 rounded-full ${stage.dot}`} />
             {STAGE_LABELS[lead.crm_stage]}
           </span>
@@ -250,7 +250,10 @@ export function LeadRow({ lead, selected, onSelect, onDelete, serviceType, needs
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             title="Open YouTube channel"
-            className="pressable shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium border border-input bg-white text-muted-foreground transition-all hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+            className="pressable shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all"
+            style={{ border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "var(--sl-fg-3)" }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = "#f87171"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(248,113,113,0.4)" }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "var(--sl-fg-3)"; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.1)" }}
           >
             <ExternalLink className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">YouTube</span>
@@ -263,11 +266,10 @@ export function LeadRow({ lead, selected, onSelect, onDelete, serviceType, needs
           onBlur={() => setConfirmDelete(false)}
           disabled={deleting}
           title={confirmDelete ? "Click again to confirm" : "Delete lead"}
-          className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${
-            confirmDelete
-              ? "bg-red-500 text-white border border-red-500"
-              : "border border-input bg-white hover:bg-red-50 hover:border-red-200 text-muted-foreground hover:text-red-600"
-          }`}
+          className="pressable shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all"
+          style={confirmDelete
+            ? { background: "#ef4444", color: "white", border: "1px solid #ef4444" }
+            : { border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "var(--sl-fg-3)" }}
         >
           {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
           {confirmDelete && <span className="hidden sm:inline">Confirm?</span>}
@@ -276,11 +278,10 @@ export function LeadRow({ lead, selected, onSelect, onDelete, serviceType, needs
         {/* Quick email */}
         <button
           onClick={handleQuickEmail}
-          className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all ${
-            emailOpen
-              ? "bg-primary text-white shadow-sm"
-              : "border border-input bg-white hover:bg-muted text-muted-foreground hover:text-foreground"
-          }`}
+          className="pressable shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all"
+          style={emailOpen
+            ? { background: "hsl(243 75% 59%)", color: "white" }
+            : { border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "var(--sl-fg-3)" }}
         >
           <Mail className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Email</span>
@@ -290,7 +291,7 @@ export function LeadRow({ lead, selected, onSelect, onDelete, serviceType, needs
 
       {/* Inline email panel */}
       {emailOpen && (
-        <div className="animate-fade-in px-4 pb-4 pt-1 border-t bg-gradient-to-b from-muted/30 to-transparent">
+        <div className="animate-fade-in px-4 pb-4 pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}>
           {generating ? (
             <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -298,7 +299,7 @@ export function LeadRow({ lead, selected, onSelect, onDelete, serviceType, needs
             </div>
           ) : generated ? (
             <div className="space-y-2 pt-2">
-              <div className="rounded-xl bg-white border px-3 py-2.5">
+              <div className="rounded-xl px-3 py-2.5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Subject</p>
                 <p className="text-sm font-semibold">{generated.subject}</p>
               </div>

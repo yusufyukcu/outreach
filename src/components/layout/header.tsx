@@ -11,7 +11,7 @@ interface HeaderProps {
 
 export function Header({ title, subtitle, children }: HeaderProps) {
   return (
-    <header className="flex items-center justify-between border-b bg-white/80 backdrop-blur-sm px-6 py-4 sticky top-0 z-10">
+    <header className="flex items-center justify-between border-b px-6 py-4 sticky top-0 z-10 backdrop-blur-md" style={{ background: "rgba(13,17,23,0.75)", borderColor: "rgba(255,255,255,0.07)" }}>
       <div className="animate-fade-in">
         <h1 className="text-xl font-bold tracking-tight">{title}</h1>
         {subtitle && (

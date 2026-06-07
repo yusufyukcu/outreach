@@ -34,9 +34,9 @@ export function KanbanCard({ lead, isDragging }: KanbanCardProps) {
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{ ...style, background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}
       className={cn(
-        "card-hover rounded-xl border bg-white p-2.5 shadow-sm cursor-grab active:cursor-grabbing",
+        "card-hover rounded-xl p-2.5 cursor-grab active:cursor-grabbing",
         (isDragging || isSortableDragging) && "opacity-40 shadow-xl rotate-2 scale-105"
       )}
     >
@@ -71,7 +71,7 @@ export function KanbanCard({ lead, isDragging }: KanbanCardProps) {
 
       {lead.deal_value_estimate && (
         <div className="mt-2 flex justify-end">
-          <span className="inline-flex items-center rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+          <span className="inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-semibold" style={{ background: "rgba(52,211,153,0.12)", color: "#34d399" }}>
             {formatCurrency(lead.deal_value_estimate)}
           </span>
         </div>

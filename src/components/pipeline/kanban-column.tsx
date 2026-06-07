@@ -16,18 +16,18 @@ export function KanbanColumn({ stage, leads }: KanbanColumnProps) {
   const totalValue = leads.reduce((sum, l) => sum + (l.deal_value_estimate ?? 0), 0)
 
   return (
-    <div className="flex w-60 shrink-0 flex-col rounded-2xl border bg-white shadow-sm overflow-hidden">
+    <div className="flex w-60 shrink-0 flex-col rounded-2xl overflow-hidden" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
       {/* Column header */}
-      <div className="px-3 py-3 border-b bg-muted/30">
+      <div className="px-3 py-3" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.03)" }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span
               className="h-2.5 w-2.5 rounded-full shrink-0"
               style={{ background: stage.color }}
             />
-            <span className="text-sm font-semibold">{stage.label}</span>
+            <span className="text-sm font-semibold" style={{ color: "var(--sl-fg-1)" }}>{stage.label}</span>
           </div>
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white border text-[11px] font-bold px-1.5 text-muted-foreground">
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full text-[11px] font-bold px-1.5" style={{ background: "rgba(255,255,255,0.08)", color: "var(--sl-fg-3)" }}>
             {leads.length}
           </span>
         </div>

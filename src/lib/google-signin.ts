@@ -1,9 +1,12 @@
 "use client"
 import { createClient } from "@/lib/supabase/client"
 
-// Requesting the Gmail send scope during login means the same "Sign in with
-// Google" step also grants permission to send email — no separate connect step.
-export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
+// gmail.send to send, gmail.readonly to read threads and detect replies.
+export const GMAIL_SCOPES =
+  "https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly"
+
+/** @deprecated use GMAIL_SCOPES */
+export const GMAIL_SEND_SCOPE = GMAIL_SCOPES
 
 /**
  * Start the Supabase Google OAuth flow. `next` is where the user lands after the
@@ -19,7 +22,7 @@ export async function signInWithGoogle(next: string = "/app/dashboard"): Promise
       redirectTo,
       // access_type=offline + prompt=consent ensures Google returns a refresh
       // token we can store for sending later.
-      scopes: GMAIL_SEND_SCOPE,
+      scopes: GMAIL_SCOPES,
       queryParams: { access_type: "offline", prompt: "consent" },
     },
   })

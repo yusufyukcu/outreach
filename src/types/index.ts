@@ -232,6 +232,11 @@ export interface OutreachMessage {
   replied_at: string | null
   ai_generated: boolean
   created_at: string
+  // Gmail thread tracking
+  gmail_message_id?: string | null
+  gmail_thread_id?: string | null
+  reply_from?: string | null
+  reply_body?: string | null
   // Joined
   lead?: Lead
 }

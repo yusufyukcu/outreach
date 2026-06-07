@@ -1,12 +1,9 @@
-// Gmail send helpers. Implemented with plain fetch (no SDK) so there's no extra
-// dependency. Authentication happens via Supabase "Sign in with Google" (the
-// google provider, configured in the Supabase dashboard) which returns a
-// provider refresh token we store in `gmail_accounts`. To mint fresh access
-// tokens for sending we call Google's token endpoint with the SAME OAuth client
-// credentials Supabase uses:  GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET.
+// Gmail helpers — send + thread-based reply detection.
+// Auth via Supabase Google provider; tokens stored in `gmail_accounts`.
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+const GMAIL_THREADS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads"
 
 export function gmailConfigured(): boolean {
   return !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET
@@ -31,7 +28,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
   return res.json()
 }
 
-// RFC 2047 encode a header value when it contains non-ASCII (e.g. Turkish).
 function encodeHeader(value: string): string {
   if (/^[\x20-\x7E]*$/.test(value)) return value
   return `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`
@@ -55,7 +51,7 @@ function buildRawMessage(opts: { from: string; to: string; subject: string; body
 export async function sendGmailMessage(
   accessToken: string,
   opts: { from: string; to: string; subject: string; body: string },
-): Promise<void> {
+): Promise<{ messageId: string; threadId: string }> {
   const res = await fetch(GMAIL_SEND_URL, {
     method: "POST",
     headers: {
@@ -65,4 +61,85 @@ export async function sendGmailMessage(
     body: JSON.stringify({ raw: buildRawMessage(opts) }),
   })
   if (!res.ok) throw new Error(`Gmail send failed: ${await res.text()}`)
+  const data = await res.json()
+  return { messageId: data.id as string, threadId: data.threadId as string }
+}
+
+// ─── Reply detection ──────────────────────────────────────────────────────────
+
+export interface GmailReply {
+  from: string
+  body: string
+  receivedAt: string
+}
+
+type GmailHeader = { name: string; value: string }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractPlainText(payload: any): string {
+  if (!payload) return ""
+  if (payload.body?.data) {
+    const b64 = (payload.body.data as string).replace(/-/g, "+").replace(/_/g, "/")
+    return Buffer.from(b64, "base64").toString("utf8")
+  }
+  if (Array.isArray(payload.parts)) {
+    // prefer text/plain
+    for (const part of payload.parts) {
+      if (part.mimeType === "text/plain" && part.body?.data) {
+        const b64 = (part.body.data as string).replace(/-/g, "+").replace(/_/g, "/")
+        return Buffer.from(b64, "base64").toString("utf8")
+      }
+    }
+    // fallback: recurse
+    for (const part of payload.parts) {
+      const text = extractPlainText(part)
+      if (text) return text
+    }
+  }
+  return ""
+}
+
+/**
+ * Fetch the Gmail thread and return the first reply message that wasn't sent by us.
+ * Returns null if no reply found or if the scope is insufficient (caller should handle 403 separately).
+ */
+export async function fetchThreadReply(
+  accessToken: string,
+  threadId: string,
+  sentMessageId: string,
+  ourEmail: string,
+): Promise<GmailReply | null> {
+  const res = await fetch(`${GMAIL_THREADS_URL}/${threadId}?format=full`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!res.ok) {
+    if (res.status === 403 || res.status === 401) {
+      throw new Error("insufficient_scope")
+    }
+    return null
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const thread = (await res.json()) as { messages?: any[] }
+  const messages = thread.messages ?? []
+
+  for (const msg of messages) {
+    if (msg.id === sentMessageId) continue
+    const labels: string[] = msg.labelIds ?? []
+    if (labels.includes("SENT")) continue
+
+    const headers: GmailHeader[] = msg.payload?.headers ?? []
+    const from = headers.find(h => h.name.toLowerCase() === "from")?.value ?? ""
+    if (from.toLowerCase().includes(ourEmail.toLowerCase())) continue
+
+    const dateHeader = headers.find(h => h.name.toLowerCase() === "date")?.value ?? ""
+    let receivedAt = new Date().toISOString()
+    try { receivedAt = new Date(dateHeader).toISOString() } catch { /* ignore */ }
+
+    const body = extractPlainText(msg.payload).trim().slice(0, 3000)
+
+    return { from, body, receivedAt }
+  }
+
+  return null
 }

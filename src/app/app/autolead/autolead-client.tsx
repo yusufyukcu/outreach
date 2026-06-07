@@ -47,10 +47,10 @@ const FREQUENCY_OPTIONS: FrequencyOption[] = [
   { label: "Every 1 hour", value: 60 * 60_000, badge: "green", badgeText: "✓ More Safe to Use" },
 ]
 
-const BADGE_STYLES: Record<string, string> = {
-  red: "bg-red-50 text-red-500 border border-red-200",
-  yellow: "bg-yellow-50 text-yellow-600 border border-yellow-200",
-  green: "bg-emerald-50 text-emerald-600 border border-emerald-200",
+const BADGE_STYLES: Record<string, React.CSSProperties> = {
+  red:    { background: "rgba(248,113,113,0.12)", color: "#f87171", border: "1px solid rgba(248,113,113,0.25)" },
+  yellow: { background: "rgba(251,191,36,0.12)",  color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" },
+  green:  { background: "rgba(52,211,153,0.12)",  color: "#34d399", border: "1px solid rgba(52,211,153,0.25)" },
 }
 
 let logIdCounter = 0
@@ -312,10 +312,10 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
 
   const logColors: Record<LogEntry["type"], string> = {
     info: "text-muted-foreground",
-    success: "text-emerald-600",
-    email: "text-indigo-600",
-    search: "text-sky-600",
-    error: "text-red-500",
+    success: "text-emerald-400",
+    email: "text-indigo-400",
+    search: "text-sky-400",
+    error: "text-red-400",
   }
   const logIcons: Record<LogEntry["type"], React.ReactNode> = {
     info: <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30 mt-1.5 shrink-0" />,
@@ -326,7 +326,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
   }
 
   return (
-    <div className="min-h-screen -m-6 p-8 bg-background">
+    <div className="min-h-screen -m-6 p-8" style={{ background: "var(--sl-bg-0)" }}>
 
       <div className="max-w-3xl mx-auto space-y-5">
 
@@ -354,7 +354,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         {showInfo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowInfo(false)}>
             <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-            <div className="relative bg-white rounded-2xl shadow-2xl border border-border w-full max-w-lg p-6 animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="relative rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-scale-in" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.1)" }} onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Info className="h-4 w-4 text-primary" />
@@ -371,10 +371,10 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                 </p>
 
                 {/* Table */}
-                <div className="rounded-xl overflow-hidden border border-border">
+                <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-muted/50">
+                      <tr style={{ background: "rgba(255,255,255,0.05)" }}>
                         <th className="text-left px-4 py-2.5 font-semibold text-foreground">Account Age</th>
                         <th className="text-left px-4 py-2.5 font-semibold text-foreground">Daily Limit</th>
                         <th className="text-left px-4 py-2.5 font-semibold text-foreground">Mail Frequency</th>
@@ -386,11 +386,11 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                         { age: "Normal account", limit: "50 emails", freq: "Every 30 min", safe: true },
                         { age: "Trusted account", limit: "100 emails", freq: "Every 10 min", safe: true },
                       ].map((row, i) => (
-                        <tr key={i} className="border-t border-border">
+                        <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                           <td className="px-4 py-2.5 text-muted-foreground">{row.age}</td>
                           <td className="px-4 py-2.5 font-semibold text-foreground">{row.limit}</td>
                           <td className="px-4 py-2.5">
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${row.safe ? "bg-emerald-50 text-emerald-600 border border-emerald-200" : "bg-amber-50 text-amber-600 border border-amber-200"}`}>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={row.safe ? { background: "rgba(52,211,153,0.12)", color: "#34d399", border: "1px solid rgba(52,211,153,0.25)" } : { background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)" }}>
                               {row.freq}
                             </span>
                           </td>
@@ -420,7 +420,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         )}
 
         {/* Status + Start/Stop card */}
-        <div className="bg-white rounded-2xl p-5 flex items-center justify-between border border-border shadow-sm">
+        <div className="rounded-2xl p-5 flex items-center justify-between" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="flex items-center gap-4">
             <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-all ${running ? "shadow-lg" : ""}`} style={{ background: running ? "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))" : "hsl(243 75% 59% / 0.08)", boxShadow: running ? "0 0 30px hsl(243 75% 59% / 0.35)" : "none" }}>
               <Zap className={`h-6 w-6 ${running ? "text-white fill-white" : "text-primary/40"}`} />
@@ -445,7 +445,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95"
               style={facelessMode
                 ? { background: "hsl(270 75% 55% / 0.1)", border: "1px solid hsl(270 75% 55% / 0.3)", color: "hsl(270 75% 45%)" }
-                : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--sl-fg-3)" }
               }
             >
               <Ghost className="h-4 w-4" />
@@ -459,7 +459,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95"
               style={autoSend
                 ? { background: "hsl(150 60% 40% / 0.1)", border: "1px solid hsl(150 60% 40% / 0.3)", color: "hsl(150 60% 32%)" }
-                : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--sl-fg-3)" }
               }
             >
               <SendHorizonal className="h-4 w-4" />
@@ -481,7 +481,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                 </button>
 
                 {mailFreqOpen && !running && (
-                  <div className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-2xl border border-border shadow-lg p-2 min-w-[210px] animate-scale-in">
+                  <div className="absolute right-0 top-full mt-1.5 z-50 rounded-2xl shadow-lg p-2 min-w-[210px] animate-scale-in" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.1)" }}>
                     <p className="text-[11px] font-semibold text-muted-foreground px-3 pt-1 pb-2">Mail Frequency</p>
                     {FREQUENCY_OPTIONS.map((opt) => {
                       const active = selectedMailFreq.value === opt.value
@@ -492,11 +492,11 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                           className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all"
                           style={active
                             ? { background: "hsl(150 60% 40% / 0.08)", color: "hsl(150 60% 32%)", fontWeight: 600 }
-                            : { color: "hsl(220 9% 40%)" }
+                            : { color: "var(--sl-fg-3)" }
                           }
                         >
                           <span>{opt.label}</span>
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${BADGE_STYLES[opt.badge]}`}>{opt.badgeText}</span>
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={BADGE_STYLES[opt.badge]}>{opt.badgeText}</span>
                         </button>
                       )
                     })}
@@ -513,7 +513,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                 className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95"
                 style={selectedDuration !== null
                   ? { background: "hsl(243 75% 59% / 0.1)", border: "1px solid hsl(243 75% 59% / 0.3)", color: "hsl(243 75% 50%)" }
-                  : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                  : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--sl-fg-3)" }
                 }
               >
                 <Clock className="h-4 w-4" />
@@ -528,7 +528,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
 
               {/* Dropdown */}
               {durationOpen && !running && (
-                <div className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-2xl border border-border shadow-lg p-2 min-w-[140px] animate-scale-in">
+                <div className="absolute right-0 top-full mt-1.5 z-50 rounded-2xl shadow-lg p-2 min-w-[140px] animate-scale-in" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.1)" }}>
                   {[{ label: "Unlimited", value: null }, ...DURATION_OPTIONS].map((opt) => {
                     const active = selectedDuration === opt.value
                     return (
@@ -538,7 +538,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                         className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm transition-all"
                         style={active
                           ? { background: "hsl(243 75% 59% / 0.08)", color: "hsl(243 75% 50%)", fontWeight: 600 }
-                          : { color: "hsl(220 9% 40%)" }
+                          : { color: "var(--sl-fg-3)" }
                         }
                       >
                         {opt.label}
@@ -558,7 +558,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                 className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-95"
                 style={SUB_PRESETS.some((p) => p.min === minSubs && p.max === maxSubs && p.label !== "Any")
                   ? { background: "hsl(243 75% 59% / 0.1)", border: "1px solid hsl(243 75% 59% / 0.3)", color: "hsl(243 75% 50%)" }
-                  : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                  : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--sl-fg-3)" }
                 }
               >
                 <span className="text-xs">
@@ -568,7 +568,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               </button>
 
               {subsOpen && !running && (
-                <div className="absolute right-0 top-full mt-1.5 z-50 bg-white rounded-2xl border border-border shadow-lg p-3 w-64 animate-scale-in">
+                <div className="absolute right-0 top-full mt-1.5 z-50 rounded-2xl shadow-lg p-3 w-64 animate-scale-in" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.1)" }}>
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     {[
                       { label: "Min", value: minSubs, set: setMinSubs },
@@ -596,7 +596,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                           className="text-[11px] px-2.5 py-1 rounded-lg font-medium transition-all"
                           style={active
                             ? { background: "hsl(243 75% 59% / 0.1)", border: "1px solid hsl(243 75% 59% / 0.3)", color: "hsl(243 75% 50%)" }
-                            : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                            : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--sl-fg-3)" }
                           }
                         >
                           {preset.label}
@@ -628,7 +628,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
             { label: "Emails Queued", value: stats.emailsQueued, grad: "hsl(199 80% 45%), hsl(180 75% 40%)" },
             { label: "Leads Added", value: stats.leadsAdded, grad: "hsl(150 60% 40%), hsl(170 70% 35%)" },
           ].map((stat) => (
-            <div key={stat.label} className="bg-white rounded-2xl p-4 text-center border border-border shadow-sm">
+            <div key={stat.label} className="rounded-2xl p-4 text-center" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
               <p className="text-3xl font-extrabold tabular-nums bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(135deg, ${stat.grad})` }}>
                 {stat.value}
               </p>
@@ -638,7 +638,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         </div>
 
         {/* Niche selector */}
-        <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
+        <div className="rounded-2xl p-5" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
           <h3 className="text-sm font-bold text-foreground mb-3">Target Niche</h3>
           <div className="flex flex-wrap gap-2">
             {NICHES.map((n) => {
@@ -651,7 +651,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                   className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   style={active
                     ? { background: "linear-gradient(135deg, hsl(243 75% 55%), hsl(280 80% 58%))", color: "white" }
-                    : { background: "hsl(220 14% 96%)", border: "1px solid hsl(220 13% 91%)", color: "hsl(220 9% 46%)" }
+                    : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--sl-fg-3)" }
                   }
                 >
                   {n}
@@ -663,7 +663,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         </div>
 
         {/* Mail Frequency selector — only shown when Auto Send is on */}
-        {autoSend && <div className="bg-white rounded-2xl p-5 border border-border shadow-sm">
+        {autoSend && <div className="rounded-2xl p-5" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-foreground">Mail Frequency</h3>
             <div className="flex items-center gap-2">
@@ -702,7 +702,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
                     </div>
                     <span className={isSelected ? "text-foreground font-semibold" : "text-muted-foreground"}>{opt.label}</span>
                   </div>
-                  <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${BADGE_STYLES[opt.badge]}`}>
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full" style={BADGE_STYLES[opt.badge]}>
                     {opt.badgeText}
                   </span>
                 </button>
@@ -713,8 +713,8 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
         </div>}
 
         {/* Activity log */}
-        <div className="bg-white rounded-2xl overflow-hidden border border-border shadow-sm">
-          <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
+        <div className="rounded-2xl overflow-hidden" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <h3 className="text-sm font-bold text-foreground">Activity Log</h3>
             {log.length > 0 && (
               <button onClick={() => setLog([])} className="text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors">Clear</button>
@@ -729,7 +729,7 @@ export function AutoLeadClient({ serviceType, orgName, orgNiche }: AutoLeadClien
               </div>
             ) : (
               log.map((entry) => (
-                <div key={entry.id} className="flex items-start gap-2 rounded-lg px-2.5 py-1.5 bg-muted/40">
+                <div key={entry.id} className="flex items-start gap-2 rounded-lg px-2.5 py-1.5" style={{ background: "rgba(255,255,255,0.04)" }}>
                   {logIcons[entry.type]}
                   <span className={`text-xs flex-1 min-w-0 leading-relaxed ${logColors[entry.type]}`}>{entry.message}</span>
                   <span className="text-[10px] text-muted-foreground/40 shrink-0 tabular-nums mt-0.5">

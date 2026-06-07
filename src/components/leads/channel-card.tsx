@@ -37,7 +37,7 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
   const m = lead.metrics
 
   return (
-    <div className="animate-fade-in-up card-hover flex flex-col rounded-2xl border bg-white p-4 overflow-hidden">
+    <div className="animate-fade-in-up card-hover flex flex-col rounded-2xl p-4 overflow-hidden" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
       {/* Header */}
       <div className="flex items-start gap-3">
         <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border bg-muted">
@@ -105,11 +105,10 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
           {lead.badges.map((b) => (
             <span
               key={b}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                POSITIVE_BADGES.has(b)
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                  : "bg-blue-50 text-blue-700 border border-blue-200"
-              }`}
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+              style={POSITIVE_BADGES.has(b)
+                ? { background: "rgba(52,211,153,0.12)", color: "#34d399", border: "1px solid rgba(52,211,153,0.2)" }
+                : { background: "rgba(96,165,250,0.12)", color: "#60a5fa", border: "1px solid rgba(96,165,250,0.2)" }}
             >
               {b === "Business email found" && <Mail className="h-3 w-3" />}
               {b}
@@ -118,7 +117,8 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
           {lead.warnings.map((w) => (
             <span
               key={w}
-              className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+              style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.2)" }}
             >
               <AlertTriangle className="h-3 w-3" />
               {w}
@@ -129,13 +129,13 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
 
       {/* Faceless score */}
       {lead.faceless_score > 0 && (
-        <div className={`mt-3 rounded-xl px-3 py-2 ${
+        <div className="mt-3 rounded-xl px-3 py-2" style={
           lead.faceless_score >= 60
-            ? "bg-indigo-50 border border-indigo-100"
+            ? { background: "rgba(129,140,248,0.1)", border: "1px solid rgba(129,140,248,0.2)" }
             : lead.faceless_score <= 20
-            ? "bg-red-50 border border-red-100"
-            : "bg-muted/40"
-        }`}>
+            ? { background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)" }
+            : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }
+        }>
           <div className="flex items-center justify-between mb-1">
             <span className={`flex items-center gap-1 text-[11px] font-semibold ${
               lead.faceless_score <= 20 ? "text-red-600" : "text-indigo-700"
@@ -174,7 +174,7 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
 
       {/* Semantic relevance */}
       {lead.relevance_explanation && (
-        <div className="mt-3 rounded-xl bg-violet-50 border border-violet-100 px-3 py-2">
+        <div className="mt-3 rounded-xl px-3 py-2" style={{ background: "rgba(167,139,250,0.1)", border: "1px solid rgba(167,139,250,0.2)" }}>
           <div className="flex items-center justify-between mb-1">
             <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700">
               <Sparkles className="h-3 w-3" /> Content Relevance
@@ -196,7 +196,9 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
 
       {/* Upload Trend */}
       {(m.upload_trend === "growing" || m.upload_trend === "declining") && (
-        <div className={`mt-3 rounded-xl px-3 py-2 ${m.upload_trend === "growing" ? "bg-emerald-50 border border-emerald-100" : "bg-amber-50 border border-amber-100"}`}>
+        <div className="mt-3 rounded-xl px-3 py-2" style={m.upload_trend === "growing"
+          ? { background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)" }
+          : { background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)" }}>
           <div className="flex items-center gap-1.5">
             {m.upload_trend === "growing"
               ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
@@ -212,7 +214,9 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
 
       {/* Comment Signals */}
       {lead.comment_signals != null && lead.comment_signals.score > 30 && (
-        <div className={`mt-3 rounded-xl px-3 py-2 ${lead.comment_signals.needs_help ? "bg-emerald-50 border border-emerald-100" : "bg-slate-50 border border-slate-100"}`}>
+        <div className="mt-3 rounded-xl px-3 py-2" style={lead.comment_signals.needs_help
+          ? { background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)" }
+          : { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="flex items-center gap-1.5 mb-1">
             <MessageSquare className={`h-3.5 w-3.5 ${lead.comment_signals.needs_help ? "text-emerald-600" : "text-slate-500"}`} />
             <span className={`text-[11px] font-semibold ${lead.comment_signals.needs_help ? "text-emerald-700" : "text-slate-600"}`}>
@@ -230,7 +234,12 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
 
       {/* Thumbnail Quality */}
       {lead.thumbnail_quality != null && (
-        <div className={`mt-3 rounded-xl px-3 py-2 ${lead.thumbnail_quality.score < 50 ? "bg-red-50 border border-red-100" : lead.thumbnail_quality.score > 75 ? "bg-slate-50 border border-slate-100" : "bg-amber-50 border border-amber-100"}`}>
+        <div className="mt-3 rounded-xl px-3 py-2" style={
+          lead.thumbnail_quality.score < 50
+            ? { background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.2)" }
+            : lead.thumbnail_quality.score > 75
+            ? { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)" }
+            : { background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.2)" }}>
           <div className="flex items-center justify-between mb-1">
             <span className={`flex items-center gap-1 text-[11px] font-semibold ${lead.thumbnail_quality.score < 50 ? "text-red-700" : lead.thumbnail_quality.score > 75 ? "text-slate-600" : "text-amber-700"}`}>
               <ImageIcon className="h-3 w-3" /> Thumbnail Quality
@@ -253,7 +262,7 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
 
       {/* Transcript Analysis */}
       {lead.transcript_analysis != null && (lead.transcript_analysis.editing_need_score > 20 || lead.transcript_analysis.faceless_confidence >= 65) && (
-        <div className="mt-3 rounded-xl bg-sky-50 border border-sky-100 px-3 py-2">
+        <div className="mt-3 rounded-xl px-3 py-2" style={{ background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.2)" }}>
           <div className="flex items-center justify-between mb-1">
             <span className="flex items-center gap-1 text-[11px] font-semibold text-sky-700">
               <FileText className="h-3 w-3" /> Transcript Analysis
@@ -274,7 +283,7 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
           {lead.transcript_analysis.editing_signals.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {lead.transcript_analysis.editing_signals.map((sig) => (
-                <span key={sig} className="inline-flex items-center rounded-full bg-sky-100 border border-sky-200 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+                <span key={sig} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ background: "rgba(56,189,248,0.12)", color: "#38bdf8", border: "1px solid rgba(56,189,248,0.2)" }}>
                   {sig}
                 </span>
               ))}
@@ -285,7 +294,7 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
 
       {/* Won Similarity */}
       {lead.won_similarity != null && lead.won_similarity > 20 && (
-        <div className="mt-3 rounded-xl bg-green-50 border border-green-100 px-3 py-2">
+        <div className="mt-3 rounded-xl px-3 py-2" style={{ background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.2)" }}>
           <div className="flex items-center justify-between mb-1">
             <span className="flex items-center gap-1 text-[11px] font-semibold text-green-700">
               <Trophy className="h-3 w-3" /> Won Client Match
@@ -342,12 +351,12 @@ function Metric({ icon, label, value, danger }: {
   danger?: boolean
 }) {
   return (
-    <div className="rounded-xl border bg-muted/30 px-2.5 py-2">
-      <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+    <div className="rounded-xl px-2.5 py-2" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className="flex items-center gap-1 mb-0.5" style={{ color: "var(--sl-fg-3)" }}>
         {icon}
         <span className="text-[11px]">{label}</span>
       </div>
-      <p className={`font-semibold text-xs ${danger ? "text-amber-600" : "text-foreground"}`}>{value}</p>
+      <p className="font-semibold text-xs" style={{ color: danger ? "#fbbf24" : "var(--sl-fg-1)" }}>{value}</p>
     </div>
   )
 }

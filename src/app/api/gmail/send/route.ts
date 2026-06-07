@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         .eq("user_id", user.id)
     }
 
-    await sendGmailMessage(accessToken, { from: account.email, to, subject: subject ?? "", body })
+    const { messageId, threadId } = await sendGmailMessage(accessToken, { from: account.email, to, subject: subject ?? "", body })
 
     // Log the message and advance the lead, mirroring the "mark as sent" flow.
     if (lead_id) {
@@ -52,6 +52,8 @@ export async function POST(req: NextRequest) {
         status: "sent",
         ai_generated: true,
         sent_at: new Date().toISOString(),
+        gmail_message_id: messageId ?? null,
+        gmail_thread_id: threadId ?? null,
       })
       await supabase
         .from("leads")

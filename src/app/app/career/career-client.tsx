@@ -62,13 +62,13 @@ export function CareerClient({ initialExperiences }: Props) {
       <div className="max-w-2xl mx-auto space-y-5">
 
         {/* Intro / how it works */}
-        <div className="animate-fade-in-up flex items-start gap-3 rounded-2xl border border-violet-200/60 bg-gradient-to-r from-violet-50 to-indigo-50 px-4 py-3.5">
+        <div className="animate-fade-in-up flex items-start gap-3 rounded-2xl px-4 py-3.5" style={{ background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.2)" }}>
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center shadow-sm shrink-0">
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           <div>
-            <p className="text-sm font-bold text-violet-900">Your track record powers better outreach</p>
-            <p className="text-xs text-violet-600 mt-0.5 leading-relaxed">
+            <p className="text-sm font-bold" style={{ color: "#c4b5fd" }}>Your track record powers better outreach</p>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: "#a78bfa" }}>
               Add channels you&apos;ve worked with. When you generate a cold email, the AI weaves in
               credible social proof like &quot;I&apos;ve previously worked with…&quot; — only if you have experience listed.
             </p>
@@ -76,7 +76,7 @@ export function CareerClient({ initialExperiences }: Props) {
         </div>
 
         {/* Add form */}
-        <div className="animate-fade-in-up rounded-2xl border bg-white p-5 shadow-sm" style={{ animationDelay: "60ms" }}>
+        <div className="animate-fade-in-up rounded-2xl p-5" style={{ animationDelay: "60ms", background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="flex items-center gap-3 mb-5">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shadow-sm">
               <Plus className="h-4 w-4 text-white" />
@@ -143,7 +143,7 @@ export function CareerClient({ initialExperiences }: Props) {
         </div>
 
         {/* Experience list */}
-        <div className="animate-fade-in-up rounded-2xl border bg-white p-5 shadow-sm" style={{ animationDelay: "120ms" }}>
+        <div className="animate-fade-in-up rounded-2xl p-5" style={{ animationDelay: "120ms", background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
           <div className="flex items-center gap-3 mb-4">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center shadow-sm">
               <Briefcase className="h-4 w-4 text-white" />
@@ -167,7 +167,7 @@ export function CareerClient({ initialExperiences }: Props) {
               {experiences.map((exp) => (
                 <div
                   key={exp.id}
-                  className="group flex items-start gap-3 rounded-xl border bg-muted/20 px-4 py-3 transition-colors hover:bg-muted/40"
+                  className="group flex items-start gap-3 rounded-xl px-4 py-3 transition-colors" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
                 >
                   <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shrink-0 text-xs font-bold text-white shadow-sm">
                     {exp.channel_name.charAt(0).toUpperCase()}
@@ -176,7 +176,7 @@ export function CareerClient({ initialExperiences }: Props) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold truncate">{exp.channel_name}</p>
                       {exp.role && (
-                        <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700">
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ background: "rgba(96,165,250,0.12)", color: "#60a5fa" }}>
                           {exp.role}
                         </span>
                       )}
@@ -197,7 +197,7 @@ export function CareerClient({ initialExperiences }: Props) {
                   <button
                     onClick={() => handleDelete(exp.id)}
                     disabled={deletingId === exp.id}
-                    className="pressable shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                    className="pressable shrink-0 rounded-lg p-1.5 text-muted-foreground transition-colors hover:text-red-400 disabled:opacity-50" style={{ background: "transparent" }}
                     title="Remove"
                   >
                     {deletingId === exp.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}

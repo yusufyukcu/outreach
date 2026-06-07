@@ -142,7 +142,7 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
             icon: Users,
             gradient: "from-indigo-500 to-violet-500",
             glow: "hsl(243 75% 59% / 0.25)",
-            bg: "from-indigo-50 to-violet-50",
+            bg: "from-indigo-500/10 to-violet-500/10",
             filter: "all",
           },
           {
@@ -151,7 +151,7 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
             icon: Flame,
             gradient: "from-rose-500 to-orange-400",
             glow: "hsl(350 80% 60% / 0.25)",
-            bg: "from-rose-50 to-orange-50",
+            bg: "from-rose-500/10 to-orange-400/10",
             filter: "all",
             hotOnly: true,
           },
@@ -161,7 +161,7 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
             icon: Bell,
             gradient: "from-amber-400 to-yellow-400",
             glow: "hsl(38 90% 55% / 0.25)",
-            bg: "from-amber-50 to-yellow-50",
+            bg: "from-amber-400/10 to-yellow-400/10",
             filter: "followup",
           },
           {
@@ -170,7 +170,7 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
             icon: Trophy,
             gradient: "from-emerald-500 to-teal-400",
             glow: "hsl(160 80% 45% / 0.25)",
-            bg: "from-emerald-50 to-teal-50",
+            bg: "from-emerald-500/10 to-teal-400/10",
             filter: "won",
           },
         ].map((card) => {
@@ -186,8 +186,8 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
                   setActiveFilter(card.filter)
                 }
               }}
-              className="pressable relative text-left rounded-2xl border bg-white p-4 shadow-sm overflow-hidden transition-all duration-200"
-              style={isActive ? { boxShadow: `0 0 0 2px ${card.glow.replace("0.25", "0.8")}, 0 4px 20px ${card.glow}` } : {}}
+              className="pressable relative text-left rounded-2xl p-4 overflow-hidden transition-all duration-200"
+              style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)", ...(isActive ? { boxShadow: `0 0 0 2px ${card.glow.replace("0.25", "0.8")}, 0 4px 20px ${card.glow}` } : {}) }}
             >
               {/* subtle bg gradient */}
               <div className={`absolute inset-0 bg-gradient-to-br ${card.bg} opacity-0 transition-opacity duration-200 ${isActive ? "opacity-100" : ""}`} />
@@ -244,9 +244,9 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
       </div>
 
       {/* Lead list */}
-      <div className="rounded-2xl border bg-white overflow-hidden shadow-sm">
+      <div className="rounded-2xl overflow-hidden" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}>
         {/* Table header */}
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-muted/40 border-b">
+        <div className="flex items-center gap-3 px-4 py-2.5" style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <input
             type="checkbox"
             checked={filteredLeads.length > 0 && selectedIds.size === filteredLeads.length}
@@ -302,7 +302,7 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
 
       {/* Floating bulk action bar */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up flex items-center gap-3 rounded-2xl border bg-white shadow-2xl px-5 py-3">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up flex items-center gap-3 rounded-2xl shadow-2xl px-5 py-3" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)" }}>
           <span className="text-sm font-bold">{selectedIds.size} selected</span>
           <Button
             size="sm"
@@ -322,8 +322,8 @@ export function LeadsClient({ serviceType, initialLeads }: LeadsClientProps) {
       {/* Bulk email modal */}
       {bulkOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="animate-scale-in w-full max-w-2xl max-h-[85vh] flex flex-col bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b">
+          <div className="animate-scale-in w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden" style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
               <div>
                 <h2 className="font-bold">Generate Emails for {selectedIds.size} Leads</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">AI will write a personalized email for each channel</p>
@@ -406,7 +406,7 @@ function BulkResultCard({ result, copied, onCopy }: { result: BulkResult; copied
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className="rounded-xl border bg-muted/20 overflow-hidden">
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)" }}>
       <div className="flex items-center justify-between px-3 py-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold truncate">{result.channel_name}</p>
@@ -423,7 +423,7 @@ function BulkResultCard({ result, copied, onCopy }: { result: BulkResult; copied
         </div>
       </div>
       {expanded && (
-        <div className="animate-fade-in px-3 pb-3 border-t bg-white">
+        <div className="animate-fade-in px-3 pb-3" style={{ borderTop: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-2 mb-1">Subject</p>
           <p className="text-sm font-semibold mb-2">{result.subject}</p>
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Body</p>

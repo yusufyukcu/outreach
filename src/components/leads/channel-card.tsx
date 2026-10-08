@@ -6,6 +6,7 @@ import {
   TrendingUp, TrendingDown, MessageSquare, ImageIcon, Trophy, FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { EditingReview } from "@/components/leads/editing-review"
 import { formatNumber, timeAgo } from "@/lib/utils"
 import type { DiscoveredLead } from "@/types"
 
@@ -17,7 +18,7 @@ interface ChannelCardProps {
 }
 
 const POSITIVE_BADGES = new Set([
-  "Active", "Long-form", "Strong views", "Consistent", "Business email found", "Contact links", "Has sponsors",
+  "Active", "Long-form", "Strong views", "Consistent", "Business email found", "Contact links", "Has sponsors", "Editing gap",
 ])
 
 function ScoreBadge({ score }: { score: number }) {
@@ -259,6 +260,9 @@ export function ChannelCard({ lead, onAddToLeads, isAdded, isLoading }: ChannelC
           </p>
         </div>
       )}
+
+      {/* Editing Review (Gemini video analysis) */}
+      {lead.editing_analysis != null && <EditingReview analysis={lead.editing_analysis} />}
 
       {/* Transcript Analysis */}
       {lead.transcript_analysis != null && (lead.transcript_analysis.editing_need_score > 20 || lead.transcript_analysis.faceless_confidence >= 65) && (

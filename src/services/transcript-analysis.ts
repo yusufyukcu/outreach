@@ -1,3 +1,5 @@
+export const TRANSCRIPT_MODEL = "gpt-4o-mini"
+
 export interface TranscriptAnalysisResult {
   is_faceless: boolean
   faceless_confidence: number  // 0-100
@@ -58,7 +60,7 @@ editing_need_score = how strongly this channel needs ${serviceType} services (0=
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: TRANSCRIPT_MODEL,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.2,
         max_tokens: 200,

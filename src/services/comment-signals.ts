@@ -1,3 +1,5 @@
+export const COMMENT_SIGNALS_MODEL = "gpt-4o-mini"
+
 export interface CommentSignalResult {
   needs_help: boolean       // true if comments suggest creator needs editing/thumbnail help
   signal: string            // human-readable summary
@@ -42,7 +44,7 @@ score = how strongly the comments suggest the creator needs ${serviceType} servi
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: COMMENT_SIGNALS_MODEL,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.2,
         max_tokens: 150,

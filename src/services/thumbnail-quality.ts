@@ -1,5 +1,7 @@
 import { getVideoThumbnailUrl } from "./youtube"
 
+export const THUMBNAIL_MODEL = "gpt-4o"
+
 export interface ThumbnailQualityResult {
   score: number             // 0-100
   needs_improvement: boolean
@@ -61,7 +63,7 @@ Return ONLY valid JSON:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: THUMBNAIL_MODEL,
         messages: [{ role: "user", content: [textContent, ...imageContent] }],
         temperature: 0.1,
         max_tokens: 200,

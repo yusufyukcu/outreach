@@ -237,6 +237,24 @@ export function evaluateLead(input: QualityInput): QualityResult {
   }
 }
 
+// Share of the final score given to the editing opportunity (100 − editing
+// quality) once the latest video has been reviewed. Without a review the score
+// is unchanged, so channels are never penalized for a missing analysis.
+export const EDITING_WEIGHT = 0.15
+
+export function applyEditingAnalysis(result: QualityResult, editingQuality: number): QualityResult {
+  const editingOpportunity = 100 - editingQuality
+  const score = Math.max(0, Math.min(100, Math.round(result.score * (1 - EDITING_WEIGHT) + editingOpportunity * EDITING_WEIGHT)))
+  return {
+    ...result,
+    score,
+    breakdown: { ...result.breakdown, editing_opportunity: editingOpportunity, total: score },
+    badges: editingQuality < 50 ? [...result.badges, "Editing gap"] : result.badges,
+    // Calibrated on anchor videos: professional editing scores about 70–75, raw recordings 25–36
+    warnings: editingQuality >= 70 ? [...result.warnings, "Already well edited"] : result.warnings,
+  }
+}
+
 export const QUALITY_WEIGHTS: { key: keyof QualityBreakdown; label: string; max: number }[] = [
   { key: "activity", label: "Activity", max: 25 },
   { key: "recent_views", label: "Recent Views", max: 20 },

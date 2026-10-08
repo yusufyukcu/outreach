@@ -1,6 +1,9 @@
 import type { Channel, ServiceType, OutreachChannel } from "@/types"
 import { formatNumber } from "@/lib/utils"
 
+export const OUTREACH_MODEL = "gpt-4o-mini"
+export const OUTREACH_TEMPERATURE = 0.8
+
 interface GenerateOutreachParams {
   channel: Channel
   serviceType: ServiceType

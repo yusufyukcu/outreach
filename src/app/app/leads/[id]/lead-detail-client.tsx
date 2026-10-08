@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { ScoreBreakdownPanel } from "@/components/leads/score-breakdown-panel"
+import { EditingReview } from "@/components/leads/editing-review"
 import { OutreachGenerator } from "@/components/outreach/outreach-generator"
 import { formatNumber, formatCurrency, timeAgo } from "@/lib/utils"
 import { toast } from "@/hooks/use-toast"
@@ -395,6 +396,7 @@ export function LeadDetailClient({ lead: initialLead, activities: initialActivit
                       )
                     })}
                   </div>
+                  {channel.editing_analysis && <EditingReview analysis={channel.editing_analysis} detailed />}
                 </div>
               )}
             </div>

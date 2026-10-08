@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS, resolveAgencyName, buildSignature, buildSignatureInstruction, buildExperienceInstruction, type ExperienceLike } from "@/services/outreach"
+import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS, resolveAgencyName, buildSignature, buildSignatureInstruction, buildExperienceInstruction, OUTREACH_MODEL, OUTREACH_TEMPERATURE, type ExperienceLike } from "@/services/outreach"
+import { recordResearchEvents, textHash, wordCount, isUuid, type ResearchEvent } from "@/services/research"
 import type { Channel, ServiceType } from "@/types"
 
 export async function POST(req: NextRequest) {
@@ -67,6 +68,31 @@ export async function POST(req: NextRequest) {
 
     const apiKey = process.env.OPENAI_API_KEY
 
+    // Research logging: how each draft was produced (no text stored, only a hash)
+    const generationEvents: ResearchEvent[] = []
+    const logGeneration = (lead: { id: string; channel_id: string }, email: { subject: unknown; body: unknown }, details: Record<string, unknown>) => {
+      const subject = String(email.subject ?? "")
+      const text = String(email.body ?? "")
+      generationEvents.push({
+        org_id: profile.org_id,
+        event_type: "email_generated",
+        lead_id: lead.id,
+        channel_id: isUuid(lead.channel_id) ? lead.channel_id : null,
+        payload: {
+          route: "bulk",
+          tone,
+          service_type,
+          outreach_channel: "email",
+          solo_sender: !resolvedAgency,
+          experiences_available: (expRows ?? []).length,
+          subject_chars: subject.length,
+          body_words: wordCount(text),
+          body_sha256: textHash(text),
+          ...details,
+        },
+      })
+    }
+
     const results = await Promise.all(
       leads.map(async (lead) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,12 +104,16 @@ export async function POST(req: NextRequest) {
         try {
           if (!apiKey) {
             // Demo fallback
+            const demo = {
+              subject: `Quick question for ${channel.name}`,
+              body: `Hey ${channel.name},\n\nI've been following your channel and think we could help you grow.\n\nWould love to share a few ideas — worth a quick chat?\n\n${signature}`,
+            }
+            logGeneration(lead, demo, { generator: "template_fallback", reason: "no_api_key" })
             return {
               lead_id: lead.id,
               channel_name: channel.name,
               email: contactEmail,
-              subject: `Quick question for ${channel.name}`,
-              body: `Hey ${channel.name},\n\nI've been following your channel and think we could help you grow.\n\nWould love to share a few ideas — worth a quick chat?\n\n${signature}`,
+              ...demo,
             }
           }
 
@@ -112,12 +142,12 @@ Only return valid JSON.`
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
             body: JSON.stringify({
-              model: "gpt-4o-mini",
+              model: OUTREACH_MODEL,
               messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt },
               ],
-              temperature: 0.8,
+              temperature: OUTREACH_TEMPERATURE,
               response_format: { type: "json_object" },
             }),
           })
@@ -126,24 +156,39 @@ Only return valid JSON.`
           const data = await res.json()
           const content = JSON.parse(data.choices[0].message.content)
 
-          return {
-            lead_id: lead.id,
-            channel_name: channel.name,
-            email: contactEmail,
+          const email = {
             subject: content.subject ?? "",
             body: content.body ?? "",
           }
-        } catch {
+          logGeneration(lead, email, {
+            generator: "llm",
+            model: OUTREACH_MODEL,
+            temperature: OUTREACH_TEMPERATURE,
+            system_prompt_sha: textHash(systemPrompt).slice(0, 12),
+          })
           return {
             lead_id: lead.id,
             channel_name: channel.name,
             email: contactEmail,
+            ...email,
+          }
+        } catch {
+          const fallback = {
             subject: `Quick question for ${channel.name}`,
             body: `Hey ${channel.name},\n\nI've been following your channel and would love to connect.\n\n${signature}`,
+          }
+          logGeneration(lead, fallback, { generator: "template_fallback", reason: "generation_error" })
+          return {
+            lead_id: lead.id,
+            channel_name: channel.name,
+            email: contactEmail,
+            ...fallback,
           }
         }
       })
     )
+
+    await recordResearchEvents(supabase, generationEvents)
 
     return NextResponse.json({ results })
   } catch (err) {

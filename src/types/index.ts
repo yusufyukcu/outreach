@@ -25,7 +25,31 @@ export interface QualityBreakdown {
   niche_match: number            // 0-15
   business_potential: number     // 0-15
   contact_availability: number   // 0-10
+  editing_opportunity?: number   // 0-100 (100 − editing quality); blended into total when a video was analyzed
   total: number                  // 0-100
+}
+
+// Gemini video review of a channel's most recent long-form upload.
+export interface EditingDimension {
+  level: number                  // 1 (poor) – 5 (excellent)
+  evidence: string               // short observation, with mm:ss timestamps where possible
+}
+
+export interface EditingAnalysis {
+  video_id: string
+  model: string
+  analyzed_at: string
+  editing_quality: number        // 0-100, weighted from the dimension levels
+  format: string                 // talking_head | voiceover_broll | screen_recording | animation | gameplay | mixed | other
+  dimensions: {
+    narration_visual_match: EditingDimension   // do the visuals show what is being said?
+    visual_variety: EditingDimension           // b-roll, graphics, text, framing changes
+    pacing: EditingDimension
+    hook: EditingDimension                     // first ~60 seconds
+    technical_quality: EditingDimension        // image, color, audio clarity and mix
+  }
+  summary: string
+  improvements: string[]         // what an editor could improve, max 3
 }
 
 export interface DiscoveredLead {
@@ -65,6 +89,7 @@ export interface DiscoveredLead {
   comment_signals: { needs_help: boolean; signal: string; score: number } | null
   won_similarity: number | null
   transcript_analysis: { is_faceless: boolean; faceless_confidence: number; faceless_signal: string; editing_need_score: number; editing_signals: string[] } | null
+  editing_analysis: EditingAnalysis | null
 }
 
 export type CRMStage =
@@ -147,6 +172,7 @@ export interface Channel {
   estimated_monthly_revenue_max: number | null
   outsourcing_likelihood_score: number | null
   editing_quality_score: number | null
+  editing_analysis?: EditingAnalysis | null   // migration 0005
   thumbnail_quality_score: number | null
   growth_trend_30d: number | null
   analysis_summary: string | null

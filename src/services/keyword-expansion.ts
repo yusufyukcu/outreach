@@ -1,5 +1,7 @@
 import type { ServiceType } from "@/types"
 
+export const KEYWORD_EXPANSION_MODEL = "gpt-4o-mini"
+
 export interface KeywordExpansionResult {
   original: string[]
   expanded: string[]
@@ -44,7 +46,7 @@ Return a JSON array of strings only. No explanation. Example format:
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: KEYWORD_EXPANSION_MODEL,
         messages: [{ role: "user", content: prompt }],
         temperature: 0.6,
         max_tokens: 300,

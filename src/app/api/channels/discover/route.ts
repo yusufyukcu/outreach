@@ -18,20 +18,25 @@ import {
   fetchVideoComments,
   type RecentVideo,
 } from "@/services/youtube"
-import { evaluateLead } from "@/services/lead-quality"
-import { expandKeywords, computeSemanticRelevance } from "@/services/keyword-expansion"
-import { analyzeCommentSignals, type CommentSignalResult } from "@/services/comment-signals"
-import { analyzeThumbnails, type ThumbnailQualityResult } from "@/services/thumbnail-quality"
-import { analyzeTranscript, type TranscriptAnalysisResult } from "@/services/transcript-analysis"
+import { evaluateLead, applyEditingAnalysis } from "@/services/lead-quality"
+import { analyzeEditingQuality, geminiConfigured, pickEditingVideo, EDITING_QUALITY_MODEL } from "@/services/editing-quality"
+import { expandKeywords, computeSemanticRelevance, KEYWORD_EXPANSION_MODEL } from "@/services/keyword-expansion"
+import { analyzeCommentSignals, COMMENT_SIGNALS_MODEL, type CommentSignalResult } from "@/services/comment-signals"
+import { analyzeThumbnails, THUMBNAIL_MODEL, type ThumbnailQualityResult } from "@/services/thumbnail-quality"
+import { analyzeTranscript, TRANSCRIPT_MODEL, type TranscriptAnalysisResult } from "@/services/transcript-analysis"
 import { fetchVideoTranscript } from "@/services/youtube"
 import { buildWonProfile, scoreAgainstWonProfile, type WonProfile } from "@/services/won-profile"
-import type { DiscoveredLead, ServiceType } from "@/types"
+import { recordResearchEvents, analysisSucceeded, type ResearchEvent } from "@/services/research"
+import type { DiscoveredLead, EditingAnalysis, ServiceType } from "@/types"
 
 // Deep analysis costs 2 quota units per channel (playlistItems + videos.list)
 const MAX_DEEP_ANALYZE = 30
+// Gemini video reviews per request (~1 Flash call each, up to ~2 min) — top candidates only
+const MAX_EDITING_REVIEWS = 5
 
 export async function POST(req: NextRequest) {
   try {
+    const startedAt = Date.now()
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -151,6 +156,8 @@ export async function POST(req: NextRequest) {
         channelHits.set(r.channelId, (channelHits.get(r.channelId) ?? 0) + 1)
       }
     }
+    // Research logging only: channels found by keyword search, before list-mined ones are merged in
+    const videoSearchIds = new Set(channelHits.keys())
 
     // Merge list-mined channels — give them a base frequency of 2
     // (manually curated > single search hit, but less than multi-hit)
@@ -162,7 +169,40 @@ export async function POST(req: NextRequest) {
     }
 
     const channelIds = [...channelHits.keys()]
+
+    // Research logging: one discovery_run event per request (funnel + settings)
+    let secondPassSearches = 0
+    const runEvent = (funnel: Record<string, unknown>): ResearchEvent => ({
+      org_id: profile.org_id,
+      event_type: "discovery_run",
+      payload: {
+        service_type,
+        niche: nicheSelected ? niche : null,
+        keywords,
+        params: { min_subscribers, max_subscribers, min_score, include_low_quality, english_only, min_recent_views, faceless_mode, min_faceless_score },
+        expanded_concepts: expansion.expanded.length,
+        won_profile_active: wonProfile !== null,
+        searches: { video_search_groups: cappedGroups.length, second_pass: secondPassSearches },
+        funnel: {
+          from_video_search: videoSearchIds.size,
+          from_list_mining: allMinedIds.length,
+          list_mining_only: allMinedIds.filter((id) => !videoSearchIds.has(id)).length,
+          unique_channels: channelIds.length,
+          ...funnel,
+        },
+        models: {
+          keyword_expansion: KEYWORD_EXPANSION_MODEL,
+          comments: COMMENT_SIGNALS_MODEL,
+          thumbnails: THUMBNAIL_MODEL,
+          transcript: TRANSCRIPT_MODEL,
+          editing: geminiConfigured() ? EDITING_QUALITY_MODEL : null,
+        },
+        duration_ms: Date.now() - startedAt,
+      },
+    })
+
     if (channelIds.length === 0) {
+      await recordResearchEvents(supabase, [runEvent({ returned: 0 })])
       return NextResponse.json({ channels: [], count: 0, analyzed: 0, expanded_concepts: allConcepts })
     }
 
@@ -250,6 +290,7 @@ export async function POST(req: NextRequest) {
       .sort((a, b) => b.result.score - a.result.score)
       .slice(0, 3)
 
+    const secondPassIds = new Set<string>()
     if (seeds.length > 0) {
       // Build search terms from seed video titles: pick titles that look like
       // content titles (not "Q&A", "vlog", personal stuff)
@@ -271,6 +312,7 @@ export async function POST(req: NextRequest) {
             })
           )
         )
+        secondPassSearches = seedSearchResults.length
 
         const newChannelIds = new Set<string>()
         for (const r of seedSearchResults) {
@@ -287,6 +329,7 @@ export async function POST(req: NextRequest) {
           const newCandidates = newDetails
             .filter((c) => c.subscriber_count >= min_subscribers && c.subscriber_count <= max_subscribers)
             .slice(0, 15) // cap second-pass to avoid quota burn
+          for (const c of newCandidates) secondPassIds.add(c.youtube_channel_id)
 
           const secondPassEvaluated = await Promise.all(
             newCandidates.map(async (c) => {
@@ -319,9 +362,12 @@ export async function POST(req: NextRequest) {
     // Fetch channel_ids already in this org's leads so we can exclude them
     const { data: existingLeads } = await supabase
       .from("leads")
-      .select("channel_id")
+      .select("channel_id, channel:channels(youtube_channel_id)")
       .eq("org_id", profile.org_id)
     const existingChannelIds = new Set((existingLeads ?? []).map((l) => l.channel_id).filter(Boolean))
+    const existingYoutubeIds = new Set(
+      (existingLeads ?? []).map((l) => (l.channel as { youtube_channel_id?: string } | null)?.youtube_channel_id).filter(Boolean),
+    )
 
     // ── Phase 2: Comment + thumbnail analysis (only for channels that pass quality) ──
     // Run in parallel per channel to avoid blocking on sequential API calls
@@ -330,6 +376,8 @@ export async function POST(req: NextRequest) {
       thumbnail_quality: ThumbnailQualityResult | null
       transcript_analysis: TranscriptAnalysisResult | null
       won_similarity: number | null
+      editing_analysis: EditingAnalysis | null
+      editing_reused: boolean
     }
     const phase2Map = new Map<string, Phase2Result>()
 
@@ -339,6 +387,35 @@ export async function POST(req: NextRequest) {
       if (faceless_mode && e.faceless.score < min_faceless_score) return false
       return true
     })
+
+    // Research logging: heuristic faceless score before vision/transcript correction,
+    // and the quality score before the editing review is blended in
+    const facelessHeuristic = new Map(evaluated.map((e) => [e.channel.youtube_channel_id, e.faceless.score]))
+    const baseQualityScore = new Map(evaluated.map((e) => [e.channel.youtube_channel_id, e.result.score]))
+
+    // ── Editing review (Gemini): latest long-form video of the top candidates ────
+    // Editing services only. Channels already in the pipeline are skipped, and a
+    // stored review of the same video is reused instead of paying for a new one.
+    const editingTargets = new Set(
+      service_type === "editing" && geminiConfigured()
+        ? phase2Candidates
+            .filter((e) => !existingYoutubeIds.has(e.channel.youtube_channel_id) && pickEditingVideo(e.videos))
+            .sort((a, b) => b.result.score - a.result.score)
+            .slice(0, MAX_EDITING_REVIEWS)
+            .map((e) => e.channel.youtube_channel_id)
+        : [],
+    )
+    const storedEditing = new Map<string, EditingAnalysis>()
+    if (editingTargets.size > 0) {
+      // Fails quietly (no reuse) until migration 0005 adds channels.editing_analysis
+      const { data: storedRows } = await supabase
+        .from("channels")
+        .select("youtube_channel_id, editing_analysis")
+        .in("youtube_channel_id", [...editingTargets])
+      for (const row of storedRows ?? []) {
+        if (row.editing_analysis) storedEditing.set(row.youtube_channel_id, row.editing_analysis as EditingAnalysis)
+      }
+    }
 
     await Promise.allSettled(
       phase2Candidates.map(async (e) => {
@@ -368,7 +445,19 @@ export async function POST(req: NextRequest) {
               .catch(() => null)
           : Promise.resolve(null)
 
-        const [commentResult, thumbnailResult, transcriptResult] = await Promise.all([commentPromise, thumbnailPromise, transcriptPromise])
+        const editingVideo = editingTargets.has(cid) ? pickEditingVideo(e.videos) : null
+        const storedReview = storedEditing.get(cid)
+        const editingReused = !!editingVideo && storedReview?.video_id === editingVideo.id
+        const editingPromise: Promise<EditingAnalysis | null> = !editingVideo
+          ? Promise.resolve(null)
+          : editingReused
+          ? Promise.resolve(storedReview ?? null)
+          : analyzeEditingQuality(editingVideo).catch(() => null)
+
+        const [commentResult, thumbnailResult, transcriptResult, editingResult] = await Promise.all([commentPromise, thumbnailPromise, transcriptPromise, editingPromise])
+
+        // ── Editing review → lead score (15% weight; unchanged when not reviewed) ──
+        if (editingResult) e.result = applyEditingAnalysis(e.result, editingResult.editing_quality)
 
         // ── Vision-corrected faceless score ─────────────────────────────────────
         // If AI detected a consistent face in thumbnails with high confidence,
@@ -423,11 +512,15 @@ export async function POST(req: NextRequest) {
           thumbnail_quality: thumbnailResult,
           transcript_analysis: transcriptResult,
           won_similarity,
+          editing_analysis: editingResult,
+          editing_reused: editingReused && !!editingResult,
         })
       })
     )
 
     const leads: DiscoveredLead[] = []
+    const signalEvents: ResearchEvent[] = []
+    let alreadyInPipeline = 0
 
     for (const e of evaluated) {
       if (e.result.excluded) continue
@@ -463,7 +556,10 @@ export async function POST(req: NextRequest) {
         .single()
 
       // Skip channels already in this org's leads pipeline
-      if (upserted?.id && existingChannelIds.has(upserted.id)) continue
+      if (upserted?.id && existingChannelIds.has(upserted.id)) {
+        alreadyInPipeline++
+        continue
+      }
 
       if (upserted?.id && (e.businessEmail || e.links)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -478,6 +574,17 @@ export async function POST(req: NextRequest) {
             },
             { onConflict: "channel_id" }
           )
+      }
+
+      // Store a fresh editing review on the channel (separate update, so the
+      // upsert above keeps working before migration 0005 adds editing_analysis)
+      const p2 = phase2Map.get(c.youtube_channel_id)
+      if (upserted?.id && p2?.editing_analysis && !p2.editing_reused) {
+        const { error: editingError } = await supabase
+          .from("channels")
+          .update({ editing_quality_score: p2.editing_analysis.editing_quality, editing_analysis: p2.editing_analysis })
+          .eq("id", upserted.id)
+        if (editingError) console.warn("[editing-quality] Could not store review:", editingError.message)
       }
 
       leads.push({
@@ -511,11 +618,121 @@ export async function POST(req: NextRequest) {
         comment_signals: phase2Map.get(c.youtube_channel_id)?.comment_signals ?? null,
         won_similarity: phase2Map.get(c.youtube_channel_id)?.won_similarity ?? null,
         transcript_analysis: phase2Map.get(c.youtube_channel_id)?.transcript_analysis ?? null,
+        editing_analysis: p2?.editing_analysis ?? null,
+      })
+
+      // Research logging: signals as known at discovery time (scores only, no text)
+      signalEvents.push({
+        org_id: profile.org_id,
+        event_type: "lead_signals",
+        channel_id: upserted?.id ?? null,
+        payload: {
+          youtube_channel_id: c.youtube_channel_id,
+          service_type,
+          niche: e.detectedNiche,
+          subscriber_count: c.subscriber_count,
+          video_count: c.video_count,
+          source: {
+            video_search: videoSearchIds.has(c.youtube_channel_id),
+            list_mining: allMinedIds.includes(c.youtube_channel_id),
+            second_pass: secondPassIds.has(c.youtube_channel_id),
+            search_hits: e.searchHits,
+          },
+          metrics: {
+            days_since_upload: e.metrics.days_since_upload,
+            median_recent_views: e.metrics.median_recent_views,
+            avg_recent_views: e.metrics.avg_recent_views,
+            upload_frequency_per_week: e.metrics.upload_frequency_per_week,
+            avg_video_length_sec: e.metrics.avg_video_length_sec,
+            long_form_pct: e.metrics.long_form_pct,
+            shorts_pct: e.metrics.shorts_pct,
+            engagement_ratio: e.metrics.engagement_ratio,
+            recent_video_count: e.metrics.recent_video_count,
+            upload_trend: e.metrics.upload_trend,
+            upload_trend_pct: e.metrics.upload_trend_pct,
+          },
+          quality_score: e.result.score,
+          base_quality_score: baseQualityScore.get(c.youtube_channel_id) ?? null,
+          quality_breakdown: e.result.breakdown,
+          relevance_score: e.relevance.score,
+          faceless: { heuristic: facelessHeuristic.get(c.youtube_channel_id) ?? null, final: e.faceless.score },
+          has_business_email: !!e.businessEmail,
+          has_links: e.links,
+          sponsorship_detected: e.sponsorship,
+          signals_video_id: e.videos[0]?.id ?? null,
+          thumbnail: p2?.thumbnail_quality
+            ? {
+                ok: analysisSucceeded(p2.thumbnail_quality.signal),
+                score: p2.thumbnail_quality.score,
+                needs_improvement: p2.thumbnail_quality.needs_improvement,
+                face_detected: p2.thumbnail_quality.face_detected,
+                face_confidence: p2.thumbnail_quality.face_confidence,
+                video_ids: e.videos.slice(0, 6).map((v) => v.id),
+              }
+            : null,
+          comments: p2?.comment_signals
+            ? {
+                ok: analysisSucceeded(p2.comment_signals.signal),
+                score: p2.comment_signals.score,
+                needs_help: p2.comment_signals.needs_help,
+              }
+            : null,
+          transcript: p2?.transcript_analysis
+            ? {
+                ok: analysisSucceeded(p2.transcript_analysis.faceless_signal),
+                is_faceless: p2.transcript_analysis.is_faceless,
+                faceless_confidence: p2.transcript_analysis.faceless_confidence,
+                editing_need_score: p2.transcript_analysis.editing_need_score,
+              }
+            : null,
+          won_similarity: p2?.won_similarity ?? null,
+          editing: p2?.editing_analysis
+            ? {
+                quality: p2.editing_analysis.editing_quality,
+                levels: Object.fromEntries(
+                  Object.entries(p2.editing_analysis.dimensions).map(([key, d]) => [key, d.level]),
+                ),
+                format: p2.editing_analysis.format,
+                video_id: p2.editing_analysis.video_id,
+                model: p2.editing_analysis.model,
+                reused: p2.editing_reused,
+              }
+            : null,
+        },
       })
     }
 
     // Sort by lead score descending (client can re-sort)
     leads.sort((a, b) => b.score - a.score)
+
+    const exclusionReasons: Record<string, number> = {}
+    for (const e of evaluated) {
+      if (!e.result.excluded || !e.result.exclusionReason) continue
+      const reason = e.result.exclusionReason.split(/ — |:/)[0].trim()
+      exclusionReasons[reason] = (exclusionReasons[reason] ?? 0) + 1
+    }
+    const passedQuality = evaluated.filter((e) => !e.result.excluded && e.result.score >= qualityThreshold)
+    await recordResearchEvents(supabase, [
+      runEvent({
+        details_fetched: details.length,
+        in_subscriber_range: details.filter((c) => c.subscriber_count >= min_subscribers && c.subscriber_count <= max_subscribers).length,
+        deep_analyzed: candidates.length,
+        second_pass_added: secondPassIds.size,
+        analyzed: evaluated.length,
+        excluded: evaluated.filter((e) => e.result.excluded).length,
+        below_threshold: evaluated.filter((e) => !e.result.excluded && e.result.score < qualityThreshold).length,
+        phase2_analyzed: phase2Candidates.length,
+        faceless_filtered: faceless_mode ? passedQuality.filter((e) => e.faceless.score < min_faceless_score).length : 0,
+        editing_targets: editingTargets.size,
+        editing_reviewed: [...phase2Map.values()].filter((p) => p.editing_analysis && !p.editing_reused).length,
+        editing_reused: [...phase2Map.values()].filter((p) => p.editing_reused).length,
+        dropped_after_editing: phase2Candidates.filter((e) => e.result.score < qualityThreshold).length,
+        already_in_pipeline: alreadyInPipeline,
+        returned: leads.length,
+        exclusion_reasons: exclusionReasons,
+      }),
+      ...signalEvents,
+    ])
 
     return NextResponse.json({
       channels: leads,

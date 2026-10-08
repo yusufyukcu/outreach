@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS, resolveAgencyName, buildSignature, buildSignatureInstruction, buildExperienceInstruction, type ExperienceLike } from "@/services/outreach"
+import { buildChannelContext, buildSystemPrompt, TONE_INSTRUCTIONS, resolveAgencyName, buildSignature, buildSignatureInstruction, buildExperienceInstruction, OUTREACH_MODEL, OUTREACH_TEMPERATURE, type ExperienceLike } from "@/services/outreach"
+import { recordResearchEvents, textHash, wordCount, isUuid } from "@/services/research"
 import type { Channel, ServiceType, OutreachChannel } from "@/types"
 
 export async function POST(req: NextRequest) {
@@ -52,10 +53,36 @@ export async function POST(req: NextRequest) {
     }
     const experienceInstruction = buildExperienceInstruction(experiences)
 
+    // Research logging: how this draft was produced (no text stored, only a hash)
+    const logGeneration = async (email: { subject: unknown; body: unknown }, details: Record<string, unknown>) => {
+      if (!profile?.org_id) return
+      const subject = String(email.subject ?? "")
+      const text = String(email.body ?? "")
+      await recordResearchEvents(supabase, [{
+        org_id: profile.org_id,
+        event_type: "email_generated",
+        channel_id: isUuid(channel?.id) ? channel.id : null,
+        payload: {
+          route: "single",
+          tone,
+          service_type: serviceType,
+          outreach_channel: outreachChannel,
+          solo_sender: !resolvedAgency,
+          experiences_available: experiences.length,
+          subject_chars: subject.length,
+          body_words: wordCount(text),
+          body_sha256: textHash(text),
+          ...details,
+        },
+      }])
+    }
+
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
       // Return a demo message if no API key configured
-      return NextResponse.json(buildDemoMessage(channel, serviceType, signature, resolvedAgency))
+      const demo = buildDemoMessage(channel, serviceType, signature, resolvedAgency)
+      await logGeneration(demo, { generator: "template_fallback", reason: "no_api_key" })
+      return NextResponse.json(demo)
     }
 
     const channelContext = buildChannelContext(channel)
@@ -89,12 +116,12 @@ Only return valid JSON, no other text.`
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: OUTREACH_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.8,
+        temperature: OUTREACH_TEMPERATURE,
         response_format: { type: "json_object" },
       }),
     })
@@ -102,16 +129,25 @@ Only return valid JSON, no other text.`
     if (!response.ok) {
       const err = await response.json()
       console.error("OpenAI error:", err)
-      return NextResponse.json(buildDemoMessage(channel, serviceType, signature, resolvedAgency))
+      const demo = buildDemoMessage(channel, serviceType, signature, resolvedAgency)
+      await logGeneration(demo, { generator: "template_fallback", reason: "openai_error" })
+      return NextResponse.json(demo)
     }
 
     const data = await response.json()
     const content = JSON.parse(data.choices[0].message.content)
 
-    return NextResponse.json({
+    const email = {
       subject: content.subject ?? "",
       body: content.body ?? "",
+    }
+    await logGeneration(email, {
+      generator: "llm",
+      model: OUTREACH_MODEL,
+      temperature: OUTREACH_TEMPERATURE,
+      system_prompt_sha: textHash(systemPrompt).slice(0, 12),
     })
+    return NextResponse.json(email)
   } catch (err) {
     console.error("Outreach generation error:", err)
     return NextResponse.json({ error: "Failed to generate outreach" }, { status: 500 })

@@ -13,7 +13,7 @@ from skimage.color import deltaE_ciede2000
 
 from . import config
 from .audio import AudioFeatures
-from .features import Shot, VisualFeatures
+from .features import Keyframe, Shot, VisualFeatures, combine_keyframes
 
 
 @dataclass
@@ -48,8 +48,9 @@ class Assessment:
         return round(SCORERS[self.criterion](self.issues, self.context, use_verdict), 1)
 
 
-def _add(issues: list[Issue], criterion: str, kind: str, t: float, t_end: float, detail: dict, scale: float = 1.0):
-    severity = round(min(1.0, config.SEVERITY[kind] * scale), 3)
+def _add(issues: list[Issue], criterion: str, kind: str, t: float, t_end: float, detail: dict, scale: float = 1.0,
+         cap: float = 1.0):
+    severity = round(min(cap, config.SEVERITY[kind] * scale), 3)
     issues.append(Issue(f"{criterion}-{len(issues) + 1}", criterion, kind, round(t, 3), round(t_end, 3), severity, detail))
 
 
@@ -201,6 +202,7 @@ def assess_cuts(f: VisualFeatures) -> Assessment:
         moving = diffs >= config.FROZEN_DIFF
         z = _robust_z(diffs, diffs[moving] if moving.sum() >= 5 else None)
         last = -10
+        found = []
         for j in np.flatnonzero((z > min(config.HIDDEN_JUMP_Z, config.MOTION_JUMP_Z)) & (diffs > config.HIDDEN_JUMP_MIN_DIFF)):
             frame = lo + int(j)
             neighbours = max(f.diff[frame - 1], f.diff[frame + 1])
@@ -220,36 +222,80 @@ def assess_cuts(f: VisualFeatures) -> Assessment:
             if not (kept or (panned and z[j] > config.MOTION_JUMP_Z)):
                 continue
             last = frame
+            found.append((frame, {"diff": round(float(f.diff[frame]), 2), "z": round(float(z[j]), 1),
+                                  "unchanged_pixels": round(float(f.stable[frame]), 3), "motion_jump_px": round(motion_jump, 1),
+                                  "detected_cut": False}))
+        # A jump cut leaves pieces long enough to be watched. Jumps a few frames apart are
+        # the footage's own cadence (frames repeated to fill a higher frame rate, a
+        # timelapse, stop motion), not cuts, and in a shot that has such a cadence the
+        # frame differences cannot single out a jump cut at all.
+        frames = [frame for frame, _ in found]
+        if any((b - a) / fps < config.JUMP_MIN_PIECE_S for a, b in zip(frames, frames[1:])):
+            continue
+        for frame, detail in found:
             hidden += 1
-            _add(issues, "cuts", "jump_cut", frame / fps, frame / fps,
-                 {"diff": round(float(f.diff[frame]), 2), "z": round(float(z[j]), 1),
-                  "unchanged_pixels": round(float(f.stable[frame]), 3), "motion_jump_px": round(motion_jump, 1),
-                  "detected_cut": False})
+            _add(issues, "cuts", "jump_cut", frame / fps, frame / fps, detail)
 
     n_cuts = len(shots) - 1 + hidden
     mark_cut_style(issues, n_cuts)
     return Assessment("cuts", issues, {"n_cuts": n_cuts, "minutes": max(f.info.duration / 60.0, 1 / 60)})
 
 
+def repetition_factor(n: int) -> float:
+    """How much each of n uses of one device counts. A device used again and again is
+    the video's technique (a vlog's jump cuts, a trailer's sound hits), a lone one is a
+    slip, and each repeat halves the chance that any one use is a slip: n uses count
+    n · 2^−(n−1) slips in total (1, 1, 0.75, 0.5, 0.31 …). One detection more or less
+    then moves the score a little instead of switching between a full penalty and none."""
+    return 2.0 ** -(max(n, 1) - 1)
+
+
+def discount_repeats(same: list[Issue], label: str) -> None:
+    factor = repetition_factor(len(same))
+    if factor < 1.0:
+        for i in same:
+            i.detail["repeats"] = f"{label}: each counts {factor:.3g}"
+            i.severity = round(i.severity * factor, 3)
+
+
 def mark_cut_style(issues: list[Issue], n_cuts: int) -> None:
-    """A device used again and again is the video's technique (a vlog's jump cuts, a
-    trailer's burst of cuts, a music video's strobe): reported, but not counted against
-    K1. An isolated one is a slip (see CUT_STYLE_* in config)."""
+    """A device on a large share of the cuts is how the video is cut (a vlog cut with
+    jump cuts, a music video's strobe): reported as style, not counted (see CUT_STYLE_*
+    in config). Otherwise jump cuts and opposing camera motion count less the more
+    often the video uses them (repetition_factor), and flash frames are a slip however
+    often they occur."""
     for kind in ("flash_frame", "jump_cut", "motion_clash"):
         same = [i for i in issues if i.kind == kind]
-        by_share = len(same) >= config.CUT_STYLE_MIN and len(same) >= config.CUT_STYLE_SHARE * n_cuts
-        by_repeats = kind != "flash_frame" and len(same) >= config.CUT_STYLE_REPEATS
-        if by_share or by_repeats:
+        if len(same) >= config.CUT_STYLE_MIN and len(same) >= config.CUT_STYLE_SHARE * n_cuts:
             for i in same:
                 i.detail["style"] = f"{kind} on {len(same)} of {n_cuts} cuts"
                 i.severity = 0.0
+        elif kind != "flash_frame":
+            discount_repeats(same, f"{kind} on {len(same)} of {n_cuts} cuts")
+
+
+def evidence_ceiling(n: int | None) -> float:
+    """The highest score n observed opportunities can earn. A criterion the video gives
+    no chance to observe (no cut, one shot) scores the scale's midpoint: no cut is no
+    evidence of smooth cutting. Each opportunity that passes is evidence, so the ceiling
+    rises toward 100 as they add up, EVIDENCE_PRIOR opportunities taking it halfway.
+    Without this, one clean cut would be worth full marks and no cut half of them."""
+    if n is None:
+        return 100.0
+    return config.NO_EVIDENCE_SCORE + (100.0 - config.NO_EVIDENCE_SCORE) * n / (n + config.EVIDENCE_PRIOR)
+
+
+def with_evidence(score: float, n: int | None) -> float:
+    """The measured score scaled to the ceiling of its evidence: a flawless video with
+    little evidence reaches only the ceiling, and every measured problem still lowers
+    the score below it (a cap would hide problems that cost less than the gap)."""
+    return score * evidence_ceiling(n) / 100.0
 
 
 def score_cuts(issues, ctx, use_verdict):
-    if ctx["n_cuts"] == 0:
-        return config.NO_EVIDENCE_SCORE  # no cut: nothing shows how well it is cut
     per_minute = _sum(issues, {"flash_frame", "jump_cut", "motion_clash"}, use_verdict) / ctx["minutes"]
-    return 100.0 * max(0.0, 1.0 - per_minute / config.ERRORS_FULL_PER_MIN)
+    score = 100.0 * max(0.0, 1.0 - per_minute / config.ERRORS_FULL_PER_MIN)
+    return with_evidence(score, ctx["n_cuts"])  # few cuts: little shows how well it is cut
 
 
 # ── K2 Pacing & temporal rhythm ──────────────────────────────────────────────
@@ -314,10 +360,11 @@ def assess_pacing(f: VisualFeatures, a: AudioFeatures) -> Assessment:
             continue
         # Median: a single bright frame inside a frozen, silent stretch must not hide it
         if n1 - n0 > 1 and float(np.median(f.diff[n0 + 1:n1])) < config.STATIC_DIFF:
-            # Longer dead air is worse: half severity at the minimum length, full at twice it.
+            # Longer dead air is worse: half severity at the minimum length, full at twice
+            # it, and a longer stretch counts as that many full errors (9 s as three).
             seconds = (n1 - n0) / fps
             _add(issues, "pacing", "dead_air", n0 / fps, n1 / fps, {"seconds": round(seconds, 2)},
-                 scale=seconds / (2 * config.DEAD_AIR_MIN_S))
+                 scale=seconds / (2 * config.DEAD_AIR_MIN_S), cap=config.DEAD_AIR_MAX_ERRORS)
     for a0, b in spans:
         inside = f.diff[a0 + 1:b][~flash[a0 + 1:b]]
         if (b - a0) / fps >= config.LONG_STATIC_SHOT_S and inside.size and float(inside.mean()) < config.STATIC_DIFF:
@@ -452,9 +499,10 @@ def score_color(issues, ctx, use_verdict):
     mismatch_rate = _sum(issues, {"color_jump"}, use_verdict) / ctx["n_shots"]
     shot_rate = _sum(issues, {"flicker", "overexposed", "underexposed"}, use_verdict) / ctx["n_shots"]
     score = 100.0 * max(0.0, 1.0 - config.COLOR_PENALTY_SCALE * (0.7 * mismatch_rate + 0.3 * shot_rate))
-    if ctx.get("n_graded", 2) < 2:  # one lit shot: shot-to-shot colour matching cannot be observed
-        score = min(score, config.NO_EVIDENCE_SCORE)
-    return score
+    # Shot-to-shot matching is observed at each transition between lit shots: one lit
+    # shot shows none, a few show little
+    n_graded = ctx.get("n_graded")
+    return with_evidence(score, None if n_graded is None else max(n_graded - 1, 0))
 
 
 # ── K4 Audio-visual balance ──────────────────────────────────────────────────
@@ -464,14 +512,20 @@ def assess_audio(a: AudioFeatures, duration: float) -> Assessment:
         return Assessment("audio", [], {"has_audio": False}, available=False)
     L, issues = a.loudness, []
 
-    lo, hi = config.LOUDNESS_TARGET_RANGE_LUFS
-    off = max(lo - L.integrated, L.integrated - hi, 0.0)  # distance from the accepted delivery levels
+    # The mix as it is played: a streaming platform turns a louder mix down to its
+    # reference level, so a loud master is not too loud for the viewer, but it does
+    # not raise a quiet one. Only the quiet side of the delivery range is an error, and
+    # the true peak is judged after the platform's gain.
+    lo = config.LOUDNESS_TARGET_RANGE_LUFS[0]
+    off = max(lo - L.integrated, 0.0)  # how far below the accepted delivery levels
     if np.isfinite(L.integrated) and off > config.LOUDNESS_TOLERANCE_LU:
         _add(issues, "audio", "loudness_level", 0.0, duration,
              {"integrated_lufs": L.integrated, "target_range_lufs": list(config.LOUDNESS_TARGET_RANGE_LUFS)},
              scale=(off - config.LOUDNESS_TOLERANCE_LU) / config.LOUDNESS_FULL_PENALTY_LU)
-    if np.isfinite(L.true_peak) and L.true_peak > config.TRUE_PEAK_MAX_DBTP:
-        _add(issues, "audio", "true_peak", 0.0, duration, {"true_peak_dbtp": L.true_peak})
+    turned_down = max(0.0, L.integrated - config.PLATFORM_LOUDNESS_LUFS) if np.isfinite(L.integrated) else 0.0
+    if np.isfinite(L.true_peak) and L.true_peak - turned_down > config.TRUE_PEAK_MAX_DBTP:
+        _add(issues, "audio", "true_peak", 0.0, duration,
+             {"true_peak_dbtp": L.true_peak, "as_played_dbtp": round(L.true_peak - turned_down, 1)})
     if np.isfinite(L.lra) and L.lra > config.LRA_MAX_LU:
         _add(issues, "audio", "loudness_range", 0.0, duration, {"lra_lu": L.lra})
 
@@ -491,12 +545,10 @@ def assess_audio(a: AudioFeatures, duration: float) -> Assessment:
                 _add(issues, "audio", "loudness_jump", L.times[i - lag], L.times[i], {"rise_lu": round(float(rise), 1)})
 
     # Loud moments that recur through the video are its sound design (a trailer's hits,
-    # laughter in a vlog), as a recurring cut device is a technique: reported, not counted.
+    # laughter in a vlog), as a recurring cut device is a technique: they count less the
+    # more often they come.
     jumps = [i for i in issues if i.kind == "loudness_jump"]
-    if len(jumps) >= config.LOUDNESS_STYLE_REPEATS:
-        for i in jumps:
-            i.detail["style"] = f"loudness_jump {len(jumps)} times"
-            i.severity = 0.0
+    discount_repeats(jumps, f"loudness_jump {len(jumps)} times")
 
     ctx = {"has_audio": True, "minutes": max(duration / 60.0, 1 / 60),
            "integrated_lufs": L.integrated, "lra_lu": L.lra, "true_peak_dbtp": L.true_peak}
@@ -512,19 +564,67 @@ def score_audio(issues, ctx, use_verdict):
 
 # ── K5 Framing & composition ─────────────────────────────────────────────────
 
+@dataclass
+class FramingUnit:
+    """A stretch K5 judges as one framing decision: a shot, or a part of a long take."""
+    start: int      # frames
+    end: int        # exclusive
+    fps: float
+    key: Keyframe
+
+    @property
+    def length(self) -> int:
+        return self.end - self.start
+
+    @property
+    def t0(self) -> float:
+        return self.start / self.fps
+
+    @property
+    def t1(self) -> float:
+        return self.end / self.fps
+
+
+def framing_units(f: VisualFeatures) -> list[FramingUnit]:
+    """Each shot is judged as one unit from its keyframes. A long take is judged in
+    stretches of FRAMING_UNIT_S from the frames sampled through it: a handheld take
+    reframes, drifts out of focus and shakes as it goes, which three frames of a
+    minute-long take cannot show, and a stretch on screen as long as a typical shot
+    weighs like one."""
+    fps = f.info.fps
+    per = max(1, round(config.FRAMING_UNIT_S / config.LONG_TAKE_SAMPLE_S))
+    by_shot = {k.shot: k for k in f.keyframes}
+    units = []
+    for s in f.shots:
+        samples = (f.take_samples or {}).get(s.index, [])
+        if len(samples) >= 2 * per:
+            groups = [samples[i:i + per] for i in range(0, len(samples), per)]
+            if len(groups[-1]) < per:
+                groups[-2:] = [groups[-2] + groups[-1]]  # a short remainder joins the stretch before it
+            half = round(0.5 * config.LONG_TAKE_SAMPLE_S * fps)
+            bounds = [s.start] + [g[0].frame - half for g in groups[1:]] + [s.end]
+            for g, a, b in zip(groups, bounds, bounds[1:]):
+                mid = len(g) // 2
+                units.append(FramingUnit(a, b, fps, combine_keyframes([g[mid], *g[:mid], *g[mid + 1:]])))
+        elif s.index in by_shot:
+            units.append(FramingUnit(s.start, s.end, fps, by_shot[s.index]))
+    return units
+
+
 def assess_framing(f: VisualFeatures) -> Assessment:
     fps, issues = f.info.fps, []
+    units = framing_units(f)
     # The video's typical sharpness, from lit shots (flash frames are K1's), with shot
     # weights (see shot_weights) so that one long soft shot cannot set the norm
-    lit = [(k.sharpness, f.shots[k.shot].length) for k in f.keyframes
-           if k.clip_low <= config.DARK_FRAME_FRAC and f.shots[k.shot].length / fps >= config.KEYFRAME_MIN_SHOT_S]
+    lit = [(u.key.sharpness, u.length) for u in units
+           if u.key.clip_low <= config.DARK_FRAME_FRAC and u.length / fps >= config.KEYFRAME_MIN_SHOT_S]
     soft_threshold = 0.0
     if lit:
         sharpness, lengths = zip(*lit)
         soft_threshold = config.SHARPNESS_REL * weighted_quantile(sharpness, shot_weights(lengths))
 
-    for k in f.keyframes:
-        s = f.shots[k.shot]
+    for s in units:
+        k = s.key
         if s.length / fps < config.KEYFRAME_MIN_SHOT_S or k.clip_low > config.BLACK_FRAME_FRAC:
             continue  # flash frames are K1's; an all-black shot has nothing to frame
         face = k.subject_source == "face"
@@ -554,7 +654,7 @@ def assess_framing(f: VisualFeatures) -> Assessment:
                 _add(issues, "framing", "soft_focus", s.t0, s.t1,
                      {"sharpness": round(k.sharpness, 1), "threshold": round(soft_threshold, 1)}, scale=scale)
 
-    for s in f.shots:
+    for s in units:
         lo, hi = s.start + 2, s.end - 2
         if hi - lo >= max(5, int(fps // 2)):
             # Fast action and dark frames give untrustworthy motion estimates; judge
@@ -577,7 +677,9 @@ def assess_framing(f: VisualFeatures) -> Assessment:
                 _add(issues, "framing", "shaky", s.t0, s.t1, {"jitter_px": round(jitter, 2)},
                      scale=jitter / (2 * config.SHAKE_JITTER_PX))
 
-    return Assessment("framing", issues, {"n_shots": len(_continuous_spans(f))})  # a flash does not add a shot
+    # A flash does not add a shot; a long take adds one per stretch beyond its first
+    n_units = len(_continuous_spans(f)) + len(units) - sum(1 for s in f.shots if any(u.start == s.start for u in units))
+    return Assessment("framing", issues, {"n_shots": n_units})
 
 
 def score_framing(issues, ctx, use_verdict):

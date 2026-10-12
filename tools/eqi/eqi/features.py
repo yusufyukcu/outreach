@@ -62,6 +62,8 @@ class VisualFeatures:
     luma: np.ndarray = field(default_factory=lambda: np.array([]))  # (n,) mean gray, 0–255
     boundary: dict[int, np.ndarray] = field(default_factory=dict)   # small gray frames around cuts
     keyframes: list[Keyframe] = field(default_factory=list)
+    # Long takes, sampled once per LONG_TAKE_SAMPLE_S: shot index → keyframes in time order
+    take_samples: dict[int, list[Keyframe]] = field(default_factory=dict)
 
     @property
     def cut_frames(self) -> list[int]:
@@ -272,11 +274,23 @@ def combine_keyframes(samples: list[Keyframe]) -> Keyframe:
     )
 
 
+def take_sample_frames(shot: Shot) -> list[int]:
+    """Frames sampled through a long take (one every LONG_TAKE_SAMPLE_S, from half a
+    step in): its framing, focus and steadiness can change as the camera moves, so
+    three frames do not describe it."""
+    if shot.length / shot.fps < config.LONG_TAKE_MIN_S:
+        return []
+    step = config.LONG_TAKE_SAMPLE_S * shot.fps
+    return [shot.start + int(step * (k + 0.5)) for k in range(int(shot.length / step))]
+
+
 def extract(info: VideoInfo, shots: list[Shot]) -> VisualFeatures:
     cut_frames = [s.start for s in shots[1:]]
     boundary_needed = {i for c in cut_frames for i in range(c - 3, c + 3)}
     keyframe_of = {f: s for s in shots for f in sample_frames(s)}
+    take_of = {f: s for s in shots for f in take_sample_frames(s)}
     samples: dict[int, list[Keyframe]] = {}
+    take_samples: dict[int, list[Keyframe]] = {}
     cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     window = cv2.createHanningWindow(config.SMALL_SIZE, cv2.CV_32F)
 
@@ -324,6 +338,9 @@ def extract(info: VideoInfo, shots: list[Shot]) -> VisualFeatures:
         if i in keyframe_of:
             shot = keyframe_of[i]
             samples.setdefault(shot.index, []).append(analyze_keyframe(frame, shot, i, cascade))
+        if i in take_of:
+            shot = take_of[i]
+            take_samples.setdefault(shot.index, []).append(analyze_keyframe(frame, shot, i, cascade))
         prev = g32
         i += 1
     cap.release()
@@ -350,4 +367,5 @@ def extract(info: VideoInfo, shots: list[Shot]) -> VisualFeatures:
         luma=np.array(luma, dtype=np.float64),
         boundary=boundary,
         keyframes=keyframes,
+        take_samples={k: v for k, v in take_samples.items() if any(s.index == k for s in shots)},
     )

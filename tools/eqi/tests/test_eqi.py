@@ -20,62 +20,101 @@ def issue(criterion, kind, t=1.0, t_end=1.0, severity=None, iid=None, **detail):
 # ── Signal scoring ───────────────────────────────────────────────────────────
 
 def test_cut_errors_count_per_minute_of_viewing():
+    from eqi.criteria import evidence_ceiling
     flash = [issue("cuts", "flash_frame")]
     # One glaring cut error per minute empties K1, however many good cuts surround it
     assert Assessment("cuts", flash, {"n_cuts": 4, "minutes": 1.0}).score() == 0.0
-    assert Assessment("cuts", flash, {"n_cuts": 40, "minutes": 2.0}).score() == 50.0
-    assert Assessment("cuts", flash, {"n_cuts": 40, "minutes": 4.0}).score() == 75.0
+    # One in two minutes halves it, one in four takes a quarter (of what 40 cuts can earn)
+    top = evidence_ceiling(40) / 100
+    assert Assessment("cuts", flash, {"n_cuts": 40, "minutes": 2.0}).score() == round(50.0 * top, 1)
+    assert Assessment("cuts", flash, {"n_cuts": 40, "minutes": 4.0}).score() == round(75.0 * top, 1)
     # No cut at all is no evidence of smooth cutting: the midpoint, not full marks
-    assert Assessment("cuts", [], {"n_cuts": 0}).score() == config.NO_EVIDENCE_SCORE
+    assert Assessment("cuts", [], {"n_cuts": 0, "minutes": 1.0}).score() == config.NO_EVIDENCE_SCORE
+
+
+def test_the_ceiling_rises_with_the_evidence_from_the_midpoint():
+    from eqi.criteria import evidence_ceiling
+    ceilings = [evidence_ceiling(n) for n in (0, 1, 2, 6, 40)]
+    assert ceilings[0] == config.NO_EVIDENCE_SCORE and ceilings == sorted(ceilings) and ceilings[-1] < 100.0
+    assert evidence_ceiling(round(config.EVIDENCE_PRIOR)) == pytest.approx(75.0)  # the prior takes it halfway
+    # One clean cut is not worth full marks while no cut is worth half of them
+    assert Assessment("cuts", [], {"n_cuts": 1, "minutes": 1.0}).score() == round(evidence_ceiling(1), 1)
+    # A measured problem still counts below the ceiling: the score is scaled, not capped
+    jump = [issue("cuts", "jump_cut")]
+    assert Assessment("cuts", jump, {"n_cuts": 3, "minutes": 4.0}).score() == round(85.0 * evidence_ceiling(3) / 100, 1)
 
 
 def test_one_lit_shot_cannot_score_above_the_midpoint_for_colour():
+    from eqi.criteria import evidence_ceiling
     assert Assessment("color", [], {"n_shots": 1, "n_graded": 1}).score() == config.NO_EVIDENCE_SCORE
-    assert Assessment("color", [], {"n_shots": 5, "n_graded": 5}).score() == 100.0
+    # Five lit shots: four transitions at which the grades can be seen to match
+    assert Assessment("color", [], {"n_shots": 5, "n_graded": 5}).score() == round(evidence_ceiling(4), 1)
 
 
-def test_repeated_jump_cuts_are_style_and_an_isolated_one_is_an_error():
-    from eqi.criteria import assess_cuts
-    diff = np.full(400, 0.8)
-    f = _features([50] * 8, diff=diff)
+def test_repeated_jump_cuts_count_less_and_an_isolated_one_is_a_slip():
+    from eqi.criteria import assess_cuts, repetition_factor
+    f = _features([100] * 17, diff=np.full(1700, 0.8))  # sixteen cuts in under a minute
     f.stable[:] = 0.3  # ordinary cuts change most pixels
-    for c in (50, 100, 150):
-        f.stable[c] = 0.9  # three cuts keep the background: jump cuts on 3 of 7 cuts
-    style = assess_cuts(f)
-    assert [i.severity for i in style.issues if i.kind == "jump_cut"] == [0.0, 0.0, 0.0]
-    assert all("style" in i.detail for i in style.issues) and style.score() == 100.0
-    f.stable[100] = f.stable[150] = 0.3  # only one left: a slip
+    for c in (100, 200, 300):
+        f.stable[c] = 0.9  # three cuts keep the background: jump cuts on 3 of 16 cuts
+    repeated = assess_cuts(f)
+    full = config.SEVERITY["jump_cut"]
+    assert [i.severity for i in repeated.issues if i.kind == "jump_cut"] == [round(full * repetition_factor(3), 3)] * 3
+    f.stable[200] = f.stable[300] = 0.3  # only one left: a slip, counted in full
     slip = assess_cuts(f)
-    assert [i.severity for i in slip.issues if i.kind == "jump_cut"] == [config.SEVERITY["jump_cut"]]
-    assert slip.score() < 100.0
+    assert [i.severity for i in slip.issues if i.kind == "jump_cut"] == [full]
+    assert slip.score() < repeated.score()
+    for c in range(400, 1000, 100):
+        f.stable[c] = 0.9  # jump cuts on 7 of 16 cuts: this is how the video is cut
+    assert all(i.severity == 0.0 and "style" in i.detail for i in assess_cuts(f).issues)
 
 
-def test_cut_style_needs_repetition_and_a_lone_flash_stays_an_error():
-    from eqi.criteria import mark_cut_style
+def test_repetition_discount_is_smooth_and_a_lone_flash_stays_an_error():
+    from eqi.criteria import mark_cut_style, repetition_factor
     def fresh(kind, n):
         return [issue("cuts", kind, t=float(k), iid=f"cuts-{k}") for k in range(n)]
-    burst = fresh("jump_cut", 3)  # a burst of jump cuts in a 20-cut trailer: a technique
+    # n uses count n · 2^−(n−1) slips: 1, 1, 0.75, 0.5 … — no jump from a full penalty to none
+    totals = [n * repetition_factor(n) for n in range(1, 9)]
+    assert totals[:4] == [1.0, 1.0, 0.75, 0.5] and all(b <= a for a, b in zip(totals, totals[1:]))
+    burst = fresh("jump_cut", 3)  # a burst of jump cuts in a 20-cut trailer: largely a technique
     mark_cut_style(burst, 20)
-    assert all(i.severity == 0.0 and "style" in i.detail for i in burst)
+    assert all(i.severity == round(config.SEVERITY["jump_cut"] / 4, 3) and "repeats" in i.detail for i in burst)
     flashes = fresh("flash_frame", 3)  # three leftover frames in 20 cuts: still errors
     mark_cut_style(flashes, 20)
     assert all(i.severity == config.SEVERITY["flash_frame"] for i in flashes)
     strobe = fresh("flash_frame", 6)  # flashes on six of twenty cuts: a strobe style
     mark_cut_style(strobe, 20)
-    assert all(i.severity == 0.0 for i in strobe)
-    two = fresh("jump_cut", 2)  # two in twenty: slips
-    mark_cut_style(two, 20)
-    assert all(i.severity == config.SEVERITY["jump_cut"] for i in two)
+    assert all(i.severity == 0.0 and "style" in i.detail for i in strobe)
 
 
-def test_loudness_at_broadcast_or_streaming_level_is_not_penalized():
+def test_jumps_a_few_frames_apart_are_the_frame_cadence_not_jump_cuts():
+    from eqi.criteria import assess_cuts
+    diff = np.abs(np.random.default_rng(6).normal(0.8, 0.2, 1200))
+    for frame in range(200, 320, 6):  # a stretch of repeated frames: every sixth frame jumps
+        diff[frame] = 6.0
+    diff[450] = 6.0  # in that shot a lone jump cannot be told from the cadence either
+    f = _features([600, 600], diff=diff)
+    f.stable[600] = 0.3  # an ordinary cut to the next shot
+    cuts = assess_cuts(f)
+    assert not [i for i in cuts.issues if i.kind == "jump_cut"] and cuts.context["n_cuts"] == 1
+    f.diff[900] = 6.0  # one jump in the next shot, which has no cadence: a jump cut
+    assert [round(i.t, 2) for i in assess_cuts(f).issues] == [30.0]
+
+
+def test_loudness_is_judged_as_the_platform_plays_it():
     from eqi.audio import AudioFeatures, Loudness
     from eqi.criteria import assess_audio
-    def level_issues(lufs):
-        L = Loudness(lufs, 8.0, -3.0, np.array([0.1, 0.2]), np.array([lufs, lufs]))
-        return [i for i in assess_audio(AudioFeatures(True, L), 60.0).issues if i.kind == "loudness_level"]
-    assert not level_issues(-23.0) and not level_issues(-14.0) and not level_issues(-25.5)
-    assert level_issues(-35.0) and level_issues(-9.0)
+    def kinds(lufs, true_peak=-3.0):
+        L = Loudness(lufs, 8.0, true_peak, np.array([0.1, 0.2]), np.array([lufs, lufs]))
+        return sorted(i.kind for i in assess_audio(AudioFeatures(True, L), 60.0).issues)
+    # Broadcast and streaming levels are fine; a quiet mix is not raised by the platform
+    assert kinds(-23.0) == kinds(-14.0) == kinds(-25.5) == []
+    assert kinds(-35.0) == ["loudness_level"]
+    # A loud master is turned down to the platform level: neither its level nor its
+    # peaks reach the viewer as they are (−9 LUFS, +0.5 dBTP is played at −4.5 dBTP)
+    assert kinds(-9.0, true_peak=0.5) == []
+    # A mix at the platform level is played as it is, so its peaks still count
+    assert kinds(-16.0, true_peak=0.4) == ["true_peak"]
 
 
 def test_a_word_after_a_pause_is_not_a_loudness_jump_but_a_burst_is():
@@ -93,12 +132,14 @@ def test_a_word_after_a_pause_is_not_a_loudness_jump_but_a_burst_is():
 
 
 def test_ai_verdict_discounts_only_in_verified_score():
+    from eqi.criteria import evidence_ceiling
     i = issue("cuts", "jump_cut")
-    a = Assessment("cuts", [i], {"n_cuts": 2, "minutes": 2.0})
-    assert a.score(use_verdict=True) == a.score(use_verdict=False) == 70.0
+    a = Assessment("cuts", [i], {"n_cuts": 20, "minutes": 2.0})
+    top = evidence_ceiling(20) / 100
+    assert a.score(use_verdict=True) == a.score(use_verdict=False) == round(70.0 * top, 1)
     i.verdict = "intentional"
-    assert a.score(use_verdict=False) == 70.0
-    assert a.score(use_verdict=True) == 100.0
+    assert a.score(use_verdict=False) == round(70.0 * top, 1)
+    assert a.score(use_verdict=True) == round(100.0 * top, 1)
 
 
 def test_pacing_renormalizes_without_beat_score():
@@ -136,16 +177,17 @@ def test_rescore_uses_the_saved_issues_and_can_take_k6_from_another_report():
             "score_signal": 0.0, "score": 0.0} for k in config.SIGNAL_CRITERIA}}
     report["criteria"]["narrative"] = {"score": None}
     k1 = Assessment("cuts", [flash], ctx["cuts"]).score()
+    k3 = Assessment("color", [], ctx["color"]).score()
     again = rescore(report)
     assert again["criteria"]["cuts"]["score_signal"] == k1 and again["criteria"]["audio"]["score"] is None
-    assert again["eqi"]["signal_only"] == weighted_index({"cuts": k1, "pacing": 100.0, "color": 100.0, "framing": 100.0},
+    assert again["eqi"]["signal_only"] == weighted_index({"cuts": k1, "pacing": 100.0, "color": k3, "framing": 100.0},
                                                          config.SIGNAL_CRITERIA)
     assert again["eqi"]["full"] is None
     reviewed = {"video": {"path": "v.mp4"}, "ai": {"model": "m"}, "ai_error": None,
                 "criteria": {**{k: {"ai_comment": "ok"} for k in config.SIGNAL_CRITERIA}, "narrative": {"score": 75.0, "level": 4}}}
     merged = rescore(report, ai_from=reviewed)
     assert merged["criteria"]["narrative"]["score"] == 75.0 and merged["ai"] == {"model": "m"}
-    assert merged["eqi"]["full"] == weighted_index({"cuts": k1, "pacing": 100.0, "color": 100.0, "framing": 100.0,
+    assert merged["eqi"]["full"] == weighted_index({"cuts": k1, "pacing": 100.0, "color": k3, "framing": 100.0,
                                                     "narrative": 75.0}, list(config.WEIGHTS))
     assert report["criteria"]["narrative"] == {"score": None}  # the saved report itself is not changed
 
@@ -349,14 +391,19 @@ def test_review_long_video_lowers_overview_fps(monkeypatch, tmp_path):
     assert models.calls[0]["contents"][0].video_metadata.fps == pytest.approx(config.AI_OVERVIEW_MAX_FRAMES / 1800)
 
 
-def test_k6_is_the_mean_of_independent_runs_on_one_upload(monkeypatch, tmp_path):
-    files, models = _fake_client(monkeypatch, [review_json(narrative_visual_coherence={"level": 3, "evidence": "a"}),
-                                               review_json(narrative_visual_coherence={"level": 4, "evidence": "b"})], repeats=2)
+def test_k6_is_the_median_of_independent_runs_on_one_upload(monkeypatch, tmp_path):
+    def level(n, evidence):
+        return review_json(narrative_visual_coherence={"level": n, "evidence": evidence})
+    files, models = _fake_client(monkeypatch, [level(1, "a"), level(4, "b"), level(4, "c")], repeats=3)
     r = ai.review(tmp_path / "v.mp4", 60.0, [issue("cuts", "jump_cut", t=5.0, iid="cuts-1")], {})
-    assert len(models.calls) == 2 and files.deleted == ["files/abc"]  # one upload, two answers
-    assert r.narrative_levels == [3, 4] and r.narrative_level == 3.5 and r.narrative_score == 62.5
-    assert r.narrative_evidence == "a" and r.run_models == [config.GEMINI_MODEL_DEFAULT] * 2
-    assert len(r.usage) == 2 and set(r.usage[0]) >= {"model", "prompt_token_count", "thoughts_token_count"}
+    assert len(models.calls) == 3 and files.deleted == ["files/abc"]  # one upload, three answers
+    # One run that reads the video very differently does not move K6
+    assert r.narrative_levels == [1, 4, 4] and r.narrative_level == 4 and r.narrative_score == 75.0
+    assert r.narrative_evidence == "a" and r.run_models == [config.GEMINI_MODEL_DEFAULT] * 3
+    assert len(r.usage) == 3 and set(r.usage[0]) >= {"model", "prompt_token_count", "thoughts_token_count"}
+    _, models = _fake_client(monkeypatch, [level(3, "a"), level(4, "b")], repeats=2)
+    two = ai.review(tmp_path / "v.mp4", 60.0, [], {})  # two runs: their mean
+    assert two.narrative_level == 3.5 and two.narrative_score == 62.5
 
 
 def test_unparseable_answer_is_asked_for_again(monkeypatch, tmp_path):
@@ -473,6 +520,40 @@ def test_soft_focus_severity_ramps_and_skips_the_margin():
     assert [i.t for i in issues] == [round(70 / 30, 3), round(80 / 30, 3)]
     assert issues[0].severity == pytest.approx(config.SEVERITY["soft_focus"] * (35 - 20) / 17.5, abs=0.01)
     assert issues[1].severity == config.SEVERITY["soft_focus"]  # at half the threshold: full severity
+
+
+def test_a_long_take_is_judged_in_stretches_through_it():
+    from eqi.criteria import assess_framing
+    from eqi.features import Keyframe
+    fps = 30.0
+    f = _features([600], fps=fps)  # one 20 s take
+
+    def sample(frame, x):  # a salient subject centred at x
+        return Keyframe(0, frame, frame / fps, [], (x, 0.5), (x - 0.05, 0.4, 0.1, 0.2), "saliency", 100.0, 0.0, 0.0)
+
+    f.keyframes = [sample(300, 0.5)]  # the three frames of the take look fine…
+    # …but sampled every second, its first 8 s have the subject run off the edge
+    f.take_samples = {0: [sample(15 + 30 * k, 0.97 if k < 8 else 0.5) for k in range(20)]}
+    a = assess_framing(f)
+    assert [(i.t, i.t_end) for i in a.issues if i.kind == "subject_cut_off"] == [(0.0, 4.0), (4.0, 8.0)]
+    assert a.context["n_shots"] == 5  # five 4 s stretches, each judged like a shot
+    f.take_samples = {}
+    assert not [i for i in assess_framing(f).issues if i.kind == "subject_cut_off"]  # one judgement of the take
+    from eqi.criteria import framing_units
+    g = _features([420], fps=fps)  # a 14 s take: 4 s, 4 s, and the last 6 s (a short remainder joins it)
+    g.keyframes = [sample(210, 0.5)]
+    g.take_samples = {0: [sample(15 + 30 * k, 0.5) for k in range(14)]}
+    assert [(u.start, u.end) for u in framing_units(g)] == [(0, 120), (120, 240), (240, 420)]
+
+
+def test_longer_dead_air_counts_as_more_errors():
+    from eqi.audio import AudioFeatures
+    from eqi.criteria import assess_pacing
+    diff = np.full(1800, 3.0)
+    diff[300:570] = 0.0  # 9 s of frozen picture…
+    a = AudioFeatures(True, silence_runs=[(10.0, 19.0)])  # …and silence
+    [dead] = [i for i in assess_pacing(_features([1800], diff=diff), a).issues if i.kind == "dead_air"]
+    assert dead.severity == pytest.approx(9.0 / (2 * config.DEAD_AIR_MIN_S))  # three full errors
 
 
 def test_frozen_stretch_does_not_turn_movement_into_jump_cuts():
@@ -593,10 +674,10 @@ def test_recurring_loudness_jumps_are_sound_design_and_a_lone_burst_is_an_error(
         L = Loudness(-22.0, 8.0, -2.0, t, m, np.full(t.size, -24.0))
         return [i for i in assess_audio(AudioFeatures(True, L), 60.0).issues if i.kind == "loudness_jump"]
 
-    hits = jumps([10, 25, 40])  # a trailer's recurring hits
-    assert len(hits) == 3 and all(i.severity == 0.0 and "style" in i.detail for i in hits)
+    hits = jumps([10, 25, 40])  # a trailer's recurring hits: sound design, mostly
+    assert len(hits) == 3 and all(i.severity == round(config.SEVERITY["loudness_jump"] / 4, 3) for i in hits)
     burst = jumps([25])
-    assert len(burst) == 1 and burst[0].severity > 0
+    assert len(burst) == 1 and burst[0].severity == config.SEVERITY["loudness_jump"]
 
 
 def test_majority_of_frames_decides_whether_a_shot_has_a_face():
@@ -760,13 +841,21 @@ def synthetic(tmp_path_factory):
     return make_synthetic_source(d / "clean.mp4", n_shots=4, shot_s=4.0), d
 
 
+def _clean_signal_eqi(n_cuts: int) -> float:
+    """EQI_signal of a video without issues: K1 and K3 can reach only the ceiling of
+    their evidence (n cuts, n transitions between lit shots), the others full marks."""
+    from eqi.criteria import evidence_ceiling
+    top = round(evidence_ceiling(n_cuts), 1)
+    return weighted_index({"cuts": top, "pacing": 100.0, "color": top, "audio": 100.0, "framing": 100.0}, config.SIGNAL_CRITERIA)
+
+
 def test_clean_synthetic_has_no_issues(synthetic):
     from eqi.pipeline import analyze
     src, _ = synthetic
     report = analyze(src, None, use_ai=False)
-    assert report["eqi"]["signal_only"] == 100.0
     assert all(not c.get("issues") for c in report["criteria"].values())
     assert len(report["shots"]) == 4
+    assert report["eqi"]["signal_only"] == _clean_signal_eqi(3)
 
 
 def test_html_report_escapes_model_text(synthetic):
@@ -812,7 +901,7 @@ def test_unparsed_answers_land_in_the_report(synthetic, monkeypatch):
     monkeypatch.setattr(pipeline.ai_layer, "review", never_json)
     r = pipeline.analyze(src, None, use_ai=True, make_figures=False)
     assert "could not be parsed" in r["ai_error"] and r["ai_unparsed_responses"] == ["I think the edit is fine."]
-    assert r["eqi"]["full"] is None and r["eqi"]["signal_only"] == 100.0
+    assert r["eqi"]["full"] is None and r["eqi"]["signal_only"] == _clean_signal_eqi(3)
 
 
 def test_colour_shift_leaves_the_other_shots_untouched(synthetic):

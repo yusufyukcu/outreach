@@ -16,6 +16,7 @@ tend to be lenient, and a missed real error costs more than a kept style choice.
 
 import json
 import os
+import statistics
 import sys
 import time
 from dataclasses import dataclass, field
@@ -102,11 +103,13 @@ class UnparseableResponse(Exception):
 
 
 def combine_runs(runs: list[AiReview]) -> AiReview:
-    """K6 is the mean of the runs' levels. Issue opinions, comments and the summary come
-    from the first run (they are reported, not scored)."""
+    """K6 is the median of the runs' levels: one run that reads the video very
+    differently (levels 1 and 4 on the same unboxing) cannot move it; with two runs it
+    is their mean. Issue opinions, comments and the summary come from the first run
+    (they are reported, not scored)."""
     levels = [r.narrative_level for r in runs]
     first = runs[0]
-    first.narrative_level = round(sum(levels) / len(levels), 2)
+    first.narrative_level = round(float(statistics.median(levels)), 2)
     first.narrative_levels = [int(level) for level in levels]
     first.run_models = [r.model for r in runs]
     return first

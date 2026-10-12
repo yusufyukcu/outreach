@@ -36,6 +36,10 @@ KEYFRAME_WIDTH = 480     # face, saliency and sharpness analysis
 # Each shot is judged from several frames (positions within the shot), so that
 # compression noise or one blink cannot flip its face, framing or sharpness finding.
 KEYFRAME_POSITIONS = (0.25, 0.5, 0.75)
+# A long take is also sampled once per LONG_TAKE_SAMPLE_S (its framing, focus and
+# steadiness change as the camera moves), from LONG_TAKE_MIN_S on.
+LONG_TAKE_MIN_S = 8.0
+LONG_TAKE_SAMPLE_S = 1.0
 
 # ── Video-relative thresholds ────────────────────────────────────────────────
 # K3 and K5 compare a shot with the video's own statistics. Each shot weighs its
@@ -47,9 +51,15 @@ KEYFRAME_POSITIONS = (0.25, 0.5, 0.75)
 # of the threshold are within the jitter of re-encoding and shot detection.
 REPORT_MIN_SCALE = 0.10
 # A criterion the video gives no chance to observe (no cut for K1, one shot for K3's
-# shot-to-shot match) scores the scale's midpoint, not full marks: no cut is no
-# evidence of smooth cutting. Measured problems can still lower it further.
+# shot-to-shot match) scores at most the scale's midpoint, not full marks: no cut is no
+# evidence of smooth cutting. Each observed opportunity (a cut, a transition between lit
+# shots) is evidence, and the ceiling rises from the midpoint toward 100 as they add up,
+# EVIDENCE_PRIOR of them taking it halfway (1 cut: 75, 2: 83, 6: 93, 19: 98) instead of
+# jumping from 50 to 100 at the first cut. The measured score is scaled to that ceiling,
+# so every problem still counts. (K2 needs no ceiling: its average-shot-length part
+# already marks an uncut take.)
 NO_EVIDENCE_SCORE = 50.0
+EVIDENCE_PRIOR = 1.0
 
 # ── Errors per minute of viewing (K1, K2, K4) ────────────────────────────────
 # Cut errors, dead air and loudness jumps are events: the viewer meets each at a
@@ -96,6 +106,9 @@ HIDDEN_JUMP_MIN_STABLE = 0.50     # background kept → a jump cut the shot dete
 HIDDEN_JUMP_ISOLATION = 3.0       # spike this many times its neighbours (a cut, not sustained motion)
 FROZEN_DIFF = 0.05                # frames that change less than this are frozen (duplicates): they carry no
                                   # motion, so they are left out of a shot's spike statistics
+JUMP_MIN_PIECE_S = 0.5            # jumps inside a shot closer than this to the next one are the footage's
+                                  # frame cadence (repeated frames, timelapse, stop motion): no jump in
+                                  # such a shot is taken for a jump cut
 FREEZE_BEFORE_S = 0.25            # a jump right after this long a freeze is the freeze ending, not a jump cut
 MOTION_JUMP_PX = 4.0              # in a moving shot: a sudden change of the camera translation this large (px at SMALL_SIZE)…
 MOTION_JUMP_MIN_CONF = 0.3        # …measured this reliably also means "same view, piece removed"
@@ -106,14 +119,14 @@ MOTION_CLASH_COS = -0.5           # opposite camera motion on both sides of a cu
 # 0.93, a lamp switching on 0.93–1.0; a jump cut displaces the picture both ways
 # (0.0–0.5 in the Tier-1 and real jump cuts). Such a change is not a jump cut.
 LIGHTING_ONE_WAY = 0.85
-# A cut device used again and again is a technique, not a slip, and is reported as style
-# without lowering K1: jump cuts and opposing camera motion (a vlog's jump cuts, a
-# trailer's burst of cuts, stop motion) from CUT_STYLE_REPEATS on, or from CUT_STYLE_MIN
-# when they make up CUT_STYLE_SHARE of the cuts; flash frames only by that share (a music
-# video's strobe), since a lone flash or black frame is the classic leftover frame.
+# A cut device on CUT_STYLE_SHARE of the cuts (at least CUT_STYLE_MIN times) is how the
+# video is cut (a vlog cut with jump cuts, a music video's strobe): reported as style
+# without lowering K1. Below that share, jump cuts and opposing camera motion used again
+# and again count less with every repeat (criteria.repetition_factor: n uses count
+# n · 2^−(n−1) slips), while flash frames stay slips, since a lone flash or black frame
+# is the classic leftover frame. Loudness jumps are discounted the same way.
 CUT_STYLE_MIN = 2
 CUT_STYLE_SHARE = 0.25
-CUT_STYLE_REPEATS = 3
 SEVERITY = {
     "flash_frame": 1.0,
     "jump_cut": 0.6,
@@ -138,6 +151,7 @@ SEVERITY = {
 # ── K2 Pacing & temporal rhythm ──────────────────────────────────────────────
 SILENCE_BELOW_REF_DB = 30.0       # silence = RMS this far below the 90th percentile
 DEAD_AIR_MIN_S = 1.5              # silent and visually static for at least this long
+DEAD_AIR_MAX_ERRORS = 10.0        # dead air counts one full error per 2 × DEAD_AIR_MIN_S (no practical cap)
 LEAD_IN_OUT_S = 2.0               # silent black lead-in / tail of an export is not dead air
 CARD_EDGE_S = 0.5                 # a silence this close to the video's start or end opens or closes it; a cut
                                   # this close to where the sound starts / stops marks a title or end card
@@ -167,6 +181,10 @@ COLOR_PENALTY_SCALE = 3.0
 # Accepted delivery levels: broadcast −23 LUFS (EBU R128) / −24 LKFS (ATSC A/85) up to
 # the −14 LUFS of streaming platforms. A mix at any of these standards is not an error.
 LOUDNESS_TARGET_RANGE_LUFS = (-24.0, -14.0)
+# Streaming platforms (YouTube) turn a louder mix down to about this level and leave a
+# quieter one as it is: a loud master reaches the viewer at this level, a quiet one
+# stays quiet. The true peak is judged after that gain.
+PLATFORM_LOUDNESS_LUFS = -14.0
 LOUDNESS_TOLERANCE_LU = 2.0
 LOUDNESS_FULL_PENALTY_LU = 8.0    # this far beyond tolerance → full severity
 TRUE_PEAK_MAX_DBTP = -1.0
@@ -178,12 +196,12 @@ LOUDNESS_JUMP_WINDOW_S = 0.5      # momentary loudness integrates 400 ms: a step
 LOUDNESS_CONTEXT_MIN_LUFS = -70.0
 LOUDNESS_JUMP_FLOOR_LUFS = -35.0  # ignore rises that start from silence
 LRA_MAX_LU = 15.0
-LOUDNESS_STYLE_REPEATS = 3        # jumps recurring this often are the sound design (a trailer's hits), not a slip
 AUDIO_GLOBAL_WEIGHT = 0.5
 AUDIO_JUMP_WEIGHT = 0.5
 
 # ── K5 Framing & composition ─────────────────────────────────────────────────
 KEYFRAME_MIN_SHOT_S = 0.3         # shorter shots (flash frames) are K1's business only
+FRAMING_UNIT_S = 4.0              # a long take is judged in stretches of about a typical shot's length
 EDGE_MARGIN = 0.01                # subject box this close to a frame edge = cut off
 HEADROOM_MAX_CENTER_Y = 0.62      # face centre lower than this = too much headroom
 PLACEMENT_TOLERANCE = 0.10        # distance to centre or a thirds line that is still fine
@@ -202,9 +220,10 @@ FRAMING_PENALTY_SCALE = 3.0
 GEMINI_MODEL_DEFAULT = "gemini-3.1-pro-preview"
 GEMINI_FALLBACK_MODEL = "gemini-3.8-flash"   # used only after retries fail; the report records the model used
 AI_RETRY_DELAYS_S = (5, 15, 30)              # back-off for 503 (overloaded) and 429 (rate limit)
-# K6 varied by one level between two runs on the same video (Sintel: 4, then 3), so
-# it is the mean of independent reviews; the report keeps every run's level.
-AI_K6_REPEATS = 2
+# K6 varies between runs on the same video (Sintel: 4, then 3; an amateur unboxing: 1,
+# then 4), so it is the median of three independent reviews: one run that reads the
+# video very differently cannot move it. The report keeps every run's level.
+AI_K6_REPEATS = 3
 AI_PARSE_ATTEMPTS = 2                        # an answer that is not valid JSON is asked for again
 AI_OVERVIEW_MAX_FRAMES = 400      # overview fps = min(1, this / duration); ≈ 112k tokens at high resolution
 AI_ZOOM_CLIPS = 8                 # close-up clips around short or high-frequency issues

@@ -14,6 +14,7 @@ from skimage.color import lab2rgb  # noqa: E402
 
 from . import config  # noqa: E402
 from .audio import AudioFeatures  # noqa: E402
+from .criteria import framing_units  # noqa: E402
 from .features import VisualFeatures  # noqa: E402
 from .media import grab_frame  # noqa: E402
 
@@ -202,7 +203,9 @@ def issue_card(issue: dict, f: VisualFeatures, video: Path, out: Path) -> Path |
         for ax in axes:
             ax.axis("off")
     elif kind in FRAMING_BOX_KINDS:
-        key = next((k for k in f.keyframes if abs(f.shots[k.shot].t0 - t) < 1 / fps), None)
+        # The judged unit (a shot, or a stretch of a long take) that starts at the issue
+        unit = next((u for u in framing_units(f) if abs(u.t0 - t) < 1 / fps), None)
+        key = unit.key if unit else None
         frame = grab_frame(video, key.frame if key else round(t * fps), width=640)
         fig, ax = plt.subplots(figsize=(5.5, 3.4), dpi=150)
         img = _rgb(frame)
@@ -215,7 +218,7 @@ def issue_card(issue: dict, f: VisualFeatures, video: Path, out: Path) -> Path |
             ax.text(x * w, y * h - 4, key.subject_source or "", color="#ff6b6b", fontsize=7)
         ax.axis("off")
     elif kind == "shaky":
-        shot = next((s for s in f.shots if abs(s.t0 - t) < 1 / fps), None)
+        shot = next((u for u in framing_units(f) if abs(u.t0 - t) < 1 / fps), None)
         if shot is None:
             return None
         motion = f.motion[shot.start + 2:shot.end - 2]

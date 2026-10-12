@@ -41,6 +41,19 @@ def _detail(detail: dict) -> str:
     return ", ".join(f"{k}={v}" for k, v in detail.items() if not isinstance(v, (list, dict)))
 
 
+def _video_type(vt: dict | None) -> str:
+    if not vt:
+        return ""
+    notes = []
+    if vt.get("designed_share"):
+        notes.append(f"designed pictures (graphics, animation, screen capture) {vt['designed_share']:.0%} of the runtime: "
+                     "camera checks not applied to them")
+    if vt.get("music_montage"):
+        notes.append("cut to music at a quick pace: colour continuity not judged, flash cuts counted as rhythm")
+    return (f'<p class="small"><b>Video type:</b> {escape(vt.get("label", ""))}'
+            + (f' <span class="muted">— {escape("; ".join(notes))}</span>' if notes else "") + "</p>")
+
+
 def render(report: dict, figures: Path | None) -> str:
     def img(name: str, alt: str) -> str:
         if figures is None or not (figures / name).exists():
@@ -77,11 +90,19 @@ def render(report: dict, figures: Path | None) -> str:
 
     if ai:
         levels = narrative.get("levels") or []
-        runs = f" (mean of {len(levels)} runs: {', '.join(map(str, levels))})" if len(levels) > 1 else ""
+        runs = f" (median of {len(levels)} runs: {', '.join(map(str, levels))})" if len(levels) > 1 else ""
         models = sorted(set(ai.get("run_models") or [])) or [ai.get("model") or ""]
+        parts = "".join(
+            f"<tr><td>{escape(p['start'])}–{escape(p['end'])}</td><td>{escape(p['fit'])}</td>"
+            f"<td>{escape(p.get('about') or '')}</td><td class=\"small\">{escape(p.get('visuals') or '')}</td></tr>"
+            for p in narrative.get("parts") or [])
+        parts_html = ("<table><tr><th>Part</th><th>Fit</th><th>About</th><th>On screen</th></tr>" + parts + "</table>"
+                      "<p class=\"small muted\">Parts of the first run. Level from the parts (1 + 4 × the runtime share "
+                      "weighted by fit: " + ", ".join(f"{k} {v:g}" for k, v in config.K6_FIT_WEIGHT.items())
+                      + f"), reported only: {', '.join(map(str, narrative.get('parts_levels') or [])) or '—'}.</p>") if parts else ""
         ai_html = (
             f"<div class=\"box\"><p><b>K6 narrative–visual coherence:</b> level {narrative.get('level')}/5{runs} — "
-            f"{escape(narrative.get('evidence') or '')}</p><p>{escape(ai.get('summary') or '')}</p>"
+            f"{escape(narrative.get('evidence') or '')}</p>{parts_html}<p>{escape(ai.get('summary') or '')}</p>"
             + ("<p><b>Improvements</b></p><ul>" + "".join(f"<li>{escape(s)}</li>" for s in ai.get("improvements") or []) + "</ul>"
                if ai.get("improvements") else "")
             + f"<p class=\"small muted\">Model {escape(', '.join(models))} · verdicts: "
@@ -99,6 +120,7 @@ def render(report: dict, figures: Path | None) -> str:
 <body><main>
 <h1>EQI report — {escape(name)}</h1>
 <div class="meta">{video['duration_s']} s · {video['width']}×{video['height']} · {video['fps']} fps · {len(report.get('shots', []))} shots · {escape(report['tool']['name'])} {escape(report['tool']['version'])}</div>
+{_video_type(report.get('video_type'))}
 <div class="cards">
   <div class="card">EQI<b>{_score(full if full is not None else eqi['signal_only'])}</b><span class="small muted">{'K1–K5 measured + K6 rated by AI' if full is not None else 'K1–K5 measured (no AI layer)'}</span></div>
   <div class="card">Measured only<b>{_score(eqi['signal_only'])}</b><span class="small muted">K1–K5</span></div>

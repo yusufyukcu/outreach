@@ -110,7 +110,9 @@ def analyze(video: Path, workdir: Path) -> AudioFeatures:
     rms_db = 20 * np.log10(rms + 1e-10)
     rms_times = librosa.frames_to_time(np.arange(rms.size), sr=sr, hop_length=256)
     ref = np.percentile(rms_db, 90)
-    silent = rms_db < ref - config.SILENCE_BELOW_REF_DB
+    # Far below the programme's level, or no signal at all (which a track silent from
+    # start to end is everywhere, so the relative test alone would never find it)
+    silent = (rms_db < ref - config.SILENCE_BELOW_REF_DB) | (rms_db <= config.NO_SOUND_DBFS)
 
     onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)
     tempo, beat_frames = librosa.beat.beat_track(onset_envelope=onset_env, sr=sr, hop_length=hop)

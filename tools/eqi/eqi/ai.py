@@ -76,7 +76,7 @@ EXCUSE_RULES = {
 @dataclass
 class AiReview:
     model: str
-    narrative_level: float                   # mean over the runs (one run: its level)
+    narrative_level: float                   # median over the runs (one run: its level)
     narrative_evidence: str
     verdicts: dict[str, tuple[str, str]]     # issue id → (verdict used for scoring, note)
     comments: dict[str, str]
@@ -85,9 +85,12 @@ class AiReview:
     overview_fps: float
     zoom_clips: list[str]                    # issue ids that got a dense clip
     reviews: dict[str, dict] = field(default_factory=dict)  # issue id → model's own verdict, confidence, observation
-    narrative_levels: list[int] = field(default_factory=list)  # K6 level of every run
+    narrative_levels: list[float] = field(default_factory=list)  # K6 level of every run
     run_models: list[str] = field(default_factory=list)        # model that answered each run
     usage: list[dict] = field(default_factory=list)            # tokens of every call (cost)
+    narrative_parts: list[dict] = field(default_factory=list)  # the parts the model split the video into (first run)
+    parts_levels: list[float] = field(default_factory=list)    # level computed from each run's parts (reported only)
+    level_source: str = "overall"                              # "overall", or "parts" when no overall level was given
 
     @property
     def narrative_score(self) -> float:
@@ -110,9 +113,56 @@ def combine_runs(runs: list[AiReview]) -> AiReview:
     levels = [r.narrative_level for r in runs]
     first = runs[0]
     first.narrative_level = round(float(statistics.median(levels)), 2)
-    first.narrative_levels = [int(level) for level in levels]
+    first.narrative_levels = [round(float(level), 2) for level in levels]
+    first.parts_levels = [p for r in runs for p in r.parts_levels]
+    first.level_source = "overall" if all(r.level_source == "overall" for r in runs) else "parts"
     first.run_models = [r.model for r in runs]
     return first
+
+
+def _seconds(text) -> float | None:
+    """'mm:ss', 'mm:ss.s' or 'h:mm:ss' → seconds."""
+    try:
+        parts = [float(p) for p in str(text).strip().split(":")]
+    except ValueError:
+        return None
+    if not 1 <= len(parts) <= 3 or any(p < 0 for p in parts):
+        return None
+    seconds = 0.0
+    for p in parts:
+        seconds = seconds * 60 + p
+    return seconds
+
+
+def level_from_parts(parts: list, duration: float, n_cuts: int | None) -> tuple[float | None, list[dict]]:
+    """A level from the model's parts: 1 + 4 × the share of the runtime whose visuals
+    the edit chose to show what is said ("shown"), a scene cut together from shots
+    chosen to follow it counting half ("covered"), one recording of it or unrelated
+    visuals nothing (see K6_FIT_WEIGHT). One unedited take has no shots chosen by an
+    edit, so it earns nothing for coverage. Reported next to the model's overall level
+    (used for K6 only when the model gives none); None when the parts cover less than
+    half of the video."""
+    weights = dict(config.K6_FIT_WEIGHT)
+    if n_cuts == 0:
+        weights["covered"] = 0.0
+    clean, total, credit, end = [], 0.0, 0.0, 0.0
+    usable = [p for p in parts if isinstance(p, dict) and p.get("fit") in weights]
+    timed = sorted(((_seconds(p.get("start")), _seconds(p.get("end")), p) for p in usable),
+                   key=lambda x: (x[0] is None, x[0] or 0.0))
+    for a, b, p in timed:
+        if a is None or b is None:
+            continue
+        a, b = max(a, end, 0.0), min(b, duration)
+        if b <= a:
+            continue
+        end = b
+        total += b - a
+        credit += (b - a) * weights[p["fit"]]
+        clean.append({"start": _ts(a), "end": _ts(b), "fit": p["fit"],
+                      "about": str(p.get("about", ""))[:120], "visuals": str(p.get("visuals", ""))[:160]})
+    if total < 0.5 * duration:
+        return None, clean
+    return 1.0 + 4.0 * credit / total, clean
 
 
 def _ts(t: float) -> str:
@@ -156,18 +206,18 @@ def build_prompt(overview_fps: float, issues: list[Issue], zoom: list[Issue], me
     rules = "\n".join(f"   - {kind}: {EXCUSE_RULES[kind]}" for kind in sorted({i.kind for i in issues}) if kind in EXCUSE_RULES)
     n_cuts = metrics.get("cuts")
     cuts = "an unknown number of cuts" if n_cuts is None else ("no cut" if n_cuts == 0 else f"{n_cuts} cut{'s' if n_cuts != 1 else ''}")
+    kind = f' and the video type "{metrics["video_type"]}"' if metrics.get("video_type") else ""
     return f"""You are a senior video editor auditing the EDITING of this video: cuts, pacing, colour, sound, framing, and how the visuals serve the narration. An automatic signal analyzer has already measured it. Your job is limited to the three tasks below.
 
 {parts_text}
 
-1. Judge K6 narrative–visual coherence, which the analyzer cannot measure: do the visuals the editor chose (b-roll, cutaways, graphics, on-screen text, the choice of shot) show what is being said, or what the story needs, at that moment? Footage that simply records the speaker or the scene as it happened is not an editing contribution, however well it matches the speech.
-   1 = visuals unrelated to the narration, or one static shot while many topics are discussed
-   2 = mostly generic visuals, occasional match
-   3 = generic or loosely related footage; matches part of the time
-   4 = visuals usually match and support the narration
-   5 = visuals consistently and specifically illustrate the narration (relevant b-roll, graphics, text callouts)
-   If there is no speech, judge how well the editing (the choice and order of shots, added graphics or text) carries the topic.
-   The analyzer measured {cuts}. One unedited take, with no cuts and nothing added (no graphics, text or cutaways), has no editing contribution: level 1, however well the scene itself is filmed.
+1. Judge K6 narrative–visual coherence, which the analyzer cannot measure: how well the visuals the editor put on screen show what is being said, or what each part of the video is about. Go through the whole video and split it into consecutive parts by topic, step or scene ({config.K6_PARTS[0]} to {config.K6_PARTS[1]} parts, from 00:00 to the end). For each part write what it is about, what is on screen, and choose its "fit":
+   - "shown": the edit puts on screen what is said or what the part is about, with material chosen for it: b-roll or a cutaway of it, an insert or close-up of the thing named, a graphic, an animation, on-screen text, a screen recording of the step; without speech, shots chosen and ordered so that they carry the topic, the story or the music
+   - "covered": the scene itself, cut together from shots chosen to follow it: a change of angle or size on the speaker, a reaction, the detail of the action as it happens
+   - "recorded": one recording of the speaker or the scene as it happened (a presenter talking to the camera, an event filmed as it unfolded), at most trimmed by jump cuts, with nothing chosen to show the topic
+   - "unrelated": the visuals do not fit what is said, distract from it, or show nothing (black, a frozen frame)
+   Judge each part on its own: a part is "shown" or "covered" only when its own visuals were chosen that way, not because the rest of the video is well made. The analyzer measured {cuts}{kind}.
+   Then give your overall level for the whole video (reported next to the parts): 1 = visuals unrelated, or one recording while many topics are discussed; 2 = mostly recorded or generic, occasional match; 3 = matches part of the time; 4 = usually shown; 5 = consistently and specifically shown.
 
 2. Review every flagged issue below. First write what you actually see and hear at that time ("observation"), then choose one verdict:
    - "error": a real editing mistake a viewer would notice
@@ -188,7 +238,7 @@ Flagged issues (id | criterion | type | time | measurement):
 
 Return ONLY valid JSON in exactly this shape:
 {{
-  "narrative_visual_coherence": {{"level": 1, "evidence": "max 200 chars, cite mm:ss"}},
+  "narrative_visual_coherence": {{"parts": [{{"start": "00:00", "end": "00:14", "about": "max 60 chars", "visuals": "max 80 chars", "fit": "shown"}}], "overall_level": 3, "evidence": "max 200 chars, cite mm:ss"}},
   "issue_reviews": [{{"id": "cuts-1", "observation": "max 150 chars", "verdict": "error", "confidence": 4, "note": "max 120 chars"}}],
   "criterion_comments": {{"cuts": "", "pacing": "", "color": "", "audio": "", "framing": "", "narrative": ""}},
   "summary": "",
@@ -196,13 +246,22 @@ Return ONLY valid JSON in exactly this shape:
 }}"""
 
 
-def parse_review(raw: str, issue_ids: set[str], model: str, overview_fps: float, zoom_ids: list[str]) -> AiReview | None:
+def parse_review(raw: str, issue_ids: set[str], model: str, overview_fps: float, zoom_ids: list[str],
+                 duration: float | None = None, n_cuts: int | None = None) -> AiReview | None:
     try:
         data = json.loads(raw[raw.find("{"):raw.rfind("}") + 1])
     except ValueError:
         return None
     narrative = data.get("narrative_visual_coherence") or {}
-    level = _level(narrative.get("level"))
+    if not isinstance(narrative, dict):
+        return None
+    overall = _level(narrative.get("overall_level", narrative.get("level")))
+    parts_level, parts = (None, [])
+    if duration and isinstance(narrative.get("parts"), list):
+        parts_level, parts = level_from_parts(narrative["parts"], duration, n_cuts)
+    level, source = overall, "overall"
+    if level is None:
+        level, source = parts_level, "parts"  # no overall level given: the one computed from the parts
     if level is None:
         return None
 
@@ -228,6 +287,9 @@ def parse_review(raw: str, issue_ids: set[str], model: str, overview_fps: float,
         overview_fps=overview_fps,
         zoom_clips=zoom_ids,
         reviews=reviews,
+        narrative_parts=parts,
+        parts_levels=[round(parts_level, 2)] if parts_level is not None else [],
+        level_source=source,
     )
 
 
@@ -284,7 +346,8 @@ def review(video: Path, duration: float, issues: list[Issue], metrics: dict, mod
             zoom_ids = [i.id for i in zoom_set]
             try:
                 runs, raw = _ask(client, errors, model, [*parts, prompt], generation_config, max(1, repeats or config.AI_K6_REPEATS),
-                                 lambda text, used: parse_review(text, ids, used, overview_fps, zoom_ids))
+                                 lambda text, used: parse_review(text, ids, used, overview_fps, zoom_ids,
+                                                                 duration, metrics.get("cuts")))
             except errors.ClientError as err:
                 if zoom_set and err.code == 400:
                     continue

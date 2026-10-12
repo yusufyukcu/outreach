@@ -33,6 +33,10 @@ def _summary_metrics(f, a, assessments) -> dict:
         metrics["loudness_range_lu"] = a.loudness.lra
     faces = sum(1 for k in f.keyframes if k.subject_source == "face")
     metrics["shots_with_detected_face"] = f"{faces}/{len(f.keyframes)}"
+    vt = getattr(assessments, "video_type", None)
+    if vt is not None:
+        metrics["video_type"] = vt.label
+        metrics["designed_picture_share"] = round(vt.designed_share, 2)
     return metrics
 
 

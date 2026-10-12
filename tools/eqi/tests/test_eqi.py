@@ -332,10 +332,45 @@ def test_review_sends_overview_and_zoom_clips(monkeypatch, tmp_path):
     assert r.zoom_clips == ["cuts-1"] and files.deleted == ["files/abc"]
 
 
-def test_k6_prompt_states_the_measured_cuts_and_the_unedited_take_rule():
-    one_take = ai.build_prompt(1.0, [], [], {"cuts": 0})
-    assert "The analyzer measured no cut." in one_take and "no editing contribution: level 1" in one_take
-    assert "The analyzer measured 12 cuts." in ai.build_prompt(1.0, [], [], {"cuts": 12})
+def test_k6_prompt_states_the_measured_cuts_and_the_video_type():
+    assert "The analyzer measured no cut." in ai.build_prompt(1.0, [], [], {"cuts": 0})
+    prompt = ai.build_prompt(1.0, [], [], {"cuts": 12, "video_type": "montage cut to music"})
+    assert 'The analyzer measured 12 cuts and the video type "montage cut to music".' in prompt
+    assert all(f'"{fit}"' in prompt for fit in config.K6_FIT_WEIGHT)
+
+
+def test_k6_level_is_the_share_of_the_runtime_the_edit_shows():
+    parts = [{"start": "00:00", "end": "00:30", "fit": "shown"}, {"start": "00:30", "end": "01:00", "fit": "covered"},
+             {"start": "01:00", "end": "01:20", "fit": "unrelated"}, {"start": "01:20", "end": "02:00", "fit": "shown"}]
+    level, clean = ai.level_from_parts(parts, 120.0, n_cuts=10)
+    # 70 s shown, 30 s covered (half), 20 s unrelated: 1 + 4 × (70 + 15) / 120
+    assert level == pytest.approx(1 + 4 * 85 / 120) and [p["fit"] for p in clean] == ["shown", "covered", "unrelated", "shown"]
+    # One recording of the speaker is level 1, as "one static shot while many topics are discussed"
+    assert ai.level_from_parts([{"start": "0:00", "end": "2:00", "fit": "recorded"}], 120.0, n_cuts=8)[0] == 1.0
+    # One unedited take has no shots chosen by an edit: no credit for coverage
+    take, _ = ai.level_from_parts([{"start": "0:00", "end": "2:00", "fit": "covered"}], 120.0, n_cuts=0)
+    assert take == 1.0
+    # Overlaps are cut, parts past the end clipped; parts covering under half the video are unusable
+    assert ai.level_from_parts([{"start": "00:00", "end": "01:00", "fit": "shown"},
+                                {"start": "00:30", "end": "05:00", "fit": "unrelated"}], 120.0, 5)[0] == pytest.approx(3.0)
+    assert ai.level_from_parts([{"start": "00:00", "end": "00:20", "fit": "shown"}], 120.0, 5)[0] is None
+
+
+def test_k6_is_the_overall_level_and_the_parts_level_is_reported_next_to_it():
+    shown = [{"start": "00:00", "end": "01:00", "fit": "shown"}]
+    raw = review_json(narrative_visual_coherence={"parts": shown, "overall_level": 4, "evidence": ""})
+    r = ai.parse_review(raw, set(), "m", 1.0, [], duration=60.0, n_cuts=4)
+    assert r.narrative_level == 4 and r.level_source == "overall" and r.parts_levels == [5.0]
+    assert r.narrative_parts[0]["fit"] == "shown"
+    # Unusable parts: nothing reported for them, the overall level still counts
+    raw = review_json(narrative_visual_coherence={"parts": [{"start": "x", "end": "y", "fit": "shown"}],
+                                                  "overall_level": 2, "evidence": ""})
+    r = ai.parse_review(raw, set(), "m", 1.0, [], duration=60.0, n_cuts=4)
+    assert r.narrative_level == 2 and r.parts_levels == []
+    # No overall level: the level computed from the parts
+    raw = review_json(narrative_visual_coherence={"parts": shown, "evidence": ""})
+    r = ai.parse_review(raw, set(), "m", 1.0, [], duration=60.0, n_cuts=4)
+    assert r.narrative_level == 5.0 and r.level_source == "parts"
 
 
 def test_clips_go_first_to_events_the_overview_cannot_show(monkeypatch, tmp_path):
@@ -690,6 +725,179 @@ def test_majority_of_frames_decides_whether_a_shot_has_a_face():
     assert lone_face.subject[0] == 0.9 or lone_face.subject[0] == 0.7
     two_faces = combine_keyframes([face, face, salient(75, 0.7, 60.0)])
     assert two_faces.subject_source == "face" and two_faces.frame == 50
+
+
+# ── Video type ───────────────────────────────────────────────────────────────
+
+def _key(shot, **kw):
+    from eqi.features import Keyframe
+    base = dict(shot=shot, frame=shot * 60 + 30, t=shot * 2 + 1.0, faces=[], subject=(0.5, 0.5),
+                subject_box=(0.0, 0.3, 0.3, 0.4), subject_source="saliency", sharpness=100.0, clip_high=0.0, clip_low=0.0)
+    base.update(kw)
+    return Keyframe(**base)
+
+
+def _typed(lengths, keys, music=False, lab=None, diff=None):
+    from eqi.audio import AudioFeatures
+    from eqi.videotype import classify
+    f = _features(lengths, lab=lab, diff=diff, keyframes=keys)
+    a = AudioFeatures(True)
+    a.pulse_clarity = 0.9 if music else 0.0
+    return f, a, classify(f, a)
+
+
+def test_flat_fills_and_a_kept_white_background_are_designed_a_blown_sky_is_not():
+    camera = dict(fill_mid=0.02)
+    # Screen or animation: flat fills; a camera shot with a blown sky stays camera footage
+    f, a, vt = _typed([60] * 4, [_key(0, fill_mid=0.4), _key(1, fill_mid=0.35), _key(2, **camera),
+                                 _key(3, fill_white=0.6, white_rolloff=0.75)])
+    assert vt.shot_designed(0) and vt.shot_designed(1) and not vt.shot_designed(2)
+    assert vt.shot_designed(3)  # half the video is designed: a white shot in it is a white slide
+    f, a, vt = _typed([60] * 4, [_key(k, **camera) for k in range(3)] + [_key(3, fill_white=0.6, white_rolloff=0.75)])
+    assert not vt.designed_shots and vt.label != "graphics, animation or screen capture"
+    # A whiteboard video keeps its white ground in every shot
+    f, a, vt = _typed([60] * 3, [_key(k, fill_white=0.7, white_rolloff=0.4) for k in range(3)])
+    assert vt.designed_share == 1.0 and vt.label == "graphics, animation or screen capture"
+    # Text on black is a card; an all-black picture is a dip to black
+    f, a, vt = _typed([60, 60], [_key(0, fill_black=0.6, black_rolloff=0.1), _key(1, fill_black=0.99, black_rolloff=None)])
+    assert vt.shot_designed(0) and not vt.shot_designed(1)
+
+
+def test_weak_fills_count_as_designed_only_in_a_video_that_uses_designed_pictures():
+    # A screen recording's panel after a heavy encode: part of its exact fill broken up
+    f, a, vt = _typed([60] * 4, [_key(0, fill_mid=0.4), _key(1, fill_mid=0.07), _key(2, fill_mid=0.35), _key(3)])
+    assert vt.shot_designed(1) and not vt.shot_designed(3)
+    # The same weak fill in camera-only footage (a hazy sky flattened by compression)
+    f, a, vt = _typed([60] * 4, [_key(0), _key(1, fill_mid=0.07), _key(2), _key(3)])
+    assert not vt.designed_shots
+
+
+def test_k3_and_k5_count_by_the_share_of_camera_footage_they_judge():
+    scores = {"cuts": 90.0, "pacing": 90.0, "color": 30.0, "audio": 90.0, "framing": 30.0}
+    camera_only = weighted_index(scores, config.SIGNAL_CRITERIA)
+    assert weighted_index(scores, config.SIGNAL_CRITERIA, {"color": 1.0, "framing": 1.0}) == camera_only
+    # A video that is 90 % screen recording: K3 and K5 judge a tenth of it
+    mostly_screen = weighted_index(scores, config.SIGNAL_CRITERIA, {"color": 0.1, "framing": 0.1})
+    assert camera_only < mostly_screen < 90.0
+    # No camera footage at all: as if K3 and K5 were not available
+    assert weighted_index(scores, config.SIGNAL_CRITERIA, {"color": 0.0, "framing": 0.0}) == 90.0
+
+
+def test_camera_checks_skip_designed_pictures_and_a_video_without_camera_footage_is_not_judged_on_k3_k5():
+    from eqi.criteria import assess_color, assess_framing
+    keys = [_key(k, fill_mid=0.5, clip_high=0.6) for k in range(3)]
+    f, a, vt = _typed([60] * 3, keys)
+    assert assess_color(f).available  # without the type every shot is judged as camera footage
+    assert [i.kind for i in assess_color(f).issues].count("overexposed") == 3
+    assert not assess_color(f, vt).available and not assess_framing(f, vt).available
+    # Mixed: only the camera shot is judged
+    keys = [_key(0, fill_mid=0.5, clip_high=0.6), _key(1, clip_high=0.6), _key(2, fill_mid=0.5, clip_high=0.6)]
+    f, a, vt = _typed([60] * 3, keys)
+    assert [(i.kind, i.t) for i in assess_color(f, vt).issues if i.kind == "overexposed"] == [("overexposed", 2.0)]
+    assert {i.t for i in assess_framing(f, vt).issues} <= {2.0}
+
+
+def test_a_slide_change_that_keeps_the_template_is_not_a_jump_cut():
+    from eqi.criteria import assess_cuts
+    keys = [_key(k, fill_mid=0.5) for k in range(3)]
+    f, a, vt = _typed([90] * 3, keys)
+    f.stable[90] = f.stable[180] = 0.9  # the background stays across both cuts
+    assert [i.kind for i in assess_cuts(f).issues].count("jump_cut") == 2  # as camera footage: jump cuts
+    assert not assess_cuts(f, vt).issues
+
+
+def test_in_a_montage_cut_to_music_flash_cuts_are_rhythm_and_colour_continuity_is_not_judged():
+    from eqi.criteria import assess_color, assess_cuts
+    lengths = [30, 30, 1, 30, 30, 30]  # one-second shots and a one-frame flash
+    values = [[50, 0, 0], [50, 0, 0], [95, 0, 0], [50, 0, 0], [50, 20, 20], [50, 0, 0]]
+    lab = _lab_per_shot(lengths, values)
+    f, a, vt = _typed(lengths, [_key(k) for k in range(6)], music=True, lab=lab)
+    assert vt.music_montage and vt.label == "montage cut to music"
+    f.boundary = {}  # undecidable from the frames: a flash
+    flashes = [i for i in assess_cuts(f, vt).issues if i.kind == "flash_frame"]
+    assert len(flashes) == 1 and flashes[0].severity == 0.0 and "style" in flashes[0].detail
+    assert [i.severity for i in assess_cuts(f).issues if i.kind == "flash_frame"] == [config.SEVERITY["flash_frame"]]
+    assert [i for i in assess_color(f).issues if i.kind == "color_jump"]          # a tint jump in a continuous scene…
+    assert not [i for i in assess_color(f, vt).issues if i.kind == "color_jump"]  # …but a new setup in a montage
+
+
+def test_flicker_is_the_light_changing_not_the_picture_moving():
+    from eqi.criteria import assess_color
+    n = 120
+    L = np.full(n, 50.0)
+    L[::2] += 4.0  # brightness alternating frame to frame
+    lab = np.column_stack([L, np.zeros(n), np.zeros(n)])
+    f = _features([n], lab=lab, diff=np.full(n, 1.6))
+    f.luma = np.where(np.arange(n) % 2 == 0, 101.6, 100.0)  # the whole frame one way: |Δ mean| = mean |Δ|
+    assert [i.kind for i in assess_color(f).issues] == ["flicker"]
+    f.diff = np.full(n, 12.0)  # the same mean change, but pixels moving both ways: movement in the picture
+    assert not [i for i in assess_color(f).issues if i.kind == "flicker"]
+
+
+def test_dead_air_is_lost_sound_not_a_pause_with_room_tone():
+    from eqi.audio import AudioFeatures
+    from eqi.criteria import assess_pacing
+    diff = np.full(1800, 3.0)
+    diff[300:450] = 0.5     # 5 s of a living, almost still picture (a speaker pausing)…
+    diff[900:1050] = 0.0    # …and 5 s of a still slide or a frozen picture
+    t = np.arange(0, 60, 0.01)
+
+    def dead(level_dbfs):
+        rms = np.where(((t >= 10) & (t < 15)) | ((t >= 30) & (t < 35)), level_dbfs, -20.0)
+        a = AudioFeatures(True, rms_times=t, rms_db=rms, silence_runs=[(10.0, 15.0), (30.0, 35.0)])
+        return [(round(i.t), i.detail["picture"]) for i in assess_pacing(_features([1800], diff=diff), a).issues
+                if i.kind == "dead_air"]
+
+    assert dead(-200.0) == [(10, "still"), (30, "frozen")]   # the sound is gone: both are dead air
+    assert dead(-55.0) == []                                  # room tone: pauses in the programme
+
+
+def test_a_long_shot_is_static_when_the_picture_a_second_later_is_the_same():
+    from eqi.audio import AudioFeatures
+    from eqi.criteria import assess_pacing
+    f = _features([900], diff=np.full(900, 0.5))  # 30 s, small frame-to-frame change
+    f.change_1s = np.full(900, 4.0)              # but a speaker moving: different a second later
+    assert not [i for i in assess_pacing(f, AudioFeatures(True)).issues if i.kind == "long_static_shot"]
+    f.change_1s = np.full(900, 0.7)              # only compression noise: a still picture
+    assert [i.kind for i in assess_pacing(f, AudioFeatures(True)).issues] == ["long_static_shot"]
+
+
+def test_an_animation_changing_scene_without_a_cut_is_paced_like_a_cut():
+    from eqi.audio import AudioFeatures
+    from eqi.criteria import assess_cuts, assess_pacing
+    change = np.full(1800, 3.0)                  # 60 s of drawing
+    change[450:480] = change[1050:1080] = 45.0   # the picture moves on to a new panel twice
+    f, a, vt = _typed([1800], [_key(0, fill_mid=0.5)])
+    f.change_1s = change
+    pacing = assess_pacing(f, a, vt)
+    assert pacing.context["scene_changes_without_cut"] == 2 and pacing.context["asl_s"] == pytest.approx(20.0, abs=0.6)
+    assert assess_cuts(f, vt).context["n_cuts"] == 2
+    g, a, vt = _typed([1800], [_key(0)])          # camera footage: the camera's own movement
+    g.change_1s = change
+    assert assess_pacing(g, a, vt).context["scene_changes_without_cut"] == 0
+
+
+def test_a_short_video_is_judged_as_a_minute_of_viewing():
+    flash = [issue("cuts", "flash_frame")]
+    from eqi.criteria import viewing_minutes
+    assert viewing_minutes(15.0) == config.MIN_VIEWING_MINUTES and viewing_minutes(120.0) == 2.0
+    # One flash in a 15 s clip costs what it costs in a one-minute video, not four times that
+    assert Assessment("cuts", flash, {"n_cuts": 40, "minutes": viewing_minutes(15.0)}).score() == \
+        Assessment("cuts", flash, {"n_cuts": 40, "minutes": 1.0}).score()
+
+
+def test_a_file_without_a_picture_fails_with_a_clear_message(tmp_path):
+    from eqi.media import probe, run_ffmpeg
+    audio = tmp_path / "sound.m4a"
+    run_ffmpeg(["-y", "-f", "lavfi", "-i", "sine=f=440:d=2", "-c:a", "aac", str(audio)])
+    with pytest.raises(ValueError, match="No video stream"):
+        probe(audio)
+    broken = tmp_path / "broken.mp4"
+    broken.write_bytes(b"\x00" * 4096)
+    with pytest.raises(ValueError):
+        probe(broken)
+    with pytest.raises(ValueError, match="No such video file"):
+        probe(tmp_path / "missing.mp4")
 
 
 def test_colour_card_reference_for_both_tests():

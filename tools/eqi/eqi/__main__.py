@@ -34,7 +34,9 @@ def _print_report(report: dict) -> None:
         print(f"  {config.SHORT_LABELS[k]:<13} {'n/a' if score is None else f'{score:5.1f}'}  ({issues} issues)")
     levels = report["criteria"]["narrative"].get("levels") or []
     if len(levels) > 1:
-        print(f"  K6 level {report['criteria']['narrative']['level']} = mean of runs {levels}")
+        print(f"  K6 level {report['criteria']['narrative']['level']} = median of runs {levels}")
+    if report.get("video_type"):
+        print(f"  video type: {report['video_type']['label']}")
     if report["ai_error"]:
         print(f"note: {report['ai_error']}")
 
@@ -71,13 +73,15 @@ def _score_row(stem: str, report: dict) -> dict:
         "eqi_signal": report["eqi"]["signal_only"],
         "eqi_full": report["eqi"]["full"],
         **{k: crit[k]["score"] for k in config.WEIGHTS},
+        "video_type": (report.get("video_type") or {}).get("label", ""),
         "ai_error": report["ai_error"] or "",
     }
 
 
 def _write_scores(out: Path, rows: list[dict]) -> None:
+    fields = list(dict.fromkeys(k for row in rows for k in row)) or ["video"]
     with open(out / "scores.csv", "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=list(rows[0]) if rows else ["video"])
+        writer = csv.DictWriter(fh, fieldnames=fields, restval="")
         writer.writeheader()
         writer.writerows(rows)
     print(f"scores: {out / 'scores.csv'}")
@@ -163,15 +167,23 @@ def main(argv: list[str] | None = None) -> int:
         from .pipeline import analyze
         videos = sorted(p for p in args.folder.iterdir() if p.suffix.lower() in VIDEO_SUFFIXES)
         args.out.mkdir(parents=True, exist_ok=True)
-        rows = []
+        rows, failed = [], []
         for i, video in enumerate(videos, 1):
             print(f"[{i}/{len(videos)}] {video.name}", flush=True)
             done = args.out / video.stem / "report.json"
             report = json.loads(done.read_text(encoding="utf-8")) if args.resume and done.exists() else None
             if report is None or (not args.no_ai and not report.get("ai")):
-                report = analyze(video, args.out / video.stem, use_ai=not args.no_ai, make_figures=not args.no_figures,
-                                 model=args.model, ai_repeats=args.k6_repeats)
+                try:
+                    report = analyze(video, args.out / video.stem, use_ai=not args.no_ai, make_figures=not args.no_figures,
+                                     model=args.model, ai_repeats=args.k6_repeats)
+                except Exception as err:  # one unreadable file must not stop the batch
+                    print(f"  failed: {type(err).__name__}: {err}", file=sys.stderr, flush=True)
+                    failed.append(video.name)
+                    rows.append({"video": video.stem, "error": f"{type(err).__name__}: {err}"})
+                    continue
             rows.append(_score_row(video.stem, report))
+        if failed:
+            print(f"{len(failed)} of {len(videos)} videos could not be analyzed: {', '.join(failed)}", file=sys.stderr)
         if args.dover:
             _add_dover(videos, rows, args.out, args.resume)
         _write_scores(args.out, rows)

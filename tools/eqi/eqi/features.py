@@ -3,6 +3,7 @@ comparison for dissolves, fades and wipes) plus one decoding pass that collects
 cheap per-frame statistics, the frames around each cut and one analyzed
 keyframe per shot."""
 
+from collections import deque
 from dataclasses import dataclass, field
 
 import cv2
@@ -47,6 +48,18 @@ class Keyframe:
     clip_high: float                                        # share of pixels ≥ 250
     clip_low: float                                         # share of pixels ≤ 5
     face_luma: float | None = None                          # mean gray inside the largest face
+    # Designed-picture cues (graphics, animation, screen capture, title cards): the
+    # share of the picture, inside letterbox bars, covered by its five most frequent
+    # exact colours, split by tone. A camera never repeats one exact colour over a large
+    # area except where its sensor clips (blown highlights, crushed shadows); flat fills
+    # of a drawn or rendered picture do. Around a large white or black area: the share
+    # of soft tones next to it (a blown sky rolls off smoothly, a designed background
+    # meets crisp lines or text).
+    fill_mid: float = 0.0
+    fill_white: float = 0.0
+    fill_black: float = 0.0
+    white_rolloff: float | None = None
+    black_rolloff: float | None = None
 
 
 @dataclass
@@ -60,6 +73,9 @@ class VisualFeatures:
     motion: np.ndarray       # (n, 2) global translation from the previous frame, px at SMALL_SIZE
     motion_conf: np.ndarray  # (n,) phase-correlation peak response: how trustworthy the translation is
     luma: np.ndarray = field(default_factory=lambda: np.array([]))  # (n,) mean gray, 0–255
+    # (n,) mean |Δgray| to the frame one second earlier: slow change (a drawing being
+    # drawn, a slow pan, a screen being filled in) that frame-to-frame differences miss
+    change_1s: np.ndarray = field(default_factory=lambda: np.array([]))
     boundary: dict[int, np.ndarray] = field(default_factory=dict)   # small gray frames around cuts
     keyframes: list[Keyframe] = field(default_factory=list)
     # Long takes, sampled once per LONG_TAKE_SAMPLE_S: shot index → keyframes in time order
@@ -210,6 +226,55 @@ def _salient_subject(gray: np.ndarray):
     return (cx / w, cy / h), (x / w, y / h, bw / w, bh / h)
 
 
+def active_area(gray: np.ndarray) -> tuple[int, int, int, int]:
+    """Rows and columns inside letterbox or pillarbox bars (uniform near-black edges),
+    as top, bottom, left, right. A frame that is mostly black has no bars: all of it."""
+    h, w = gray.shape
+    rows, cols = gray.max(axis=1) <= config.DARK_LEVEL, gray.max(axis=0) <= config.DARK_LEVEL
+    top = int(np.argmin(rows)) if not rows.all() else h
+    bottom = h - int(np.argmin(rows[::-1])) if not rows.all() else 0
+    left = int(np.argmin(cols)) if not cols.all() else w
+    right = w - int(np.argmin(cols[::-1])) if not cols.all() else 0
+    if bottom - top < config.BARS_MIN_PICTURE * h or right - left < config.BARS_MIN_PICTURE * w:
+        return 0, h, 0, w
+    return top, bottom, left, right
+
+
+def flat_colours(frame: np.ndarray) -> dict:
+    """Designed-picture cues of one frame (see Keyframe.fill_*). Nearest-neighbour
+    resizing keeps every pixel's exact colour, so the shares are those of the full frame."""
+    h, w = frame.shape[:2]
+    width = min(w, config.FLAT_WIDTH)
+    img = cv2.resize(frame, (width, max(1, round(h * width / w))), interpolation=cv2.INTER_NEAREST)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    top, bottom, left, right = active_area(gray)
+    img, gray = img[top:bottom, left:right], gray[top:bottom, left:right]
+    pixels = img.reshape(-1, 3).astype(np.int16)
+    code = (img[..., 0].astype(np.int32) << 16) | (img[..., 1].astype(np.int32) << 8) | img[..., 2].astype(np.int32)
+    values, counts = np.unique(code, return_counts=True)
+    out = {"fill_mid": 0.0, "fill_white": 0.0, "fill_black": 0.0, "white_rolloff": None, "black_rolloff": None}
+    for c in np.argsort(counts)[::-1][:5]:
+        v = int(values[c])
+        rgb = np.array([v >> 16 & 255, v >> 8 & 255, v & 255], np.int16)
+        luma = 0.114 * rgb[0] + 0.587 * rgb[1] + 0.299 * rgb[2]
+        tone = "fill_black" if luma <= config.FLAT_BLACK_LUMA else "fill_white" if luma >= config.FLAT_WHITE_LUMA else "fill_mid"
+        if tone == "fill_mid":
+            # A drawn fill is one exact colour; a smooth area of a camera picture (a wall, a
+            # sky, a table) that compression made flat is a mound of nearly equal colours
+            distance = np.abs(pixels - rgb).max(axis=1)
+            near = int(np.count_nonzero((distance > 0) & (distance <= config.FLAT_NEAR_LEVELS)))
+            if near > config.FLAT_SPIKE_MAX_NEAR * counts[c]:
+                continue
+        out[tone] += float(counts[c] / gray.size)
+    ring_kernel = np.ones((5, 5), np.uint8)
+    for name, area, soft in (("white_rolloff", gray >= 250, (gray >= 190) & (gray < 250)),
+                             ("black_rolloff", gray <= 5, (gray > 5) & (gray <= 50))):
+        if area.mean() >= config.FLAT_ROLLOFF_MIN_AREA:
+            ring = (cv2.dilate(area.astype(np.uint8), ring_kernel) > 0) & ~area
+            out[name] = float(soft[ring].mean()) if ring.any() else None  # nothing else in the picture
+    return {k: (round(v, 4) if isinstance(v, float) else v) for k, v in out.items()}
+
+
 def analyze_keyframe(frame: np.ndarray, shot: Shot, frame_idx: int, cascade) -> Keyframe:
     h, w = frame.shape[:2]
     img = cv2.resize(frame, (config.KEYFRAME_WIDTH, round(h * config.KEYFRAME_WIDTH / w)), interpolation=cv2.INTER_AREA)
@@ -240,6 +305,7 @@ def analyze_keyframe(frame: np.ndarray, shot: Shot, frame_idx: int, cascade) -> 
         clip_high=float(np.mean(gray >= 250)),
         clip_low=float(np.mean(gray <= 5)),
         face_luma=face_luma,
+        **flat_colours(frame),
     )
 
 
@@ -264,13 +330,17 @@ def combine_keyframes(samples: list[Keyframe]) -> Keyframe:
         if chosen.faces:  # a minority face: fall back to the frame's saliency, if any
             chosen = Keyframe(chosen.shot, chosen.frame, chosen.t, [], None, None, None,
                               chosen.sharpness, chosen.clip_high, chosen.clip_low)
+    def median(name):
+        values = [getattr(k, name) for k in samples if getattr(k, name, None) is not None]
+        return float(np.median(values)) if values else None
+
     return Keyframe(
         shot=chosen.shot, frame=chosen.frame, t=chosen.t, faces=chosen.faces,
         subject=chosen.subject, subject_box=chosen.subject_box, subject_source=chosen.subject_source,
-        sharpness=float(np.median([k.sharpness for k in samples])),
-        clip_high=float(np.median([k.clip_high for k in samples])),
-        clip_low=float(np.median([k.clip_low for k in samples])),
+        sharpness=median("sharpness"), clip_high=median("clip_high"), clip_low=median("clip_low"),
         face_luma=chosen.face_luma,
+        fill_mid=median("fill_mid") or 0.0, fill_white=median("fill_white") or 0.0, fill_black=median("fill_black") or 0.0,
+        white_rolloff=median("white_rolloff"), black_rolloff=median("black_rolloff"),
     )
 
 
@@ -294,9 +364,11 @@ def extract(info: VideoInfo, shots: list[Shot]) -> VisualFeatures:
     cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     window = cv2.createHanningWindow(config.SMALL_SIZE, cv2.CV_32F)
 
-    lab, diff, ncc, stable, motion, motion_conf, luma = [], [], [], [], [], [], []
+    lab, diff, ncc, stable, motion, motion_conf, luma, change_1s = [], [], [], [], [], [], [], []
     boundary: dict[int, np.ndarray] = {}
     keyframes: list[Keyframe] = []
+    second = max(1, round(info.fps))
+    recent: deque = deque(maxlen=second)   # the last second of small gray frames
 
     cap = cv2.VideoCapture(str(info.path))
     prev = prev_mid = None
@@ -310,6 +382,8 @@ def extract(info: VideoInfo, shots: list[Shot]) -> VisualFeatures:
         gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
         g32 = gray.astype(np.float32)
         luma.append(float(g32.mean()))
+        change_1s.append(float(np.mean(np.abs(g32 - recent[0]))) if len(recent) == second else 0.0)
+        recent.append(g32)
         mid = cv2.cvtColor(cv2.resize(frame, config.STABLE_SIZE, interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
         if prev_mid is None:
             stable.append(1.0)
@@ -365,6 +439,7 @@ def extract(info: VideoInfo, shots: list[Shot]) -> VisualFeatures:
         motion=np.array(motion, dtype=np.float64),
         motion_conf=np.array(motion_conf, dtype=np.float64),
         luma=np.array(luma, dtype=np.float64),
+        change_1s=np.array(change_1s, dtype=np.float64),
         boundary=boundary,
         keyframes=keyframes,
         take_samples={k: v for k, v in take_samples.items() if any(s.index == k for s in shots)},

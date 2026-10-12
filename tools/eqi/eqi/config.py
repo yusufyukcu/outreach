@@ -41,6 +41,50 @@ KEYFRAME_POSITIONS = (0.25, 0.5, 0.75)
 LONG_TAKE_MIN_S = 8.0
 LONG_TAKE_SAMPLE_S = 1.0
 
+# ── Picture type: camera footage or a designed picture ───────────────────────
+# Graphics, animation, screen capture, slides and title cards are designed pictures:
+# their whites, framing, focus, steadiness and colour are set by design, so the camera
+# checks (exposure, framing, focus, shake, flicker, grade match, a kept background as a
+# jump cut) do not apply to them. A camera never repeats one exact colour over a large
+# area except where its sensor clips; flat fills of a drawn or rendered picture do.
+# Measured on labelled shots of the three test sets: exact mid-tone fills (spikes, see
+# below) cover 0.18–0.94 of a designed shot and at most a title overlaid on footage in
+# camera shots; white and black areas occur in both (sensor clipping), so they decide
+# only together with the rest of the video.
+FLAT_WIDTH = 640                  # nearest-neighbour resize keeps exact colours
+BARS_MIN_PICTURE = 0.30           # letterbox bars leave at least this share of the frame
+FLAT_BLACK_LUMA = 20              # exact colours this dark are black…
+FLAT_WHITE_LUMA = 235             # …this bright white, the rest mid-tones
+FLAT_ROLLOFF_MIN_AREA = 0.05      # roll-off around white / black measured from this share on
+# A mid-tone fill counts only as a spike: an exact colour with few nearly equal ones
+# (within FLAT_NEAR_LEVELS per channel) around it. Compression flattens smooth camera
+# areas into mounds of nearly equal colours (measured: 1–5 near pixels per exact one on
+# a table, a wall, a sky); a drawn fill is one colour (0.0–0.6).
+FLAT_NEAR_LEVELS = 2
+FLAT_SPIKE_MAX_NEAR = 0.6
+DESIGNED_FILL_MID = 0.15          # flat mid-tone fills → designed
+# A video "uses designed pictures" when most of its shots are on white or this share of
+# its runtime clearly shows fills or cards. In such a video a white ground, or weaker
+# fills, are designed too: a heavier encode breaks up part of a slide's exact fills
+# (a screen recording's panel: 0.22 of the picture as published, 0.06 at 480p CRF 28),
+# and the decision must not flip with the encode. 93 % of all keyframes of the three
+# test sets have no fill at all; camera shots reach 0.13 only in rare hazy highlights.
+DESIGNED_VIDEO_SHARE = 0.15
+DESIGNED_BACKGROUND = 0.40        # in such a video: a white ground this large…
+DESIGNED_FILL_MID_IN_CONTEXT = 0.05   # …or fills this large
+DESIGNED_BLACK = 0.30             # a black background this large…
+DESIGNED_BLACK_ROLLOFF = 0.45     # …that meets crisp content: titles, logos, renders on black 0.09–0.48 (a
+                                  # re-encode softens a title's edges from 0.22 to 0.33); camera shadows ≥ 0.55
+# A video cut to music at a quick pace (music-driven, average shot at most this long) is
+# a montage: a music video, an ad, a highlight reel. It cuts between setups and moments
+# by design, so its shots are not expected to continue one grade, and its one- and
+# two-frame shots are part of its rhythm.
+MONTAGE_AVERAGE_SHOT_S = 3.0
+# Labels of the reported video type (the rules above decide; the label summarises)
+TYPE_DESIGNED_SHARE = 0.70        # this share of the runtime designed: graphics / animation / screen capture
+TYPE_MIXED_SHARE = 0.20           # from this share on: live action with graphics or screen capture
+TYPE_PRESENTER_FACES = 0.50       # this share of the camera shots with a face: presenter or interview
+
 # ── Video-relative thresholds ────────────────────────────────────────────────
 # K3 and K5 compare a shot with the video's own statistics. Each shot weighs its
 # length up to the median shot length, and the median is averaged over a band, so a
@@ -69,6 +113,11 @@ EVIDENCE_PRIOR = 1.0
 # i.e. one full-severity error per minute empties it. (K3 and K5 judge properties of
 # shots — grade, exposure, framing — as a share of the shots.)
 ERRORS_FULL_PER_MIN = 1.0
+# A video shorter than a minute counts as one minute of viewing. Ratings of an
+# experience hardly depend on its length (duration neglect, Fredrickson & Kahneman
+# 1993), and without the floor one detection would decide a 15 s clip's score between
+# full marks and zero (one slip in 15 s is four per minute).
+MIN_VIEWING_MINUTES = 1.0
 
 # ── K1 Cut & transition smoothness ───────────────────────────────────────────
 SCENE_MIN_LEN = 1                 # frames; low so that flash frames survive detection
@@ -151,12 +200,28 @@ SEVERITY = {
 # ── K2 Pacing & temporal rhythm ──────────────────────────────────────────────
 SILENCE_BELOW_REF_DB = 30.0       # silence = RMS this far below the 90th percentile
 DEAD_AIR_MIN_S = 1.5              # silent and visually static for at least this long
+# Dead air is a stretch that gives the viewer nothing: the sound is gone (no signal at
+# all, as when nothing was placed on the audio track or the sound dropped out) while the
+# picture stands still, or the picture is frozen (a freeze frame) under no more than
+# room tone. A pause with room tone over a living picture is a pause in the programme —
+# a speaker thinking, someone typing — and a still designed picture under room tone is
+# time to read it; neither is dead air. Measured: every injected and real loss of sound
+# lies at −200 dBFS (digital zero), every pause with room tone between −80 and −50 dBFS.
+NO_SOUND_DBFS = -90.0
 DEAD_AIR_MAX_ERRORS = 10.0        # dead air counts one full error per 2 × DEAD_AIR_MIN_S (no practical cap)
 LEAD_IN_OUT_S = 2.0               # silent black lead-in / tail of an export is not dead air
 CARD_EDGE_S = 0.5                 # a silence this close to the video's start or end opens or closes it; a cut
                                   # this close to where the sound starts / stops marks a title or end card
 STATIC_DIFF = 1.5                 # mean |Δgray| below this = visually static
 LONG_STATIC_SHOT_S = 20.0
+# A long shot is static when the picture a second later is almost the same: median
+# |Δgray| to the frame a second before below this (compression noise of a locked-off
+# picture 0.5–1; a speaker talking 2–7, a hand drawing on a whiteboard 2.5–3.5).
+STATIC_CHANGE_1S = 1.5
+# Inside an animation or screen recording, a change of the whole picture within a
+# second (mean |Δgray| to a second before at least this; across a cut 30–150) is a
+# change of scene without a cut: a pan to the next panel, a new window, a morph.
+SCENE_CHANGE_1S = 30.0
 ASL_GOOD_RANGE = (1.0, 8.0)       # average shot length (s) without penalty; calibrate per genre
 MUSIC_PULSE_CLARITY = 0.30        # onset autocorrelation peak above this → music-driven
 BEAT_TOLERANCE_S = 0.08           # cut counts as on-beat within ±80 ms
@@ -170,7 +235,12 @@ BLACK_SHOT_L = 5.0                # mean L* below this: a dip to black, which ha
 TINT_JUMP_AB = 10.0               # a shot's tint (a*b* mean) this far from both neighbours…
 TINT_NEIGHBOUR_AB = 6.0           # …while the neighbours agree within this = a mismatched shot inside a scene
 TINT_MIN_L = 15.0                 # tint is meaningless in near-black shots
-FLICKER_STD_L = 1.5               # detrended frame-to-frame L* oscillation inside a shot
+FLICKER_STD_L = 1.5               # detrended frame-to-frame L* oscillation inside a shot…
+# …of the light, not of the picture: flicker changes the brightness of the whole frame
+# one way at a time (|Δ mean| ≈ mean |Δ|, see LIGHTING_ONE_WAY), while movement in the
+# picture brightens some pixels and darkens others. Measured on the three test sets, the
+# frames of the shots flagged before were one-way in 0–26 % (median 6 %): content moving.
+FLICKER_LIGHT_SHARE = 0.50        # at least this share of the shot's frame changes must be one-way
 OVEREXPOSED_FRAC = 0.08           # share of pixels ≥ 250
 UNDEREXPOSED_FRAC = 0.25          # share of pixels ≤ 5…
 EXPOSED_FACE_LUMA = 60.0          # …unless the detected face is this bright (mean gray): a dark backdrop, not underexposure
@@ -224,6 +294,17 @@ AI_RETRY_DELAYS_S = (5, 15, 30)              # back-off for 503 (overloaded) and
 # then 4), so it is the median of three independent reviews: one run that reads the
 # video very differently cannot move it. The report keeps every run's level.
 AI_K6_REPEATS = 3
+# Before its overall level, the model splits the video into parts and labels what each
+# part's visuals do: "shown" (b-roll, inserts, graphics, text, shots chosen for the
+# music), "covered" (the scene cut from shots chosen to follow it), "recorded" (one
+# recording of the speaker or the event), "unrelated". K6 is the model's overall level
+# after that walk through the video (run-to-run ICC on the held-out set 0.75 with the
+# earlier prompt, 0.86 with this one). A level computed from the parts — 1 + 4 × the
+# runtime share weighted as below — is reported next to it: equally reliable (0.85)
+# but, in EQI, no better at ordering the tiers (it credits mid above amateur videos
+# more and professional above mid less), so it does not replace the model's level.
+K6_FIT_WEIGHT = {"shown": 1.0, "covered": 0.5, "recorded": 0.0, "unrelated": 0.0}
+K6_PARTS = (3, 12)
 AI_PARSE_ATTEMPTS = 2                        # an answer that is not valid JSON is asked for again
 AI_OVERVIEW_MAX_FRAMES = 400      # overview fps = min(1, this / duration); ≈ 112k tokens at high resolution
 AI_ZOOM_CLIPS = 8                 # close-up clips around short or high-frequency issues

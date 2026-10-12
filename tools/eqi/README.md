@@ -11,16 +11,24 @@ comments on each measured issue (real error, deliberate style, or false
 detection), but these comments **do not change the score**: in validation the
 model excused most real, injected defects as deliberate style (see *Proof*).
 
+Before judging, the program measures the **video type** (see *Video type*): which
+shots are camera footage and which are designed pictures (graphics, animation,
+screen capture, cards), and whether the video is a montage cut to music. Each check
+of K1–K5 is applied only where its assumption about the footage holds — a camera
+check to camera footage, colour continuity to consecutive shots of one scene — so
+that a whiteboard animation, a screen-recorded tutorial, a music video and an
+interview are each judged by what an error is in that kind of video.
+
 ## Criteria (single source of truth: `eqi/config.py`)
 
 | | Criterion | Weight | Measured as | Main references |
 |---|---|---|---|---|
-| K1 | Cut & transition smoothness | 0.20 | shots: hard cuts (PySceneDetect) and dissolves, fades and wipes (twin comparison; in a video where no cut is found, dissolves in moving footage from the colour make-up one second apart); flash frames (≤ 2-frame shots whose pixels leave the range of the frames either side), jump cuts (cuts that keep the background: unchanged-pixel ratio; inside a shot also a sudden, reliably measured jump of a panning camera; a change that only brightens or darkens is a change of light, not a jump), opposite camera motion across a cut (Farnebäck optical flow) | PySceneDetect; Zhang et al. 1993; Pardo et al. 2021 |
-| K2 | Pacing & temporal rhythm | 0.20 | dead air (silence + static picture inside the programme; a silent title or end card marked by a cut is not dead air), very long static shots, average shot length, cut–beat alignment vs chance when the audio is music-driven (librosa beat tracking, onset pulse clarity) | Cutting et al. 2010; McFee et al. 2015 |
-| K3 | Colour & lighting consistency | 0.16 | shots whose colour deviates from the video's dominant grade (CIEDE2000; dips to black left out) or whose tint (a\*b\*) differs from both neighbouring shots while those agree (a mismatched camera or grade inside a scene), brightness flicker, clipped highlights/shadows | Sharma et al. 2005 |
-| K4 | Audio-visual balance | 0.12 | integrated loudness outside the accepted delivery levels (−24 to −14 LUFS: broadcast to streaming), true peak > −1 dBTP, loudness range, sudden loudness jumps against the level of the seconds before (momentary vs short-term loudness, ffmpeg ebur128) | ITU-R BS.1770; EBU R128; ATSC A/85 |
-| K5 | Framing & composition | 0.12 | judged per shot from three frames (¼, ½, ¾; a face counts when most of them show one): subject (Haar face detector, else spectral-residual saliency) cut off by the frame edge, headroom, placement vs centre/thirds, soft focus (Laplacian variance vs the video's typical sharpness), camera shake (phase-correlation jitter) | Viola & Jones 2001; Hou & Zhang 2007 |
-| K6 | Narrative–visual coherence | 0.20 | Gemini rates 1–5 against an anchored rubric with timestamped evidence; score = (level − 1)/4 · 100 | Wu et al. 2024 (Q-Align) |
+| K1 | Cut & transition smoothness | 0.20 | shots: hard cuts (PySceneDetect) and dissolves, fades and wipes (twin comparison; in a video where no cut is found, dissolves in moving footage from the colour make-up one second apart); flash frames (≤ 2-frame shots whose pixels leave the range of the frames either side; in a montage cut to music a flash cut of its rhythm), jump cuts (cuts that keep the background: unchanged-pixel ratio; inside a shot also a sudden, reliably measured jump of a panning camera; a change that only brightens or darkens is a change of light, not a jump; jumps a few frames apart are the footage's frame cadence — repeated frames, a timelapse, stop motion — not cuts; not tested where a designed picture keeps its layout, a slide or a screen), opposite camera motion across a cut (Farnebäck optical flow) | PySceneDetect; Zhang et al. 1993; Pardo et al. 2021 |
+| K2 | Pacing & temporal rhythm | 0.20 | dead air (the sound gone — no signal at all — while the picture stands still; longer stretches counting as more errors; a silent title or end card marked by a cut is not dead air, nor a pause with room tone), very long static shots (the picture a second later almost the same), average shot length (inside an animation or screen recording a change of the whole picture within a second is a change of scene, as a cut), cut–beat alignment vs chance when the audio is music-driven (librosa beat tracking, onset pulse clarity) | Cutting et al. 2010; McFee et al. 2015 |
+| K3 | Colour & lighting consistency | 0.16 | camera shots only: shots whose colour deviates from the video's dominant grade (CIEDE2000; dips to black left out) or whose tint (a\*b\*) differs from both neighbouring shots while those agree (a mismatched camera or grade inside a scene; neither test in a montage cut to music, which jumps between setups by design), flicker of the light (one-way brightness changes of the whole frame, not movement in it), clipped highlights/shadows | Sharma et al. 2005 |
+| K4 | Audio-visual balance | 0.12 | the mix as the platform plays it: integrated loudness below the accepted delivery levels (−24 LUFS broadcast, −14 LUFS streaming; a louder mix is turned down to −14 LUFS, a quieter one is not raised), true peak > −1 dBTP after that turn-down, loudness range, sudden loudness jumps against the level of the seconds before (momentary vs short-term loudness, ffmpeg ebur128) | ITU-R BS.1770; EBU R128; ATSC A/85 |
+| K5 | Framing & composition | 0.12 | camera footage only, judged per shot from three frames (¼, ½, ¾; a face counts when most of them show one), and through a long take (≥ 8 s) from a frame every second, in 4 s stretches each judged like a shot: subject (Haar face detector, else spectral-residual saliency) cut off by the frame edge, headroom, placement vs centre/thirds, soft focus (Laplacian variance vs the video's typical sharpness), camera shake (phase-correlation jitter) | Viola & Jones 2001; Hou & Zhang 2007 |
+| K6 | Narrative–visual coherence | 0.20 | Gemini first splits the video into its parts and labels what each part's visuals do — *shown* (b-roll, inserts, graphics, text, shots chosen for the music), *covered* (the scene cut from shots chosen to follow it), *recorded* (one recording of the speaker or event), *unrelated* — then rates 1–5 against an anchored rubric with timestamped evidence; median of three independent runs; score = (level − 1)/4 · 100 | Wu et al. 2024 (Q-Align) |
 
 Every criterion score is a transparent function of its issues (see *Scoring*).
 Two indices are reported:
@@ -33,6 +41,49 @@ if issues the AI called *intentional* or *false_positive* stopped counting.
 `AI_VERDICTS_IN_SCORE` in `config.py` switches that back on; keep it off unless
 a new model passes the validation below.
 
+**Video type** (`eqi/videotype.py`, reported as `video_type`). Each check of K1–K5
+rests on an assumption about the footage — a camera recorded it, consecutive shots
+continue one scene, a pause is part of the programme. The video type tells where
+the assumption holds; it is decided by deterministic rules on measured features,
+so K1–K5 stay independent of the AI.
+
+* *Designed pictures* — graphics, animation, screen capture, slides, title cards. A
+  camera never repeats one exact colour over a large area except where its sensor
+  clips; a drawn or rendered picture does. A shot is designed when its five most
+  frequent exact mid-tone colours cover at least 15 % of it (frames sampled at
+  640 px with nearest-neighbour resizing, letterbox bars left out), each counted
+  only as a *spike*: an exact colour with few nearly equal colours (± 2 levels)
+  around it. Compression turns a smooth area of camera footage — a wall, a sky, a
+  table — into a mound of nearly equal colours (1–5 near pixels per exact one
+  measured), a drawn fill stays one colour (0.0–0.6); 93 % of all keyframes of the
+  three test sets have no such fill at all. A shot is also designed when it shows
+  text, logos or renders on black (a black ground of at least 30 % that meets crisp
+  content: at most 45 % soft dark tones next to it; titles and logos measured
+  0.09–0.48, camera shadows roll off at 0.55 or more). In a video that uses designed
+  pictures (most of its shots on white, or 15 % of its runtime clearly designed), a
+  white ground or a weaker fill (≥ 5 %) counts too: a heavier encode breaks up part of
+  a slide's exact fills, and the decision must not flip with the encode. A blown sky
+  in camera footage on its own is not designed. The
+  camera checks are not applied to designed shots — exposure, flicker and grade
+  match (K3), framing, focus and shake (K5), a kept background as a jump cut and
+  opposite motion across a cut (K1) — and a video without camera footage is not
+  judged on K3 and K5 at all (weights renormalized, as K4 for a video without
+  sound). In a mixed video K3 and K5 count by the share of the runtime that is
+  camera footage (`eqi.coverage`): they judge only that share, and one shot more or
+  less judged as camera footage then moves EQI a little, not a lot. Inside a designed shot, a change of the whole picture within a second
+  (mean |Δgray| to the frame a second before ≥ 30: a pan to the next panel, a new
+  window, a morph) is a change of scene and counts as a cut for the average shot
+  length (K2) and as evidence (K1).
+* *Montage cut to music* — music-driven audio and an average shot of at most 3 s: a
+  music video, an ad, a highlight reel. It cuts between setups and moments by
+  design, so shot-to-shot colour continuity (K3's grade and tint tests) is not
+  judged, and a one- or two-frame shot is a flash cut of its rhythm, reported as
+  style (in two K-pop videos 3–4 such flashes among 83–119 cuts had emptied K1).
+* The label — graphics, animation or screen capture (designed ≥ 70 % of the
+  runtime); single take; montage cut to music; live action with graphics or screen
+  capture (designed ≥ 20 %); presenter or interview (faces in half the camera
+  shots); live-action edit — is reported and given to the AI as context.
+
 **Video-relative thresholds.** K3's grade test and K5's soft-focus test compare a
 shot with the video's own statistics (dominant grade and its shot-to-shot spread;
 typical sharpness). Each shot weighs its length, but at most the median shot
@@ -44,8 +95,9 @@ Severity grows from 0 at the threshold to full at twice the threshold (half the
 sharpness for soft focus); findings in the first tenth of that ramp are not
 reported, because there the two sides of the threshold are within the jitter of
 re-encoding and shot detection. A shot's framing, face and sharpness are judged
-from three of its frames, and frozen (duplicate) frames are left out of the
-spike statistics that find jump cuts inside a shot.
+from three of its frames (a long take from its 4 s stretches), and frozen
+(duplicate) frames are left out of the spike statistics that find jump cuts
+inside a shot.
 
 **Scoring.** Cut errors (flash frames, jump cuts, opposite camera motion), dead
 air and loudness jumps are events: the viewer meets each at a moment, however many
@@ -54,27 +106,76 @@ careless. They are counted as severity-weighted errors per minute of viewing, at
 one rate for all three criteria: the error term is
 1 − (Σ severity / minutes) / `ERRORS_FULL_PER_MIN` with the rate set to 1, so one
 full-severity error per minute empties the term and one in two minutes halves it.
-K1 = 100 · error term; K2 = 0.5 · dead-air term + 0.25 · average shot length +
-0.25 · cut–beat alignment (renormalized when the audio is not music);
+A video shorter than a minute counts as one minute of viewing: ratings of an
+experience hardly depend on its length (duration neglect, Fredrickson & Kahneman
+1993), and without the floor one detection would decide a 15 s clip's score between
+full marks and zero.
+Dead air is a stretch that gives the viewer nothing: the sound is gone (≤ −90 dBFS,
+no signal at all: nothing was put on the track, or it dropped out) while the picture
+stands still. A pause with room tone — a speaker thinking, someone typing, a still
+slide or screen there to be read — is not dead air; every injected and real loss of sound measured
+lies at −200 dBFS (digital zero), every pause with room tone between −80 and −50
+dBFS. Dead air counts by its length: half an error at 1.5 s, a full one at 3 s, and
+one more for every further 3 s (a 9 s freeze is three errors). A long shot (≥ 20 s)
+is static when the picture a second later is almost the same (median |Δgray| to the
+frame a second before < 1.5): a speaker talking (2–7) or a hand drawing on a
+whiteboard (2.5–3.5) changes it, although their frame-to-frame differences are as
+small as those of a still picture. Flicker is the light changing: a shot flickers
+when its detrended brightness jitters (L\* SD > 1.5) and at least half of its frame
+changes brighten or darken the whole picture one way (|Δ mean| ≥ 0.85 · mean |Δ|,
+the lighting test of K1); before, movement in the picture (hands, a moving camera,
+0–26 % one-way changes) was read as flicker.
+K1 = 100 · error term · evidence factor; K2 = 0.5 · dead-air term + 0.25 · average
+shot length + 0.25 · cut–beat alignment (renormalized when the audio is not music);
 K4 = 100 · (1 − 0.5 · level/peak/range penalty − 0.5 · (1 − jump term)).
 K3 and K5 judge properties of shots (grade and exposure; framing, focus and
-shake) and count them as a share of the shots:
-K3 = 100 · (1 − 3 · (0.7 · mismatches + 0.3 · exposure findings) / shots),
+shake) and count them as a share of the shots (a long take's 4 s stretches count
+as shots in K5):
+K3 = 100 · (1 − 3 · (0.7 · mismatches + 0.3 · exposure findings) / shots) · evidence factor,
 K5 = 100 · (1 − 3 · mean penalty per shot). Their detectors also fire on
 deliberate style — a trailer's differently graded scenes, a handheld action shot —
 so a per-minute count would punish style as hard as errors.
 
-*Style.* A device that recurs is a technique, not a slip: jump cuts or opposite
-camera motion on three or more cuts (or on two that make up a quarter of the
-cuts), flash frames on a quarter of the cuts (a strobe) and loudness jumps three
-or more times (a trailer's hits, laughter in a vlog) are reported with their
-measurements but count zero. A lone flash frame or jump cut is the classic slip
-and counts in full.
+*Style.* A device that makes up a quarter of the cuts (at least two) is how the
+video is cut — a vlog cut with jump cuts, a music video's strobe of flash frames —
+and is reported with its measurements but counts zero. Below that share, jump
+cuts, opposite camera motion and loudness jumps count less the more often the
+video uses them: each repeat halves the chance that any one use is a slip, so n
+uses count n · 2^−(n−1) slips in total (1, 1, 0.75, 0.5, 0.31 …). One detection
+more or less then moves the score a little instead of switching between a full
+penalty and none (the previous rule zeroed three repeats and counted two in full).
+A flash frame below the strobe share is the classic leftover frame and counts in
+full however often it occurs.
 
-*No evidence.* A video without a cut gives K1 the scale's midpoint (50), and a
-video with only one lit shot caps K3 at 50: no cut is no evidence of smooth
-cutting. The AI is told the measured number of cuts, and one unedited take with
-nothing added (no graphics, text or cutaways) gets K6 level 1.
+*Evidence.* A criterion the video gives no chance to observe scores at most the
+scale's midpoint: no cut is no evidence of smooth cutting, one lit shot none of
+matching grades. Every cut (K1) and every transition between lit shots (K3) is
+evidence, and the ceiling rises from 50 toward 100 as they add up — 1 cut: 75,
+2: 83, 6: 93, 19: 98 — instead of jumping from 50 to 100 at the first cut. The
+measured score is scaled to that ceiling (evidence factor = ceiling / 100), so a
+problem always counts, even in a video with few cuts. K2 needs no ceiling: its
+average-shot-length part already marks an uncut take. The AI is told the measured
+number of cuts and the video type.
+
+**K6 from a walk through the parts.** Before giving its level, the model splits the
+video into 3–12 consecutive parts by topic, step or scene and labels each by what
+its visuals do: *shown* — the edit puts on screen what is said or what the part is
+about, with material chosen for it (b-roll, a cutaway, an insert or close-up of the
+thing named, a graphic, an animation, on-screen text, a screen recording of the
+step; without speech, shots chosen and ordered to carry the topic, the story or the
+music); *covered* — the scene cut together from shots chosen to follow it (angles,
+a reaction, the detail of the action as it happens); *recorded* — one recording of
+the speaker or the event, trimmed at most; *unrelated* — visuals that do not fit,
+distract, or show nothing. Then it gives its overall level on the 1–5 rubric (1:
+visuals unrelated, or one recording while many topics are discussed; 5: visuals
+consistently and specifically shown), which is K6. Walking through the parts first
+anchors the level in what is on screen: run-to-run reliability on the held-out set
+rose from ICC 0.75 to 0.86, and footage that only records a scene (an amateur
+unboxing) is no longer read as illustrating it (median level 2 instead of 3); an
+unedited take stays at level 1. A level computed from the parts (1 + 4 × the share
+of the runtime weighted 1, ½, 0 and 0) is reported next to it (`parts_levels`): it
+is as reliable, but in EQI it orders the groups no better (see *Video types*); when
+the model gives no overall level it is used instead (`level_source`).
 
 **What the AI sees.** The whole video at 1 frame/s and high media resolution
 (280 tokens per frame instead of 70, so focus, jitter and edges stay visible),
@@ -103,9 +204,12 @@ the model that answered each run is stored in the report. For experiments use
 `--strict-model` (no fallback) so that every video is judged by the same model,
 and rerun failed videos with `batch --resume`.
 
-K6 is the mean of `--k6-repeats` independent reviews of the same upload
-(default 2): on the Sintel trailer two runs gave level 4 and level 3, a 5-point
-swing in EQI. The report keeps every run's level. An answer that is not valid
+K6 is the median of `--k6-repeats` independent reviews of the same upload
+(default 3; with two runs, their mean): on the Sintel trailer two runs gave level
+4 and level 3, on an amateur unboxing 1 and 4 (a 15-point swing in EQI), and a
+median of three cannot be moved by one run that reads the video very differently.
+The report keeps every run's level, the level computed from every run's parts, and
+the parts of the first run (shown in `report.html`). An answer that is not valid
 JSON is asked for again once; if it never parses, the raw answers are stored in
 `report.json` (`ai_unparsed_responses`). Token use of every call is stored in
 `ai.usage`: for the 52 s Sintel trailer one Gemini 3.1 Pro run took 80 k input
@@ -147,14 +251,19 @@ python -m eqi rescore out/tier1 --out out/tier1_new --reuse-reports   # only the
 python -m eqi rescore-reports out/batch --out out/batch_new --ai-from out/batch_ai   # saved reports, current scoring; K6 from another run
 python -m eqi ai-check out/tier1 out/tier1_b --out out/ai_check --extra out/k6_test   # AI review accuracy (calls Gemini)
 python -m eqi tier2 out/batch/scores.csv ratings.csv --out out/tier2
-python -m pytest -q tests                               # 70 tests
+python -m pytest -q tests                               # 88 tests
 ```
 
 `ratings.csv` (long format): `video, rater, overall[, cuts, pacing, color, audio, framing, narrative]`
 with ratings on the ITU-T P.910 five-point ACR scale.
 
+A file without a picture (audio only, damaged, not a video) stops `analyze` with a
+plain message; `batch` notes it in `scores.csv` (`error` column) and goes on with
+the next video. Portrait, rotated, variable-frame-rate, odd-sized, silent and
+very short videos are analysed (see *Stability*).
+
 ### Outputs
-* `report.json` — scores, every issue with time, severity, measurement and AI verdict, shot list, timing
+* `report.json` — video type, scores, every issue with time, severity, measurement and AI verdict, K6 parts, shot list, timing
 * `report.html` — the same in readable form with all figures (open in a browser)
 * `figures/timeline.png` — issue severity per criterion over time, cut positions
 * `figures/issue_<id>.png` — evidence per issue: the exact frames around a cut, colour swatches, thirds grid with the subject box, jitter trace
@@ -206,25 +315,39 @@ at confidence 5.
 **Tier 1 on real footage (October 2026).** The same 20 variants were made from
 four real, professionally edited videos — the Sintel trailer, a 90 s Tears of
 Steel excerpt, a 90 s NASA ScienceCast (narration over footage) and a 90 s NASA
-interview compilation — with the harness above, and scored with the final code
-(`out/tier1v6_*`, videos in `out/tier1v2_*/videos`; the clean reference is
-re-encoded like the variants, so its EQI differs slightly from the original file's).
+interview compilation — with the harness above, and scored with the code of 8
+October (`out/tier1v6_*`) and with the current code (`out/tier1v7_*`, same videos in
+`out/tier1v2_*/videos`; the clean reference is re-encoded like the variants, so
+its EQI differs slightly from the original file's).
 
 | Source | Clean EQI_signal | Issues on clean | Detected, strongest level | Detected, all levels | Same-kind false alarms | Side effects: new + lost (severity) | Monotonic kinds |
 |---|---|---|---|---|---|---|---|
-| Synthetic | 100.0 | 0 | 8/8 | 17/23 | 0 | 0 | 7/7 |
-| Sintel trailer | 85.6 | 14 | 5/8 | 10/23 | 1 | 1 + 26 (3.91) | 5/7 |
-| Tears of Steel | 90.6 | 10 | 6/8 | 11/23 | 2 | 8 + 0 (0.87) | 7/7 |
-| NASA ScienceCast | 82.0 | 6 | 6/8 | 12/23 | 0 | 0 | 6/7 |
-| NASA interview | 59.4 | 9 | 7/8 | 17/23 | 0 | 0 | 6/7 |
-| **Real videos** | | | **24/32 (75 %)** | **50/92 (54 %)** | **3/80** | **35 in 22/80 (4.78)** | **24/28** |
+| Synthetic | 100.0 → 97.2 | 0 | 8/8 | 17/23 | 0 | 0 | 7/7 |
+| Sintel trailer | 85.6 → 81.1 | 14 | 5/8 | 10/23 | 1 | 1 + 26 (3.91) → 1 + 16 (3.51) | 5/7 |
+| Tears of Steel | 90.6 → 89.7 | 10 | 6/8 | 11/23 | 2 | 8 + 0 (0.87) | 7/7 → 6/7 |
+| NASA ScienceCast | 82.0 → 83.7 | 6 → 9 | 6/8 | 12/23 | 0 | 0 → 3 + 2 (0.63) | 6/7 → 7/7 |
+| NASA interview | 59.4 → 68.9 | 9 | 7/8 | 17/23 | 0 | 0 → 3 + 0 (0.34) | 6/7 |
+| **Real videos** | | | **24/32 (75 %)** | **50/92 (54 %)** | **3/80** | **35 in 22/80 (4.78) → 33 in 26/80 (5.35)** | **24/28** |
+
+(8 October → current code where they differ.) The changes of 10 October (see
+*Fixes after the market test*) leave detection and false alarms as they were. The
+clean scores move with them: the evidence factor caps K1 and K3 of the synthetic
+source's 7 cuts at 93.8; the NASA interview's two jump cuts now count one slip
+together instead of two (K1 20 → 59, EQI_signal 59.4 → 68.9); the Sintel trailer's
+three sound hits count 0.75 of a slip instead of nothing (K4 75 → 49) while its
+long shots are judged in stretches (K5 56 → 65); the ScienceCast's long takes are
+judged in stretches too, so one soft shot weighs by its screen time (K5 41 → 74,
+with 3 more but smaller findings). When a jump cut removes time inside a long take
+the grid of stretches moves, which adds 5 small side effects. The new
+non-monotonic kind is a jump cut in Tears of Steel whose K1 rises by 0.1 at the
+strongest level, where the undetected jump adds one cut to the evidence.
 
 With the per-minute scoring a detected defect now costs what a viewer would
 notice: the mean EQI_signal drop at the strongest level over the four real
-videos is 16.1 for a flash frame, 11.3 for a 4 s dead air, 4.5 for a jump cut,
-4.4 for a colour shift, 1.3 for a +12 dB boost, 1.1 for shake and 0.4 for a crop
-(5.6 over all kinds; with the scoring of the first blind test 1.4, e.g. 1.9 for
-a flash frame and 3.4 for dead air). Where the clean video already has the
+videos is 17.8 for a flash frame, 10.9 for a 4 s dead air, 3.3 for a jump cut,
+4.3 for a colour shift, 1.3 for a +12 dB boost, 2.5 for shake and 1.1 for a crop
+(5.9 over all kinds; with the scoring of 8 October 5.6, with that of the first
+blind test 1.4, e.g. 1.9 for a flash frame and 3.4 for dead air). Where the clean video already has the
 same kind of error, the criterion can be at its floor and the drop is smaller:
 the NASA interview's silent title cards between the interviews are dead air
 already, so a further 4 s of dead air no longer lowers K2. Detection is
@@ -284,6 +407,23 @@ whose detection changed had their defect in another shot (with one defect
 position per kind and source, recall varies with the shot drawn). The thresholds
 were not tuned further on these videos, to avoid fitting them to the test set.
 
+*With the rules of 12 October* (video type, see *Video types* below), Tier 1 on the
+four real videos gives 23/32 at the strongest level (24/32 before), 47/92 at all
+levels (50/92), the same 3/80 same-kind false alarms and 24/28 monotonic kinds; side
+effects 13 new + 22 lost in 29 of 80 variants (severity 6.8; before 15 + 18 in 26,
+5.4). All differences are in the NASA ScienceCast, 58 % of whose runtime is medical
+animation, now measured as designed: the crop landed on an animation shot, which
+framing no longer judges; the milder colour shift sat between a camera shot and an
+animation shot, and with the animation out of the grade statistics it no longer
+passes (the strongest one still does); and with fewer camera shots, K3's and K5's
+statistics rest on fewer shots (a borderline colour finding of the clean video
+vanishes in six variants). On the synthetic source (40 s) and the Sintel trailer
+(52 s) detection is unchanged, but a defect now costs what it costs in a one-minute
+video (the minute floor): a 4 s dead air lowers the synthetic EQI_signal by 17.0
+instead of 19.2 points. Mean EQI_signal drop at the strongest level over the real
+videos: flash frame 19.0, dead air 12.2, shake 3.7, jump cut 2.3, colour shift 1.5,
+loudness boost 1.3, crop 0.3.
+
 **AI layer validation (October 2026).** The strongest level of every defect
 was injected into four real videos (Sintel trailer, a Tears of Steel excerpt,
 a NASA ScienceCast and a NASA interview) and reviewed in a 2 × 2 design: first
@@ -314,13 +454,15 @@ plus *broken* copies of professional videos with all seven Tier-1 defects at the
 strongest level. They were analysed under neutral names (v01…, m01…) in shuffled
 order; the AI never sees the groups. The groups describe the producer, not the
 edit, so some amateur videos are well edited. EQI = measured K1–K5 + K6 from
-Gemini 3.1 Pro (mean of two runs, `--strict-model`).
+Gemini 3.1 Pro (`--strict-model`; mean of two runs with the code of 8 October,
+median of three with the code of 10 October).
 
 | Set | Professional | Mid | Amateur | Broken | Spearman ρ, group order vs EQI |
 |---|---|---|---|---|---|
 | First set, before the fixes (22 videos) | 76.1 | 70.2 | 78.4 | 68.4 | −0.06 |
-| First set, final code (22 videos, `out/eval_tiers/results_v6`) | 81.5 | 68.4 | 68.2 | 45.4 | 0.54 (p = 0.01) |
-| **Market set, final code, held out (33 videos, `out/eval_market/results`)** | **81.8** | **74.3** | **66.8** | **61.1** | **0.66 (p < 0.001)** |
+| First set, code of 8 October (22 videos, `out/eval_tiers/results_v6`) | 81.5 | 68.4 | 68.2 | 45.4 | 0.54 (p = 0.01) |
+| Market set, code of 8 October, held out for it (33 videos, `out/eval_market/results`) | 81.8 | 74.3 | 66.8 | 61.1 | 0.66 (p < 0.001) |
+| **Held-out set, final code of 10 October (33 videos, `out/eval_holdout/results`)** | **80.8** | **77.3** | **74.2** | **60.0** | **0.42 (p = 0.015)** |
 
 (medians; ρ over all groups with professional > mid > amateur > broken). The
 first set (22 Wikimedia Commons videos, 90 s excerpts or whole short videos) was
@@ -346,12 +488,208 @@ flash frame, the freeze, the shake and the colour shift were found 3/3, the crop
 less than 10 LU above the level of the seconds before. Gemini use for both sets: 6.1 M input and 0.42 M output
 tokens (thinking included), 110 calls.
 
-What still costs well-made videos points: loud masters (−8 to −10 LUFS with true
-peaks above −1 dBTP in an ad, a music video and a short film) bring K4 down to
-15–37 against the streaming ceiling of −14 LUFS; two jump cuts count as two slips while three
-count as a style, so one more or one less detection can flip the group (a tour
-montage on the first set: K1 85 → 42); and K6 varied by three levels between the
-two runs on one video (levels 1 and 4 on an amateur unboxing).
+What still cost well-made videos points after 8 October: loud masters (−8 to −10
+LUFS with true peaks above −1 dBTP in an ad, a music video and a short film)
+brought K4 down to 15–37 against the streaming ceiling of −14 LUFS; two jump cuts
+counted as two slips while three counted as a style, so one more or one less
+detection could flip the group (a tour montage on the first set: K1 85 → 42); and
+K6 varied by three levels between the two runs on one video (levels 1 and 4 on an
+amateur unboxing). These are addressed by the fixes below.
+
+**Fixes after the market test (10 October 2026).** The open points above and new
+measurement errors found in the two test sets were closed with general rules
+(criteria, weights and the 0–100 scale unchanged; details in *Criteria* and
+*Scoring*): jumps a few frames apart are the footage's frame cadence, not jump cuts
+(they had given an uncut amateur take 47 and a timelapse travel video 132 "cuts",
+so an uncut take looked like a flawlessly cut edit); repeated devices are
+discounted smoothly; loudness is judged as the platform plays it; the evidence
+ceiling of K1 and K3 rises with every cut instead of jumping from 50 to 100 at the
+first one, and scales the measured score rather than capping it (a cap hid every
+problem smaller than the gap: a colour shift then cost 0.1 instead of 4.3 EQI
+points); long takes are judged in 4 s stretches (a two-minute handheld take had
+been one framing decision from three frames); dead air counts per 3 s; K6 is the
+median of three runs. Both earlier sets were used to design these rules, so they
+are development sets now, and a third set was held out (below).
+
+Each rule switched off on its own, on the cached measurements of both earlier sets
+(group medians professional / mid / amateur / broken, Spearman ρ of group order vs
+EQI; K6 = median of three runs):
+
+| Rules | First set (22) | ρ | Market set (33) | ρ |
+|---|---|---|---|---|
+| All rules of 10 October | 80.6 / 67.2 / 72.6 / 45.3 | 0.46 | 80.6 / 77.2 / 69.4 / 59.3 | 0.69 |
+| without the frame-cadence rule | 80.6 / 67.2 / 72.6 / 45.3 | 0.46 | 80.8 / 77.2 / 69.4 / 59.3 | 0.69 |
+| without the repetition discount | 82.2 / 66.5 / 70.4 / 44.5 | 0.49 | 81.2 / 74.4 / 69.4 / 59.3 | 0.68 |
+| without loudness as played | 82.2 / 65.4 / 69.8 / 44.5 | 0.46 | 81.2 / 76.4 / 66.2 / 59.3 | 0.64 |
+| without the evidence ceiling | 82.7 / 68.9 / 73.3 / 45.8 | 0.46 | 80.9 / 78.0 / 70.3 / 59.7 | 0.68 |
+| without long takes in stretches | 78.0 / 65.7 / 72.4 / 44.5 | 0.45 | 80.5 / 77.9 / 69.4 / 59.7 | 0.69 |
+| without dead air by length | 80.6 / 67.2 / 72.6 / 46.8 | 0.44 | 80.6 / 77.2 / 69.4 / 61.3 | 0.68 |
+| none (rules of 8 October) | 81.5 / 67.2 / 68.2 / 45.4 | 0.52 | 81.8 / 74.3 / 67.3 / 62.1 | 0.67 |
+
+No single rule changes the ranking much: they remove measurement errors and
+discontinuities, and the group order rests mostly on what the AI's K6 sees. On the
+market set the rules together lift mid videos (loud masters, two-jump-cut
+reviews) and lower broken copies (longer freezes), ρ 0.67 → 0.69; on the first set
+the amateur group rises (its three well-edited videos — a recycling documentary,
+a stop-motion film, a tour montage — gain from the discount and from loudness as
+played), ρ 0.52 → 0.46. The frame-cadence rule hardly moves the medians but
+changes single videos both ways: the uncut amateur take loses its 47 phantom cuts
+(K1 99 → 75), while in two travel films a lone jump that the phantom repeats had
+turned into "style" now counts as a slip (K1 74 → 50 and 100 → 68).
+
+**Held-out set (10 October 2026).** 33 new Commons imports of YouTube videos
+under CC BY, grouped by producer before any scoring and analysed once with the
+final code (neutral names h01…h33 in shuffled order, the first 120 s, K6 the
+median of three runs in one session). Professional: a film trailer, two K-pop
+music videos, a cooking video, a lab behind-the-scenes, a parliament explainer, a
+wedding film, a game showcase, a whiteboard-animation explainer, a football club
+ad. Mid: creators' software and hotel reviews, cooking, travel and sport vlogs, two
+unboxings, an independent music video, a tutorial, a travel short film. Amateur:
+five personal unboxings, an airport arrival, a lumberjack show, a hang-gliding
+flight, a student film, a dance clip. Broken: copies of three narrated professional
+videos (lab behind-the-scenes, parliament explainer, game showcase). The rules of
+8 October were scored on the same measurements for comparison (K6 there the mean
+of the first two runs, as they used it):
+
+| Rules | Professional | Mid | Amateur | Broken | ρ, all groups | ρ, without broken |
+|---|---|---|---|---|---|---|
+| 10 October (final) | 80.8 | 77.3 | 74.2 | 60.0 | 0.42 (0.13–0.68) | 0.25 (−0.17–0.60) |
+| 10 October, K6 mean of the first two runs | 79.8 | 77.3 | 74.2 | 60.0 | 0.38 | 0.19 |
+| 8 October | 75.1 | 75.0 | 75.4 | 57.7 | 0.22 | 0.01 |
+| 10 October, K1–K5 only (EQI_signal) | 75.9 | 76.2 | 74.0 | 50.0 | 0.27 | 0.02 |
+
+(Medians; 95 % CIs from 4,000 bootstrap resamples of the videos within each group.)
+The group order holds on videos that played no part in the design: professional >
+mid > amateur > broken by median and by mean (77.3 / 75.8 / 70.8 / 57.8). On the
+same measurements the new rules beat those of 8 October, which gave the three clean
+groups the same median: ρ +0.20 (95 % CI +0.09 to +0.34) over all groups, +0.23
+(+0.09 to +0.41) without the broken copies. Most of the gain comes from the rules
+(ρ 0.38 with K6 still the mean of two runs), the rest from the median of three. But
+the separation is weaker than on the development sets (market set 0.69 after the
+fixes) and too weak to place a single video: a random professional video scores
+above a random mid one with probability 0.59, mid above amateur 0.61, professional
+above amateur 0.66, and without the broken copies ρ is not significant (p = 0.19).
+Every professional video and all mid videos but one score above every broken copy;
+amateur videos score above broken copies with probability 0.77, since the AI gives
+each broken copy the original's full K6 (level 5): two of the three copies (64.0,
+60.0) outscore three amateur videos each. The copies lost 19.7 (game showcase
+83.7 → 64.0) and 28.4 points (parliament 77.8 → 49.4), the lab behind-the-scenes
+only 5.6 (65.6 → 60.0): its K1–K5 fell by 13 points, but the AI gave the broken copy
+story level 5 in all three runs and the clean original level 4 in all three. On
+K1–K5 alone the broken copies are clearly lowest (every professional and amateur
+video above every broken copy, drops of 13–35 points), while the three clean groups
+are not ordered (ρ 0.02): their order comes from K6.
+
+Found after the run (and fixed on 12 October with general rules, see below — which
+made this set a development set too):
+* Fast-cut music videos use single-frame flashes as a device: two K-pop videos get
+  K1 = 0 from 3–4 one-frame shots among 83–119 cuts (flash frames below the style
+  share count in full).
+* A whiteboard animation reads as overexposed in every shot (about 80 % of the
+  pixels at full white; K3 50), and its drawing shots of up to 30 s as long static
+  shots.
+* Silent, static moments of 2–4 s in the lab behind-the-scenes (typing, a pause in
+  speech) count as dead air (K2 18).
+* Three amateur unboxings score 83–85, above the median professional video: few
+  cuts and few measurable slips. K1–K5 count errors; they do not see the craft
+  (shot choice, rhythm, grade, sound design) that makes a professional video better
+  than a correct one.
+
+In the first three cases the AI review called the findings intentional, rightly.
+With its verdicts applied (`full_with_ai_verdicts`, an opinion in the report, not
+EQI) the clean groups separate well — medians 91.0 / 90.0 / 77.4, ρ 0.72 without
+the broken copies, mid above amateur 0.97, though professional above mid stays at
+0.59 — but the AI excuses the injected defects as well: the broken copies (median
+85.1) then score above most amateur videos (amateur above broken 0.20), and the game
+showcase copy loses 1.8 points. So the verdicts stay opinions.
+
+**Video types (12 October 2026).** The cases above share one cause: a check applied
+where its assumption about the footage does not hold. The rules of *Video type* and
+*Scoring* replace the AI's verdicts there with measured decisions — designed
+pictures (graphics, animation, screen capture, cards) are not judged by camera
+checks, a montage cut to music is not held to colour continuity and its flash cuts
+count as rhythm, dead air needs the sound gone, flicker needs the light to change, a
+still shot needs the picture a second later to be the same, an animation's change
+of scene counts as a cut, and a short video counts as a minute — and K6 gets a
+structured prompt. Criteria, weights and the 0–100 scale are unchanged; K3 and K5
+count by the share of camera footage they judge. All three tier sets were used to
+design these rules, so none of them is held out any more; the numbers below
+measure how the rules behave on the videos they were designed on, and a new
+held-out set is needed for an independent estimate.
+
+On all 88 videos with K6 kept as it was (the stored runs of 8–10 October), the K1–K5
+rules alone (medians professional / mid / amateur / broken; Spearman ρ of group
+order vs EQI; 95 % CI of the change from 4,000 bootstrap resamples within the
+groups):
+
+| Set | Rules of 10 October | ρ | Rules of 12 October | ρ | Change of ρ |
+|---|---|---|---|---|---|
+| First set (22) | 80.6 / 67.2 / 72.6 / 45.3 | 0.46 | 81.7 / 72.7 / 71.7 / 46.2 | 0.51 | +0.05 (−0.07 to +0.23) |
+| Market set (33) | 80.6 / 77.2 / 69.4 / 59.3 | 0.69 | 82.4 / 78.2 / 72.3 / 59.3 | 0.67 | −0.01 (−0.16 to +0.16) |
+| Held-out set (33) | 80.8 / 77.3 / 74.2 / 60.0 | 0.42 | 85.3 / 82.0 / 75.3 / 63.1 | 0.75 | +0.33 (+0.10 to +0.59) |
+| All 88 | 80.6 / 75.3 / 71.7 / 58.5 | 0.51 | 84.1 / 77.5 / 74.7 / 57.5 | 0.63 | +0.12 (+0.02 to +0.24) |
+| All 88, without broken | | 0.38 | | 0.54 | +0.16 (+0.02 to +0.32) |
+| All 88, K1–K5 only (EQI_signal) | 79.6 / 76.5 / 74.0 / 52.0 | 0.41 | 84.2 / 79.7 / 75.5 / 52.0 | 0.52 | +0.11 (−0.01 to +0.25) |
+
+The gain sits where the type-specific errors were (the held-out set: two K-pop
+videos, a whiteboard and a parliament animation, two screen-recorded tutorials, a
+behind-the-scenes video with screen recordings); on the two other sets the order is
+as before. Each rule switched off on its own (all 88 videos, ρ over all groups /
+without broken): all rules 0.63 / 0.54; without designed pictures 0.57 / 0.45;
+without the montage rule 0.58 / 0.46; without dead air as lost sound 0.58 / 0.46;
+without the minute floor 0.61 / 0.51; without scene changes in designed pictures
+0.62 / 0.52; without "still = the same a second later" 0.62 / 0.52; without
+flicker as light 0.63 / 0.53 (it removes misreadings of movement but does not order
+the groups); without the video type at all 0.53 / 0.40.
+
+K6 with the structured prompt was run on 41 of the 88 videos (29 of the held-out
+set, 12 of the market set; three runs each, Gemini 3.1 Pro, one session) before the
+API's prepaid credit ran out; the other 47 keep their earlier K6. Run-to-run
+reliability of the level, one-way ICC(1,1) over the three runs (Shrout & Fleiss
+1979):
+
+| K6 | Held-out (27) | Market (11) | All 41 |
+|---|---|---|---|
+| Earlier prompt (10 October; market: third run two days later) | 0.75 | 0.73 | 0.78 |
+| Structured prompt, the model's overall level (used) | 0.86 | 0.74 | 0.82 |
+| Structured prompt, level computed from the parts (reported) | 0.85 | 0.73 | 0.81 |
+
+On these 41 videos (11 professional, 15 mid, 13 amateur, 2 broken), as of 10
+October EQI ordered the groups with ρ 0.32 (0.22 without broken), with the rules of
+12 October and the earlier K6 0.63 (0.57), and with the structured K6 0.67 (0.63;
++0.35, 95 % CI +0.09 to +0.64 against 10 October): medians 84.1 / 83.0 / 71.1 /
+59.7, professional above mid 0.64, mid above amateur 0.82, professional above
+amateur 0.96, amateur above broken 0.81. The new K6 alone separates the clean
+groups better than the earlier one (ρ 0.63 vs 0.58; amateur median level 2 instead
+of 3: footage that only records a scene is no longer read as illustrating it), but
+its share of the EQI gain is small and not significant (+0.05, −0.07 to +0.19); the
+gain comes from the K1–K5 rules. The level computed from the parts orders mid above
+amateur better (0.88) but professional above mid worse (0.53), so it is reported,
+not used. Reports: `out/<set>/results_v8` (the runs) and `out/<set>/results_v8_final`
+(K1–K5 with the final code, K6 from the runs).
+
+**Stability (12 October 2026).** *Inputs:* a portrait phone video, a 2560×1440
+60 fps video, a variable-frame-rate video without audio, an odd-sized (853×479)
+video with 8 kHz mono sound, a 1 s clip, a still picture with sound, an all-black
+silent video, WebM/VP9 and AVI/MPEG-4 files are analysed; an audio-only file and a
+truncated MP4 stop with a plain message (`No video stream …`), and `batch` goes on
+with the next file. Two failures were fixed on the way: a track that is silent from
+start to end was never found silent (the silence threshold is relative to the
+track's own level, so digital silence now counts as silence too), and an all-black
+video was taken for a designed picture. Analysis takes about 1× real time for
+1080p30 and 2.5× for 1440p60 on a 16-thread PC. *Re-encoding:* 15 videos of
+all types, each re-encoded at 720p CRF 30 and 480p CRF 28 (30 copies), were scored
+again: EQI_signal moved by 1.9 points (median; mean 3.1, at most 13.2), with the
+rules of 10 October by 0.9 (mean 2.5, at most 8.2); the video type label stayed the
+same in 28 of 30. The decision on designed pictures had first flipped with the
+encode (a heavy encode breaks up part of a slide's exact fills; up to 30.7 points),
+which the rules now prevent: in a video that uses designed pictures, weaker fills
+and white grounds are designed too, K3 and K5 count by the share of camera footage,
+and a freeze under room tone is no longer dead air. What still moves is older: the
+number of jump cuts found (an unboxing with four jump cuts as published, one at
+720p — the earlier rules had hidden this by also counting false jump cuts in its
+intro graphics, which made all of them a style), K3's video-relative statistics
+over few shots, and loudness jumps at the threshold after a new audio encode.
 
 **Tier 2 — real videos vs experts.** `tier2` reports SRCC, KRCC, PLCC (after a
 4-parameter logistic mapping), RMSE with bootstrap 95 % CIs, rater reliability
@@ -382,19 +720,65 @@ resampled together, since both correlations use the same ratings).
   light (a lamp, a muzzle flash), not for a jump cut or a flash frame. A jump cut
   in which a dark subject vanishes from a bright background also changes the
   pixels one way and is missed.
-* Loudness jumps that recur three or more times count as sound design; an amateur
-  mix with a level jump at every clip boundary is then judged only by its loudness
-  level and range.
-* K4 judges loudness against delivery levels (−24 to −14 LUFS). Loud music and
-  advertising masters (−8 to −10 LUFS) lose most of K4 although the mix may be
-  intended; the editor rarely controls the master.
-* The style rule is a threshold: two jump cuts count as two slips, three as a
-  technique, so one detection more or less can move K1 by tens of points. A
-  discount that grows with each repetition would be smoother; it should be
-  chosen on a new test set, not on the two used here.
+* Loudness jumps count less the more often they recur (n jumps count
+  n · 2^−(n−1) slips); an amateur mix with a level jump at every clip boundary is
+  then judged mainly by its loudness level and range. A trailer's three sound hits
+  still count as 0.75 of a slip, which in a 52 s trailer costs K4 about a quarter.
+* K4 judges the mix as a streaming platform plays it: a loud master is turned
+  down to −14 LUFS (YouTube does this), so neither its level nor its peaks count,
+  while a quiet mix is not raised and does count. For broadcast delivery, where a
+  loud master fails technical QC, this is too lenient; EQI does not judge
+  broadcast compliance.
+* The style share is still a threshold: a device on a quarter of the cuts counts
+  zero, just below that it is discounted only by its repeats. Below the share the
+  discount is smooth, so one detection more or less moves K1 by a few points, not
+  by tens (two jump cuts count one slip, three 0.75, four 0.5).
+* Devices that look like errors are recognised by the video type, not by the AI:
+  flash cuts only in a montage cut to music (music-driven, average shot ≤ 3 s),
+  white grounds and other designed pictures only where the picture is measured as
+  designed, pauses only by their sound. A device outside these rules still counts as
+  an error below the style share — flash cuts in a trailer whose music has no steady
+  beat, for instance.
+* Designed pictures are not judged by the camera checks, so a defect inside one is
+  not measured either: in Tier 1 the crop and the milder colour shift that landed on
+  the ScienceCast's medical animation shots are no longer found (23/32 at the
+  strongest level instead of 24/32). The decision uses exact colours: a 2D animation
+  with shading, or a screen whose background is a photo or a fine pattern, reads as
+  camera footage (part of an animated feature's shots, a tutorial's textured
+  background); a camera shot with a large flat highlight can read as designed in a
+  video that also uses graphics.
+* K1–K5 count errors. A plain, correctly made video (an unboxing on a tripod) makes
+  few measurable errors; telling professional from correct-but-plain work rests on
+  K6, which now credits only what the edit chose to show (see *K6 from parts*).
+* The evidence ceiling lowers K1 and K3 of every video with few cuts, also of
+  well-made formats without hard cuts (one long interview take): there the score
+  says that little of the cutting or grading could be observed, not that it is
+  poor. In animation and screen recordings, scene changes without a cut count as
+  evidence.
+* K3 and K5 count by the share of camera footage they judge: in a video that is
+  mostly graphics they rest on few shots, whose video-relative statistics are
+  fragile.
+* A long take is judged in 4 s stretches on a grid that starts at the shot's first
+  frame. Time removed inside a long take (a jump cut) moves the grid, so a finding
+  at the reporting margin can move to a neighbouring stretch: in Tier 1 such shifts
+  appear as side effects of severity ≈ 0.1–0.3.
+* K6 drifts with the preview model: a third run two days after the first two
+  (same model name, same prompt, same inputs) gave professional and mid videos
+  0.8 levels more on average (level 5 where the earlier runs gave 4) and amateur
+  videos the same. The median of three runs keeps such a run from moving K6, but
+  K6 levels from different days are not interchangeable; a test set should be
+  reviewed in one session. The level computed from parts (12 October) rests on
+  smaller judgements per part; whether it drifts less from day to day has not been
+  measured yet (all its runs are from one session).
 * A title or end card is recognised by a cut near where the sound starts or stops;
   a silent end card that appears without a cut counts as dead air, like a last shot
-  that freezes and runs silent to the end.
+  that freezes and runs silent to the end. Dead air needs the sound gone (no
+  signal); a freeze frame under room tone is not dead air (none occurred in the
+  three test sets; the two room-tone freezes found were still screens).
+* Re-encoding moves some measurements (see *Stability*): shot detection and the
+  jump-cut test find a different number of jump cuts in some videos, video-relative
+  statistics over few shots shift with one shot more or less, and a loudness jump at
+  the threshold can appear or vanish with the audio codec.
 * Video-relative thresholds (K3 outlier test, K5 softness) can still flip a
   finding that sits at the reporting margin when a defect changes another shot
   (one shot each in Tears of Steel and Sintel, severity ≈ 0.1); the margin and the

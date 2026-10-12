@@ -14,6 +14,7 @@ from skimage.color import deltaE_ciede2000
 from . import config
 from .audio import AudioFeatures
 from .features import Keyframe, Shot, VisualFeatures, combine_keyframes
+from .videotype import VideoType, classify
 
 
 @dataclass
@@ -100,6 +101,18 @@ def _ramp(distance: float, full: float) -> float:
     return float(min(1.0, max(0.0, distance / full))) if full > 0 else 1.0
 
 
+def viewing_minutes(duration_s: float) -> float:
+    """Minutes over which event errors are counted, at least MIN_VIEWING_MINUTES."""
+    return max(duration_s / 60.0, config.MIN_VIEWING_MINUTES)
+
+
+def _camera_only(f: VisualFeatures) -> VideoType:
+    """The type assumed when none is given: every shot camera footage, not a montage
+    (the checks then run everywhere, as they did before video types)."""
+    return VideoType(label="unknown", designed_share=0.0, music_montage=False, music_driven=False,
+                     average_shot_s=0.0, cuts_per_min=0.0, face_share=0.0, white_background=False, strong_share=0.0)
+
+
 def _moving_average(x: np.ndarray, window: int) -> np.ndarray:
     window = max(1, min(window, x.size))
     pad = window // 2
@@ -155,8 +168,9 @@ def _leaves_neighbours(f: VisualFeatures, shot) -> bool:
     return share >= config.FLASH_OUTSIDE_MIN
 
 
-def assess_cuts(f: VisualFeatures) -> Assessment:
+def assess_cuts(f: VisualFeatures, vt: VideoType | None = None) -> Assessment:
     fps, shots, issues = f.info.fps, f.shots, []
+    vt = vt or _camera_only(f)
     after_flash: set[int] = set()
 
     for k in range(1, len(shots)):
@@ -168,10 +182,17 @@ def assess_cuts(f: VisualFeatures) -> Assessment:
             after_flash.add(shots[k + 1].start)
             if _leaves_neighbours(f, shots[k]):
                 _add(issues, "cuts", "flash_frame", t, shots[k].t1, {"frames": shots[k].length})
+                if vt.music_montage:
+                    # Cut to music at a quick pace, a one- or two-frame shot is part of the
+                    # rhythm (a flash cut on the music), not a frame left over from a trim
+                    issues[-1].detail["style"] = "flash in a montage cut to music"
+                    issues[-1].severity = 0.0
             continue  # otherwise a step of a lighting change or of a quick transition
 
         if shots[k].gradual:
             continue  # inside a dissolve neighbouring frames are mixes: no jump-cut or motion test
+        if vt.shot_designed(shots[k - 1].index) or vt.shot_designed(shots[k].index):
+            continue  # a slide, screen or graphic keeps its layout by design: no jump-cut or motion test
         lo, hi = config.JUMP_CUT_STABLE
         if lo <= f.stable[c] < hi:
             before, after = f.boundary.get(c - 1), f.boundary.get(c)
@@ -194,8 +215,8 @@ def assess_cuts(f: VisualFeatures) -> Assessment:
     hidden = 0
     for s in shots:
         lo, hi = s.start + 2, s.end - 2
-        if hi - lo < 5:
-            continue
+        if hi - lo < 5 or vt.shot_designed(s.index):
+            continue  # in a screen capture or animation new content appears in a jump by design
         diffs = f.diff[lo:hi]
         # A frozen stretch (dead air, a freeze frame) would shrink the shot's typical
         # change to nearly 0 and make every ordinary movement after it look like a jump.
@@ -236,9 +257,12 @@ def assess_cuts(f: VisualFeatures) -> Assessment:
             hidden += 1
             _add(issues, "cuts", "jump_cut", frame / fps, frame / fps, detail)
 
-    n_cuts = len(shots) - 1 + hidden
+    # A designed picture's change of scene without a cut is its transition: evidence too
+    scenes = len(designed_scene_changes(f, vt))
+    n_cuts = len(shots) - 1 + hidden + scenes
     mark_cut_style(issues, n_cuts)
-    return Assessment("cuts", issues, {"n_cuts": n_cuts, "minutes": max(f.info.duration / 60.0, 1 / 60)})
+    return Assessment("cuts", issues, {"n_cuts": n_cuts, "scene_changes_without_cut": scenes,
+                                       "minutes": viewing_minutes(f.info.duration)})
 
 
 def repetition_factor(n: int) -> float:
@@ -329,9 +353,53 @@ def _continuous_spans(f: VisualFeatures) -> list[tuple[int, int]]:
     return spans
 
 
-def assess_pacing(f: VisualFeatures, a: AudioFeatures) -> Assessment:
+def designed_scene_changes(f: VisualFeatures, vt: VideoType) -> list[int]:
+    """Frames where a designed picture changes scene without a cut: an animation pans to
+    the next panel or morphs into the next scene, a screen recording opens a new window.
+    The whole picture differs from a second before (SCENE_CHANGE_1S), as across a cut.
+    Inside camera footage the camera's own movement does the same, so only designed
+    shots are searched. Changes are at least a second apart and from the shot's ends."""
+    if f.change_1s.size != f.diff.size:
+        return []
+    second = max(1, round(f.info.fps))
+    found = []
+    for s in f.shots:
+        if not vt.shot_designed(s.index) or s.length < 3 * second:
+            continue
+        window = f.change_1s[s.start + second:s.end]   # windows that lie inside the shot
+        peaks: list[int] = []
+        for j in np.argsort(window)[::-1]:
+            if window[j] < config.SCENE_CHANGE_1S:
+                break
+            frame = s.start + second + int(j) - second // 2   # the middle of the second that changed
+            if s.start + second <= frame <= s.end - second and all(abs(frame - p) > second for p in peaks):
+                peaks.append(frame)
+        found += peaks
+    return sorted(found)
+
+
+def _split_at(spans: list[tuple[int, int]], frames: list[int]) -> list[tuple[int, int]]:
+    out = []
+    for a0, b in spans:
+        inner = [c for c in frames if a0 < c < b]
+        bounds = [a0, *inner, b]
+        out += list(zip(bounds, bounds[1:]))
+    return out
+
+
+def _sound_level(a: AudioFeatures, t0: float, t1: float) -> float:
+    """Median RMS level (dBFS) between t0 and t1; −inf when it was not measured."""
+    inside = (a.rms_times >= t0) & (a.rms_times < t1) if a.rms_times.size else np.zeros(0, bool)
+    return float(np.median(a.rms_db[inside])) if inside.any() else float("-inf")
+
+
+def assess_pacing(f: VisualFeatures, a: AudioFeatures, vt: VideoType | None = None) -> Assessment:
     fps, issues = f.info.fps, []
-    spans = _continuous_spans(f)
+    vt = vt or _camera_only(f)
+    # An animation or screen recording changes scene without cutting: such a change paces
+    # the video as a cut does
+    scenes = designed_scene_changes(f, vt)
+    spans = _split_at(_continuous_spans(f), scenes)
     lengths = np.array([(b - a0) / fps for a0, b in spans])
     asl = float(lengths.mean())
     flash = np.zeros(len(f.diff), bool)
@@ -356,22 +424,46 @@ def assess_pacing(f: VisualFeatures, a: AudioFeatures) -> Assessment:
             cards = [c for c, _ in spans[1:] if c >= n0 - edge]
             if cards:
                 n1 = min(n1, cards[0])
-        if (n1 - n0) / fps < config.DEAD_AIR_MIN_S:
+        if (n1 - n0) / fps < config.DEAD_AIR_MIN_S or n1 - n0 <= 1:
             continue
         # Median: a single bright frame inside a frozen, silent stretch must not hide it
-        if n1 - n0 > 1 and float(np.median(f.diff[n0 + 1:n1])) < config.STATIC_DIFF:
-            # Longer dead air is worse: half severity at the minimum length, full at twice
-            # it, and a longer stretch counts as that many full errors (9 s as three).
-            seconds = (n1 - n0) / fps
-            _add(issues, "pacing", "dead_air", n0 / fps, n1 / fps, {"seconds": round(seconds, 2)},
-                 scale=seconds / (2 * config.DEAD_AIR_MIN_S), cap=config.DEAD_AIR_MAX_ERRORS)
+        motion = float(np.median(f.diff[n0 + 1:n1]))
+        if motion >= config.STATIC_DIFF:
+            continue
+        # Nothing for the viewer: the sound is gone while the picture stands still. A pause
+        # with room tone is a pause in the programme — a speaker thinking, someone typing,
+        # a still slide or screen there to be read — not dead air.
+        level = _sound_level(a, n0 / fps, n1 / fps)
+        if level > config.NO_SOUND_DBFS:
+            continue
+        # Longer dead air is worse: half severity at the minimum length, full at twice
+        # it, and a longer stretch counts as that many full errors (9 s as three).
+        seconds = (n1 - n0) / fps
+        _add(issues, "pacing", "dead_air", n0 / fps, n1 / fps,
+             {"seconds": round(seconds, 2), "level_dbfs": round(level, 1) if np.isfinite(level) else None,
+              "picture": "frozen" if motion < config.FROZEN_DIFF else "still"},
+             scale=seconds / (2 * config.DEAD_AIR_MIN_S), cap=config.DEAD_AIR_MAX_ERRORS)
+    second = max(1, round(fps))
     for a0, b in spans:
-        inside = f.diff[a0 + 1:b][~flash[a0 + 1:b]]
-        if (b - a0) / fps >= config.LONG_STATIC_SHOT_S and inside.size and float(inside.mean()) < config.STATIC_DIFF:
-            _add(issues, "pacing", "long_static_shot", a0 / fps, b / fps, {"seconds": round((b - a0) / fps, 1)})
+        if (b - a0) / fps < config.LONG_STATIC_SHOT_S:
+            continue
+        if f.change_1s.size == f.diff.size:
+            # Still as a viewer sees it: the picture a second later is (almost) the same. A
+            # speaker talking, a hand drawing or a slow pan changes it; frame-to-frame
+            # differences are small in all of them.
+            change = float(np.median(f.change_1s[a0 + second:b]))
+            static = change < config.STATIC_CHANGE_1S
+        else:
+            inside = f.diff[a0 + 1:b][~flash[a0 + 1:b]]
+            change = float(inside.mean()) if inside.size else 0.0
+            static = inside.size > 0 and change < config.STATIC_DIFF
+        if static:
+            _add(issues, "pacing", "long_static_shot", a0 / fps, b / fps,
+                 {"seconds": round((b - a0) / fps, 1), "change": round(change, 2)})
 
     ctx = {
-        "minutes": max(f.info.duration / 60.0, 1 / 60),
+        "minutes": viewing_minutes(f.info.duration),
+        "scene_changes_without_cut": len(scenes),
         "asl_s": round(asl, 2),
         "shot_length_cv": round(float(lengths.std() / asl), 3) if asl > 0 else 0.0,
         "asl_score": round(_asl_score(asl), 1),
@@ -420,10 +512,26 @@ def grade_statistics(lab: np.ndarray, lengths) -> tuple[np.ndarray, np.ndarray, 
     return reference, deviation, max(config.COLOR_JUMP_MIN_DE, med + config.COLOR_JUMP_MAD_K * spread)
 
 
-def assess_color(f: VisualFeatures) -> Assessment:
+def _light_share(f: VisualFeatures, lo: int, hi: int) -> float:
+    """Share of the frame changes in [lo, hi) that change the whole picture one way: the
+    light, not something moving in it (see LIGHTING_ONE_WAY)."""
+    if f.luma.size < hi or hi - lo < 2:
+        return 1.0  # not measured: as before
+    step = np.abs(np.diff(f.luma[lo - 1:hi]))
+    return float(np.mean(step >= config.LIGHTING_ONE_WAY * np.maximum(f.diff[lo:hi], 1e-6)))
+
+
+def assess_color(f: VisualFeatures, vt: VideoType | None = None) -> Assessment:
     fps, issues = f.info.fps, []
+    vt = vt or _camera_only(f)
     # Flash frames are K1's business; compare the shots on either side of them instead.
-    spans = [Shot(i, a, b, fps) for i, (a, b) in enumerate(_continuous_spans(f))]
+    # Designed pictures (graphics, screens, cards) have their colours by design: only
+    # camera shots are judged, and a video without any is not judged on K3.
+    first_shot = {s.start: s.index for s in f.shots}
+    spans = [Shot(i, a, b, fps) for i, (a, b) in enumerate(_continuous_spans(f))
+             if not vt.shot_designed(first_shot.get(a, -1))]
+    if not spans:
+        return Assessment("color", [], {"n_shots": 0, "n_graded": 0, "camera_shots": 0}, available=False)
     shots = [s for s in spans if s.length / fps >= config.KEYFRAME_MIN_SHOT_S] or spans
     shot_lab = []
     for s in shots:
@@ -437,7 +545,10 @@ def assess_color(f: VisualFeatures) -> Assessment:
     # A dip to black has no grade: it is neither a reference nor a mismatch.
     graded = [k for k in range(len(shots)) if shot_lab[k][0] >= config.BLACK_SHOT_L]
     flagged = set()
-    if len(graded) >= 2:
+    # A montage cut to music jumps between setups and moments by design: its shots are not
+    # expected to continue one grade, so shot-to-shot colour continuity is not judged there.
+    continuity = not vt.music_montage
+    if continuity and len(graded) >= 2:
         lab = shot_lab[graded]
         reference, deviation, threshold = grade_statistics(lab, [shots[k].length for k in graded])
         for n in np.flatnonzero(deviation > threshold):
@@ -462,7 +573,7 @@ def assess_color(f: VisualFeatures) -> Assessment:
     # content change it from shot to shot, a camera or grade mismatch shifts the tint.
     # Near-black shots (a dip to black between soundbites) carry no tint: compare
     # each lit shot with the nearest lit shots on either side.
-    lit = [k for k in range(len(shots)) if shot_lab[k][0] >= config.TINT_MIN_L]
+    lit = [k for k in range(len(shots)) if shot_lab[k][0] >= config.TINT_MIN_L] if continuity else []
     for p, k, q in zip(lit, lit[1:], lit[2:]):
         a, b, c = shot_lab[p], shot_lab[k], shot_lab[q]
         if k in flagged:
@@ -477,22 +588,24 @@ def assess_color(f: VisualFeatures) -> Assessment:
 
     window = int(fps // 2) | 1
     for s in f.shots:
-        if s.length >= fps:
+        if s.length >= fps and not vt.shot_designed(s.index):
             L = f.lab[s.start + 2:s.end - 2, 0]
             if L.size >= window:
                 jitter = float(np.std(L - _moving_average(L, window)))
                 if jitter > config.FLICKER_STD_L:
-                    _add(issues, "color", "flicker", s.t0, s.t1, {"l_std": round(jitter, 2)})
+                    light = _light_share(f, s.start + 2, s.end - 2)
+                    if light >= config.FLICKER_LIGHT_SHARE:  # the light flickers, not the picture moving
+                        _add(issues, "color", "flicker", s.t0, s.t1, {"l_std": round(jitter, 2), "one_way_share": round(light, 2)})
     for k in f.keyframes:
         s = f.shots[k.shot]
-        if s.length / fps < config.KEYFRAME_MIN_SHOT_S or k.clip_low > config.BLACK_FRAME_FRAC:
-            continue  # flash frames are K1's; an all-black shot is a dip to black
+        if s.length / fps < config.KEYFRAME_MIN_SHOT_S or k.clip_low > config.BLACK_FRAME_FRAC or vt.shot_designed(s.index):
+            continue  # flash frames are K1's; an all-black shot is a dip to black; a designed picture is lit by design
         if k.clip_high > config.OVEREXPOSED_FRAC:
             _add(issues, "color", "overexposed", s.t0, s.t1, {"clipped_high": round(k.clip_high, 3)})
         if k.clip_low > config.UNDEREXPOSED_FRAC and not (k.face_luma or 0) >= config.EXPOSED_FACE_LUMA:
             _add(issues, "color", "underexposed", s.t0, s.t1, {"clipped_low": round(k.clip_low, 3)})
 
-    return Assessment("color", issues, {"n_shots": len(spans), "n_graded": len(graded)})
+    return Assessment("color", issues, {"n_shots": len(spans), "n_graded": len(graded), "continuity_judged": continuity})
 
 
 def score_color(issues, ctx, use_verdict):
@@ -550,7 +663,7 @@ def assess_audio(a: AudioFeatures, duration: float) -> Assessment:
     jumps = [i for i in issues if i.kind == "loudness_jump"]
     discount_repeats(jumps, f"loudness_jump {len(jumps)} times")
 
-    ctx = {"has_audio": True, "minutes": max(duration / 60.0, 1 / 60),
+    ctx = {"has_audio": True, "minutes": viewing_minutes(duration),
            "integrated_lufs": L.integrated, "lra_lu": L.lra, "true_peak_dbtp": L.true_peak}
     return Assessment("audio", issues, ctx)
 
@@ -611,9 +724,16 @@ def framing_units(f: VisualFeatures) -> list[FramingUnit]:
     return units
 
 
-def assess_framing(f: VisualFeatures) -> Assessment:
+def assess_framing(f: VisualFeatures, vt: VideoType | None = None) -> Assessment:
     fps, issues = f.info.fps, []
-    units = framing_units(f)
+    vt = vt or _camera_only(f)
+    all_units = framing_units(f)
+    # A designed picture is composed by design (a slide, a screen, a drawing): framing,
+    # focus and steadiness are camera checks, judged on camera footage only.
+    units = [u for u in all_units if not (vt.shot_designed(u.key.shot) and vt.is_designed(u.key))]
+    visible = [u for u in units if u.length / fps >= config.KEYFRAME_MIN_SHOT_S and u.key.clip_low <= config.BLACK_FRAME_FRAC]
+    if not visible:  # no camera picture to frame (graphics only, or black)
+        return Assessment("framing", [], {"n_shots": 0, "designed_units": len(all_units) - len(units)}, available=False)
     # The video's typical sharpness, from lit shots (flash frames are K1's), with shot
     # weights (see shot_weights) so that one long soft shot cannot set the norm
     lit = [(u.key.sharpness, u.length) for u in units
@@ -677,9 +797,11 @@ def assess_framing(f: VisualFeatures) -> Assessment:
                 _add(issues, "framing", "shaky", s.t0, s.t1, {"jitter_px": round(jitter, 2)},
                      scale=jitter / (2 * config.SHAKE_JITTER_PX))
 
-    # A flash does not add a shot; a long take adds one per stretch beyond its first
-    n_units = len(_continuous_spans(f)) + len(units) - sum(1 for s in f.shots if any(u.start == s.start for u in units))
-    return Assessment("framing", issues, {"n_shots": n_units})
+    # A flash does not add a shot; a long take adds one per stretch beyond its first;
+    # designed pictures are not judged
+    n_units = (len(_continuous_spans(f)) + len(all_units) - sum(1 for s in f.shots if any(u.start == s.start for u in all_units))
+               - (len(all_units) - len(units)))
+    return Assessment("framing", issues, {"n_shots": max(n_units, 1), "designed_units": len(all_units) - len(units)})
 
 
 def score_framing(issues, ctx, use_verdict):
@@ -699,11 +821,19 @@ SCORERS = {
 }
 
 
-def assess_all(f: VisualFeatures, a: AudioFeatures) -> dict[str, Assessment]:
-    return {
-        "cuts": assess_cuts(f),
-        "pacing": assess_pacing(f, a),
-        "color": assess_color(f),
+class Assessments(dict):
+    """The five assessments by criterion, with the video type they were judged under."""
+    video_type: VideoType | None = None
+
+
+def assess_all(f: VisualFeatures, a: AudioFeatures) -> Assessments:
+    vt = classify(f, a)
+    out = Assessments({
+        "cuts": assess_cuts(f, vt),
+        "pacing": assess_pacing(f, a, vt),
+        "color": assess_color(f, vt),
         "audio": assess_audio(a, f.info.duration),
-        "framing": assess_framing(f),
-    }
+        "framing": assess_framing(f, vt),
+    })
+    out.video_type = vt
+    return out

@@ -40,15 +40,25 @@ _FFMPEG_TBR = re.compile(r"Video:.*?(\d+(?:\.\d+)?)k? tbr")
 
 
 def probe(path: Path) -> VideoInfo:
+    path = Path(path)
+    if not path.is_file():
+        raise ValueError(f"No such video file: {path}")
+    # Ask ffmpeg first: OpenCV can spin on a file without a picture (audio only)
+    header = run_ffmpeg(["-i", str(path)], check=False).stderr
+    if "Video:" not in header:
+        raise ValueError(f"No video stream in {path.name} (audio only, damaged, or not a video file)")
     cap = cv2.VideoCapture(str(path))
     if not cap.isOpened():
-        raise ValueError(f"Cannot open video: {path}")
+        cap.release()
+        raise ValueError(f"Cannot open video: {path} (damaged or unsupported file)")
     fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
     n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    readable = cap.read()[0]
     cap.release()
-    header = run_ffmpeg(["-i", str(path)], check=False).stderr
+    if not readable or width <= 0 or height <= 0:
+        raise ValueError(f"No picture could be decoded from {path.name} (damaged or unsupported file)")
     has_audio = "Audio:" in header
     if not 1.0 <= fps <= 240.0:
         # Some WebM files report their time base (e.g. 1000) as the frame rate;

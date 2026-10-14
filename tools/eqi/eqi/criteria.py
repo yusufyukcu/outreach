@@ -197,7 +197,10 @@ def assess_cuts(f: VisualFeatures, vt: VideoType | None = None) -> Assessment:
         if lo <= f.stable[c] < hi:
             before, after = f.boundary.get(c - 1), f.boundary.get(c)
             light = before is not None and after is not None and _lighting_change(before, after)
-            if not light and not _after_freeze(f, c):
+            # A jump cut shows the picture jump; a detector hit where it barely changes (an
+            # encoder's keyframe redrawing a still picture) is not one
+            visible = f.diff[c] >= config.HIDDEN_JUMP_MIN_DIFF
+            if visible and not light and not _after_freeze(f, c):
                 _add(issues, "cuts", "jump_cut", t, t, {"unchanged_pixels": round(float(f.stable[c]), 3), "detected_cut": True})
             continue
 

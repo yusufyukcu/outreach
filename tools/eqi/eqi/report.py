@@ -83,7 +83,8 @@ def build_report(f: VisualFeatures, a: AudioFeatures, assessments: dict[str, Ass
         "tool": {"name": "EQI — Edit Quality Index", "version": __version__,
                  "weights": config.WEIGHTS, "verdict_factor": config.VERDICT_FACTOR},
         "video": {"path": str(info.path), "duration_s": round(info.duration, 2), "fps": info.fps,
-                  "frames": info.n_frames, "width": info.width, "height": info.height, "has_audio": a.has_audio},
+                  "frames": info.n_frames, "width": info.width, "height": info.height, "has_audio": a.has_audio,
+                  "shot_check": getattr(info, "shot_check", None)},
         "video_type": vt.to_dict() if vt is not None else None,
         "eqi": {
             "signal_only": weighted_index(signal, config.SIGNAL_CRITERIA, coverage),

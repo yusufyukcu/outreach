@@ -23,7 +23,7 @@ interview are each judged by what an error is in that kind of video.
 
 | | Criterion | Weight | Measured as | Main references |
 |---|---|---|---|---|
-| K1 | Cut & transition smoothness | 0.20 | shots: hard cuts (PySceneDetect) and dissolves, fades and wipes (twin comparison; in a video where no cut is found, dissolves in moving footage from the colour make-up one second apart); flash frames (≤ 2-frame shots whose pixels leave the range of the frames either side; in a montage cut to music a flash cut of its rhythm), jump cuts (cuts that keep the background: unchanged-pixel ratio; inside a shot also a sudden, reliably measured jump of a panning camera; a change that only brightens or darkens is a change of light, not a jump; jumps a few frames apart are the footage's frame cadence — repeated frames, a timelapse, stop motion — not cuts; not tested where a designed picture keeps its layout, a slide or a screen), opposite camera motion across a cut (Farnebäck optical flow) | PySceneDetect; Zhang et al. 1993; Pardo et al. 2021 |
+| K1 | Cut & transition smoothness | 0.20 | shots: hard cuts (PySceneDetect; where the picture barely changes, mean \|Δgray\| < 2, a hit counts only if the shot-transition network TransNetV2 sees a transition there — an encoder keyframe redrawing a still picture is not a cut) and dissolves, fades and wipes (twin comparison; in a video where no cut is found, dissolves in moving footage from the colour make-up one second apart); flash frames (≤ 2-frame shots whose pixels leave the range of the frames either side; in a montage cut to music a flash cut of its rhythm), jump cuts (cuts that keep the background and visibly change the picture: unchanged-pixel ratio, mean \|Δgray\| ≥ 2 — a detector hit where an encoder's keyframe redraws the same picture is not a jump; inside a shot also a sudden, reliably measured jump of a panning camera; a change that only brightens or darkens is a change of light, not a jump; jumps a few frames apart are the footage's frame cadence — repeated frames, a timelapse, stop motion — not cuts; not tested where a designed picture keeps its layout, a slide or a screen), opposite camera motion across a cut (Farnebäck optical flow) | PySceneDetect; Souček & Lokoč 2020; Zhang et al. 1993; Pardo et al. 2021 |
 | K2 | Pacing & temporal rhythm | 0.20 | dead air (the sound gone — no signal at all — while the picture stands still; longer stretches counting as more errors; a silent title or end card marked by a cut is not dead air, nor a pause with room tone), very long static shots (the picture a second later almost the same), average shot length (inside an animation or screen recording a change of the whole picture within a second is a change of scene, as a cut), cut–beat alignment vs chance when the audio is music-driven (librosa beat tracking, onset pulse clarity) | Cutting et al. 2010; McFee et al. 2015 |
 | K3 | Colour & lighting consistency | 0.16 | camera shots only: shots whose colour deviates from the video's dominant grade (CIEDE2000; dips to black left out) or whose tint (a\*b\*) differs from both neighbouring shots while those agree (a mismatched camera or grade inside a scene; neither test in a montage cut to music, which jumps between setups by design), flicker of the light (one-way brightness changes of the whole frame, not movement in it), clipped highlights/shadows | Sharma et al. 2005 |
 | K4 | Audio-visual balance | 0.12 | the mix as the platform plays it: integrated loudness below the accepted delivery levels (−24 LUFS broadcast, −14 LUFS streaming; a louder mix is turned down to −14 LUFS, a quieter one is not raised), true peak > −1 dBTP after that turn-down, loudness range, sudden loudness jumps against the level of the seconds before (momentary vs short-term loudness, ffmpeg ebur128) | ITU-R BS.1770; EBU R128; ATSC A/85 |
@@ -215,6 +215,39 @@ JSON is asked for again once; if it never parses, the raw answers are stored in
 `ai.usage`: for the 52 s Sintel trailer one Gemini 3.1 Pro run took 80 k input
 and 3–4 k output tokens (thinking included).
 
+### Shot-transition network: TransNetV2
+
+A hard cut that barely changes the picture is checked with TransNetV2 (Souček &
+Lokoč 2020, MIT licence), a network trained on annotated shot transitions (see K1).
+It runs from an ONNX file with ONNX Runtime on the CPU. The file is made once from
+the official TensorFlow weights in a separate environment; TensorFlow and PyTorch
+are needed only there:
+
+```bash
+C=85cef72af9a916bdfd7cc94a670c9cdfbf12d1ed      # TransNetV2 master, 2021-07-28
+mkdir -p third_party/TransNetV2/transnetv2-weights/variables
+for f in saved_model.pb variables/variables.data-00000-of-00001 variables/variables.index; do
+  curl -L -o third_party/TransNetV2/transnetv2-weights/$f \
+    https://media.githubusercontent.com/media/soCzech/TransNetV2/$C/inference/transnetv2-weights/$f
+done
+for f in inference-pytorch/convert_weights.py inference-pytorch/transnetv2_pytorch.py LICENSE; do
+  curl -L -o third_party/TransNetV2/$(basename $f) https://raw.githubusercontent.com/soCzech/TransNetV2/$C/$f
+done
+# sha256 as in TransNetV2 issue #1: saved_model.pb 8ac2a52c…f554, variables.data-… b8c9dc3e…9367, variables.index 8b99e28b…403f
+python -m venv .venv-transnet
+.venv-transnet/Scripts/python -m pip install tensorflow==2.15.1 onnx==1.17.0 onnxruntime==1.18.1
+.venv-transnet/Scripts/python -m pip install torch==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+.venv-transnet/Scripts/python scripts/export_transnetv2.py third_party/TransNetV2
+# transnetv2.onnx: 30,549,149 bytes, sha256 09c2dc32bad2e16004fdebe9743d928738e6896da18ea0aea94077c7757c7000
+```
+
+The script copies the weights into the official PyTorch port, replaces the bit shifts
+of its colour histogram (ONNX has them only for unsigned integers) with the same
+integer arithmetic, and checks the ONNX model against the TensorFlow model (largest
+difference 1.2e-7). Without the file the check is off: `video.shot_check` in
+`report.json` is null and every hit of the cut detector counts, as before 14 October.
+`EQI_TRANSNET_MODEL` points to another location of the file.
+
 ### Baseline: DOVER (optional, for Tier 2)
 
 Tier 2 compares EQI with DOVER (Wu et al., ICCV 2023), a general video quality
@@ -243,6 +276,7 @@ about 10–15 s after the model has loaded.
 ```bash
 python -m eqi analyze video.mp4 --out out/video1        # report.json, report.html, figures/
 python -m eqi analyze video.mp4 --no-ai                 # signal layer only
+python -m eqi serve                                     # analysis page in the browser (127.0.0.1:8765), analyses in out/app
 python -m eqi batch videos/ --out out/batch --strict-model --resume --dover   # all videos + scores.csv (Tier 2 input)
 python -m eqi synth --out out/synthetic_clean.mp4       # clean synthetic test video
 python -m eqi tier1 source.mp4 --out out/tier1 --figures   # controlled-defect experiment
@@ -251,7 +285,7 @@ python -m eqi rescore out/tier1 --out out/tier1_new --reuse-reports   # only the
 python -m eqi rescore-reports out/batch --out out/batch_new --ai-from out/batch_ai   # saved reports, current scoring; K6 from another run
 python -m eqi ai-check out/tier1 out/tier1_b --out out/ai_check --extra out/k6_test   # AI review accuracy (calls Gemini)
 python -m eqi tier2 out/batch/scores.csv ratings.csv --out out/tier2
-python -m pytest -q tests                               # 88 tests
+python -m pytest -q tests                               # 94 tests
 ```
 
 `ratings.csv` (long format): `video, rater, overall[, cuts, pacing, color, audio, framing, narrative]`
@@ -262,8 +296,17 @@ plain message; `batch` notes it in `scores.csv` (`error` column) and goes on wit
 the next video. Portrait, rotated, variable-frame-rate, odd-sized, silent and
 very short videos are analysed (see *Stability*).
 
+`serve` opens a page in the browser where videos are dropped or chosen and analysed
+one after the other with the same pipeline as `analyze`, with or without the AI layer.
+Each analysis gets a folder in `out/app` with the uploaded video, `job.json` and the
+usual `report.json`, `report.html` and figures; the page shows the stage of the running
+analysis, then EQI and the measured-only score, and links the report. It uses the
+report's stylesheet and listens on 127.0.0.1 only. An analysis that was running when
+the server stopped is marked failed rather than started again, so that a restart never
+spends AI credit on its own.
+
 ### Outputs
-* `report.json` — video type, scores, every issue with time, severity, measurement and AI verdict, K6 parts, shot list, timing
+* `report.json` — video type, scores, every issue with time, severity, measurement and AI verdict, K6 parts, shot list, timing, and the cut detector's hits the shot-transition network removed (`video.shot_check`)
 * `report.html` — the same in readable form with all figures (open in a browser)
 * `figures/timeline.png` — issue severity per criterion over time, cut positions
 * `figures/issue_<id>.png` — evidence per issue: the exact frames around a cut, colour swatches, thirds grid with the subject box, jitter trace
@@ -423,6 +466,50 @@ video (the minute floor): a 4 s dead air lowers the synthetic EQI_signal by 17.0
 instead of 19.2 points. Mean EQI_signal drop at the strongest level over the real
 videos: flash frame 19.0, dead air 12.2, shake 3.7, jump cut 2.3, colour shift 1.5,
 loudness boost 1.3, crop 0.3.
+
+*13 October.* The two "jump cuts" of the clean NASA interview were the harness's
+IDR frames (one a second) redrawing the same picture: at 74 s and 79 s the speaker
+does not move and the picture changes by 0.7/255 (mean |Δgray|), while 97 % of its
+pixels stay. A jump cut at a detected cut now needs a visible change of the
+picture, the floor a jump inside a shot already needed (mean |Δgray| ≥ 2). The
+clean interview then has no jump cut (K1 59.2 → 98.7, EQI_signal 68.9 → 78.8, 7
+issues instead of 9), and detection, false alarms and side effects of all five
+sources are unchanged; so are the scores of all 88 tier-set videos. With the higher
+clean score the mean EQI_signal drop at the strongest level rises for the flash
+frame (19.0 → 19.5) and the crop (0.3 → 0.4). The same IDR frames still count as
+cuts (see *Limitations*).
+
+*14 October.* A hard cut that barely changes the picture (mean |Δgray| < 2 at
+64×36) now counts only if the shot-transition network TransNetV2 sees a transition
+there (see *Install*). The network was used as published (no training on our
+videos) with its own decision threshold of 0.5. Of the 75 such hits in the three
+test sets and the five Tier-1 sources, the network saw 2; the rest were keyframe
+hits on still pictures — all 7 "cuts" of the uncut eclipse video (probability
+0.004–0.007, one every 5.35 s, the encoder's keyframe interval), 28 of the 37 cuts
+of the NASA interview, frames of a handheld whip pan — and hits inside fades through
+black. The first version also removed those: in the Sintel trailer two shots joined
+by a fade through black became one shot, whose colour then mixed black frames into
+the lit picture (K3 of the clean trailer 78.7 → 50.0), and the side effects of
+Tier 1 rose from 22 lost issues (severity 5.27) to 33 (15.62). The network marks
+hard cuts, not fades, and lightness cannot tell a fade from a dark still picture
+(the eclipse, L\* 0.6–0.9, is darker than the fades, L\* 0.3–0.7). What does is
+black itself: all 13 hits at fades and cuts through black lay 0–0.17 s from a frame
+with no picture (99 % of the pixels at most 4/255), every other hit at least 0.37 s,
+and only 4 of those 62 within a second. So a hit within 0.25 s of black is not checked. With that rule,
+on the cached measurements of the same videos (K6 as before):
+* Tier 1 is unchanged: strongest level 31/40, all levels 64/115, 3 same-kind false
+  alarms, side effects 13 new (1.52) and 22 lost (5.27). Monotonic kinds 31/35 →
+  30/35: with 10 shots instead of 37 the clean NASA interview's K3 statistics move
+  more, and the level-2 colour shift raises its K3 by 3.0. Its clean EQI_signal falls
+  78.8 → 72.8, because the keyframe hits no longer add K1 and K3 evidence.
+* All 88 videos: EQI ρ 0.68 → 0.68 (without broken 0.60 → 0.61; paired bootstrap
+  +0.00, 95 % CI −0.00 to +0.01), measured only 0.52 → 0.53 (+0.01, +0.00 to +0.03;
+  without broken 0.36 → 0.38, +0.00 to +0.04). Ten videos change: the uncut eclipse
+  video 68.2 → 52.4 (no cut, so K1 is the scale's midpoint), an amateur video with a
+  keyframe hit every 4 s 64.4 → 56.5, the others by at most 1.3.
+* Re-encoding (*Stability*): EQI_signal moves by 1.5 instead of 1.9 (median; mean
+  2.7 instead of 2.9, at most 13.2 as before), K3 by 5.7 instead of 6.7 (mean), and
+  the video type label stays the same in 30 of 30 copies instead of 28.
 
 **AI layer validation (October 2026).** The strongest level of every defect
 was injected into four real videos (Sintel trailer, a Tears of Steel excerpt,
@@ -642,19 +729,20 @@ without the minute floor 0.61 / 0.51; without scene changes in designed pictures
 flicker as light 0.63 / 0.53 (it removes misreadings of movement but does not order
 the groups); without the video type at all 0.53 / 0.40.
 
-K6 with the structured prompt was run on 41 of the 88 videos (29 of the held-out
-set, 12 of the market set; three runs each, Gemini 3.1 Pro, one session) before the
-API's prepaid credit ran out; the other 47 keep their earlier K6. Run-to-run
-reliability of the level, one-way ICC(1,1) over the three runs (Shrout & Fleiss
-1979):
+K6 with the structured prompt was run on 41 of the 88 videos on 12 October (29 of
+the held-out set, 12 of the market set) before the API's prepaid credit ran out,
+and on the other 47 on 13 October (Gemini 3.1 Pro, three runs each; four videos
+have two runs and one has one, where the credit ran out during a video). Run-to-run
+reliability of the level, one-way ICC(1,1) over three runs (Shrout & Fleiss 1979),
+on the videos with three runs of both prompts:
 
-| K6 | Held-out (27) | Market (11) | All 41 |
-|---|---|---|---|
-| Earlier prompt (10 October; market: third run two days later) | 0.75 | 0.73 | 0.78 |
-| Structured prompt, the model's overall level (used) | 0.86 | 0.74 | 0.82 |
-| Structured prompt, level computed from the parts (reported) | 0.85 | 0.73 | 0.81 |
+| K6 | First set (20) | Market (32) | Held-out (31) | All 83 |
+|---|---|---|---|---|
+| Earlier prompt (8–10 October; first and market set: third run two days later) | 0.75 | 0.61 | 0.82 | 0.75 |
+| Structured prompt, the model's overall level (used) | 0.90 | 0.80 | 0.89 | 0.86 |
+| Structured prompt, level computed from the parts (reported) | 0.84 | 0.80 | 0.86 | 0.83 |
 
-On these 41 videos (11 professional, 15 mid, 13 amateur, 2 broken), as of 10
+On the 41 videos of 12 October (11 professional, 15 mid, 13 amateur, 2 broken), as of 10
 October EQI ordered the groups with ρ 0.32 (0.22 without broken), with the rules of
 12 October and the earlier K6 0.63 (0.57), and with the structured K6 0.67 (0.63;
 +0.35, 95 % CI +0.09 to +0.64 against 10 October): medians 84.1 / 83.0 / 71.1 /
@@ -665,8 +753,27 @@ of 3: footage that only records a scene is no longer read as illustrating it), b
 its share of the EQI gain is small and not significant (+0.05, −0.07 to +0.19); the
 gain comes from the K1–K5 rules. The level computed from the parts orders mid above
 amateur better (0.88) but professional above mid worse (0.53), so it is reported,
-not used. Reports: `out/<set>/results_v8` (the runs) and `out/<set>/results_v8_final`
-(K1–K5 with the final code, K6 from the runs).
+not used.
+
+*All 88 videos (13 October).* With the structured K6 on every video (26
+professional, 26 mid, 28 amateur, 8 broken), EQI orders the groups with ρ 0.68
+(0.60 without broken): medians 85.8 / 82.2 / 69.7 / 57.9, professional above mid
+0.73, mid above amateur 0.75, professional above amateur 0.90, amateur above broken
+0.78. Against the code of 10 October that is +0.17 (95 % CI +0.05 to +0.30; without
+broken +0.22, +0.07 to +0.39), against the rules of 12 October with the earlier K6
++0.04 (−0.02 to +0.12; without broken +0.06, −0.03 to +0.16), which is not
+significant. By set, with the earlier K6 in brackets: first set 0.49 (0.51), market
+set 0.75 (0.67), held-out set 0.75 (0.75). The structured K6 puts amateur videos
+well below the rest (median level 2 against 5 for professional and mid; the
+earlier prompt 3 against 4) but does not separate professional from mid (both at
+the top level; professional above mid 0.57 for K6 alone), and it gives the broken
+copies the level of their professional originals (5), which K1–K5 separate. K6
+alone orders the clean groups about as well as the earlier prompt (ρ 0.55 vs
+0.53). The reviews come from two days (41 videos on 12 October, 47 on 13 October)
+and the structured prompt's day-to-day drift is not measured: a repeat of 15
+videos of 12 October, planned on 13 October, failed when the credit ran out again.
+Reports: `out/<set>/results_v8` (the runs) and `out/<set>/results_v8_final` (K1–K5
+with the final code, K6 from the runs).
 
 **Stability (12 October 2026).** *Inputs:* a portrait phone video, a 2560×1440
 60 fps video, a variable-frame-rate video without audio, an odd-sized (853×479)
@@ -690,6 +797,17 @@ number of jump cuts found (an unboxing with four jump cuts as published, one at
 720p — the earlier rules had hidden this by also counting false jump cuts in its
 intro graphics, which made all of them a style), K3's video-relative statistics
 over few shots, and loudness jumps at the threshold after a new audio encode.
+*13 October:* in both copies of the NASA interview the shot detector fired at seven
+of the new encoder's keyframes, where the same picture is redrawn (mean |Δgray|
+0.6–0.9); two of these "cuts" kept 95–96 % of the pixels and counted as jump cuts
+(K1 95.0 → 58). With the visible-change rule (*Tier 1*, 13 October) K1 of the
+copies is 96.9 and 97.1; over the 30 copies K1 moves by 5.4 points on average
+instead of 7.7 (at most 29.6 instead of 36.9), EQI_signal by 1.9 (median; mean
+2.9, at most 13.2, the unboxing). The keyframe hits still split the interview's
+shots, which adds K3 evidence (K3 71.1 → 83–84). *14 October:* the shot-transition
+network removes these hits (6–7 in each copy of the interview); EQI_signal now moves
+by 1.5 (median; mean 2.7, at most 13.2), and the video type label is the same in all
+30 copies.
 
 **Tier 2 — real videos vs experts.** `tier2` reports SRCC, KRCC, PLCC (after a
 4-parameter logistic mapping), RMSE with bootstrap 95 % CIs, rater reliability
@@ -767,9 +885,10 @@ resampled together, since both correlations use the same ratings).
   0.8 levels more on average (level 5 where the earlier runs gave 4) and amateur
   videos the same. The median of three runs keeps such a run from moving K6, but
   K6 levels from different days are not interchangeable; a test set should be
-  reviewed in one session. The level computed from parts (12 October) rests on
-  smaller judgements per part; whether it drifts less from day to day has not been
-  measured yet (all its runs are from one session).
+  reviewed in one session. Whether the structured prompt (12 October) drifts less
+  has not been measured: its reviews of the tier sets come from two days (41
+  videos on 12 October, 47 on 13 October), and a repeat of 15 videos on the second
+  day failed when the API credit ran out.
 * A title or end card is recognised by a cut near where the sound starts or stops;
   a silent end card that appears without a cut counts as dead air, like a last shot
   that freezes and runs silent to the end. Dead air needs the sound gone (no
@@ -779,6 +898,13 @@ resampled together, since both correlations use the same ratings).
   jump-cut test find a different number of jump cuts in some videos, video-relative
   statistics over few shots shift with one shot more or less, and a loudness jump at
   the threshold can appear or vanish with the audio codec.
+* The shot detector also fires where an encoder's keyframe redraws a still picture.
+  Since 14 October such a hit counts only if TransNetV2 sees a transition there
+  (*Tier 1*, 14 October), but not within 0.25 s of black, where the network cannot
+  judge a fade: a keyframe hit right beside black still counts as a cut. A fade
+  through black is marked only where the cut detector happens to fire inside it (the
+  twin comparison does not see fades: their frame differences are too small), and
+  the network is a published model, not validated on our footage beyond these sets.
 * Video-relative thresholds (K3 outlier test, K5 softness) can still flip a
   finding that sits at the reporting margin when a defect changes another shot
   (one shot each in Tears of Steel and Sintel, severity ≈ 0.1); the margin and the
@@ -800,5 +926,5 @@ resampled together, since both correlations use the same ratings).
 Castellano, PySceneDetect · Chung & Zisserman 2016 (SyncNet) · Cutting, DeLong & Nothelfer 2010 ·
 EBU R 128 · Farnebäck 2003 · Hou & Zhang 2007 · ITU-R BS.1770 · ITU-T P.910 (2023) ·
 Kuglin & Hines 1975 · McFee et al. 2015 (librosa) · Pardo et al. 2021 · Sharma, Wu & Dalal 2005 ·
-Shrout & Fleiss 1979 · Viola & Jones 2001 · Wu et al. 2024 (Q-Align) ·
+Shrout & Fleiss 1979 · Souček & Lokoč 2020 (TransNetV2) · Viola & Jones 2001 · Wu et al. 2024 (Q-Align) ·
 Zhang, Kankanhalli & Smoliar 1993 (twin comparison)

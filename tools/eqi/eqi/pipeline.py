@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from . import ai as ai_layer
@@ -13,6 +14,9 @@ from .criteria import assess_all
 from .features import detect_shots, extract
 from .media import probe
 from .report import build_report
+
+# The stages `analyze` reports to its `progress` callback, in this order ("ai" only with the AI layer)
+STAGES = ("probe", "shots", "visual", "audio", "scoring", "ai", "report")
 
 
 def _summary_metrics(f, a, assessments) -> dict:
@@ -41,24 +45,31 @@ def _summary_metrics(f, a, assessments) -> dict:
 
 
 def analyze(video: Path, out_dir: Path | None = None, use_ai: bool = True,
-            make_figures: bool = True, model: str | None = None, ai_repeats: int | None = None) -> dict:
+            make_figures: bool = True, model: str | None = None, ai_repeats: int | None = None,
+            progress: Callable[[str], None] | None = None) -> dict:
     video = Path(video)
+    step = progress or (lambda stage: None)  # told each of STAGES as it starts
     timing = {}
     t0 = time.perf_counter()
 
+    step("probe")
     info = probe(video)
+    step("shots")
     shots = detect_shots(info)
     timing["shots"] = round(time.perf_counter() - t0, 2)
 
+    step("visual")
     t = time.perf_counter()
     visual = extract(info, shots)
     timing["visual"] = round(time.perf_counter() - t, 2)
 
+    step("audio")
     t = time.perf_counter()
     with tempfile.TemporaryDirectory() as tmp:
         audio = audio_layer.analyze(video, Path(tmp))
     timing["audio"] = round(time.perf_counter() - t, 2)
 
+    step("scoring")
     assessments = assess_all(visual, audio)
 
     review, ai_error, unparsed = None, None, None
@@ -66,6 +77,7 @@ def analyze(video: Path, out_dir: Path | None = None, use_ai: bool = True,
         if not os.environ.get("GEMINI_API_KEY"):
             ai_error = "GEMINI_API_KEY not set — AI layer (K6 and issue review) skipped"
         else:
+            step("ai")
             t = time.perf_counter()
             issues = [i for a in assessments.values() for i in a.issues]
             try:
@@ -82,6 +94,7 @@ def analyze(video: Path, out_dir: Path | None = None, use_ai: bool = True,
             timing["ai"] = round(time.perf_counter() - t, 2)
 
     timing["total"] = round(time.perf_counter() - t0, 2)
+    step("report")
     report = build_report(visual, audio, assessments, review, ai_error, timing)
     if unparsed is not None:
         report["ai_unparsed_responses"] = unparsed  # what the model said, to find out why

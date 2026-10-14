@@ -142,6 +142,16 @@ FLASH_OUTSIDE_MIN = 0.25          # …when this share of its pixels leaves the 
                                   # change or a one-frame dissolve; injected white frames: 1.0, a lamp switching on: 0.0)
 FLASH_SAME_SHOT_DIFF = 12.0       # pictures either side of a flash this close (mean |Δgray|) = one shot interrupted
 FLASH_EDGE_DIFF = 20.0            # a frame difference this large where a flash ends (64×36 gray)
+# A hard cut that barely changes the picture is checked with the shot-transition network
+# (eqi/shotnet.py): where it sees no transition, the detector reacted to an encoder keyframe
+# redrawing a still picture (mean |Δgray| ~0.3–0.9), not to a cut
+CUT_CHECK_MAX_DIFF = 2.0          # mean |Δgray| at 64×36 below which a cut is checked (the size of a visible jump)
+SHOTNET_THRESHOLD = 0.5           # TransNetV2's own decision threshold (official predictions_to_scenes)
+# …but not beside a frame with no picture: the network marks hard cuts, not a fade to or from
+# black, so there the detector's hit is the only mark of a transition (Sintel trailer: two shots
+# joined by a fade through black; such hits lie 0–0.17 s from black, keyframe hits 0.37 s or more)
+NO_PICTURE_LEVEL = 4              # gray (64×36) that 99 % of a frame's pixels stay at or below: digital black
+FADE_EDGE_S = 0.25                # beside = this close in time
 # Jump cut = a cut that keeps the background: most pixels stay unchanged across it
 # (a new camera angle or scene changes nearly every pixel).
 STABLE_SIZE = (320, 180)          # resolution for the unchanged-pixel ratio (keeps background texture)
@@ -150,7 +160,8 @@ DARK_LEVEL = 24                   # pixels this dark in both frames say nothing 
 STABLE_MIN_VALID = 0.20           # below this share of usable pixels the ratio is undefined (dark scenes)
 JUMP_CUT_STABLE = (0.50, 0.98)    # unchanged-pixel ratio of a jump cut at a detected cut
 HIDDEN_JUMP_Z = 8.0               # robust z-score of a frame-difference spike inside a shot
-HIDDEN_JUMP_MIN_DIFF = 2.0        # and its absolute size (mean |Δgray|, 0–255; small when only a speaker on a plain backdrop moves)
+HIDDEN_JUMP_MIN_DIFF = 2.0        # and its absolute size (mean |Δgray|, 0–255; small when only a speaker on a plain backdrop moves);
+                                  # a jump cut at a detected cut needs it too (an encoder keyframe redraws a still picture at ~0.3–0.9)
 HIDDEN_JUMP_MIN_STABLE = 0.50     # background kept → a jump cut the shot detector missed
 HIDDEN_JUMP_ISOLATION = 3.0       # spike this many times its neighbours (a cut, not sustained motion)
 FROZEN_DIFF = 0.05                # frames that change less than this are frozen (duplicates): they carry no

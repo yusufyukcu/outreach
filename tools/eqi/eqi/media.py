@@ -33,6 +33,7 @@ class VideoInfo:
     height: int
     duration: float
     has_audio: bool
+    shot_check: dict | None = None   # set by features.detect_shots: the network's check of quiet cuts
 
 
 _FFMPEG_FPS = re.compile(r"Video:.*?(\d+(?:\.\d+)?) fps")

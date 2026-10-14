@@ -54,6 +54,7 @@ def test_one_lit_shot_cannot_score_above_the_midpoint_for_colour():
 def test_repeated_jump_cuts_count_less_and_an_isolated_one_is_a_slip():
     from eqi.criteria import assess_cuts, repetition_factor
     f = _features([100] * 17, diff=np.full(1700, 0.8))  # sixteen cuts in under a minute
+    f.diff[f.cut_frames] = 6.0  # each cut changes the picture visibly
     f.stable[:] = 0.3  # ordinary cuts change most pixels
     for c in (100, 200, 300):
         f.stable[c] = 0.9  # three cuts keep the background: jump cuts on 3 of 16 cuts
@@ -653,6 +654,7 @@ def test_a_cut_that_only_changes_the_light_is_not_a_jump_cut():
     from eqi.criteria import assess_cuts
     before = np.random.default_rng(2).integers(40, 160, (90, 160))
     f = _features([100, 100])
+    f.diff[100] = 6.0
     f.stable[:] = 0.3
     f.stable[100] = 0.9  # most of the picture unchanged across the cut
     f.boundary[99] = before.astype(np.uint8)
@@ -662,6 +664,16 @@ def test_a_cut_that_only_changes_the_light_is_not_a_jump_cut():
     lit[:, :60] += 50  # part of the scene lit up (a muzzle flash): every change is brighter
     f.boundary[100] = lit.astype(np.uint8)
     assert assess_cuts(f).issues == []
+
+
+def test_a_keyframe_refreshing_a_still_picture_is_not_a_jump_cut():
+    from eqi.criteria import assess_cuts
+    f = _features([200, 200], diff=np.full(400, 0.3))  # a speaker on a plain backdrop
+    f.stable[200] = 0.97  # the shot detector fired where almost every pixel stays
+    f.diff[200] = 0.7     # an encoder keyframe redrawing the same picture (NASA interview, 74 s)
+    assert not [i for i in assess_cuts(f).issues if i.kind == "jump_cut"]
+    f.diff[200] = 6.0     # the speaker visibly jumps
+    assert [i.kind for i in assess_cuts(f).issues] == ["jump_cut"]
 
 
 def test_a_change_of_light_inside_a_shot_is_not_a_hidden_jump_cut():
@@ -801,6 +813,7 @@ def test_a_slide_change_that_keeps_the_template_is_not_a_jump_cut():
     from eqi.criteria import assess_cuts
     keys = [_key(k, fill_mid=0.5) for k in range(3)]
     f, a, vt = _typed([90] * 3, keys)
+    f.diff[[90, 180]] = 6.0
     f.stable[90] = f.stable[180] = 0.9  # the background stays across both cuts
     assert [i.kind for i in assess_cuts(f).issues].count("jump_cut") == 2  # as camera footage: jump cuts
     assert not assess_cuts(f, vt).issues
@@ -1138,3 +1151,131 @@ def test_injected_defect_is_detected(synthetic, kind, level):
     report = analyze(Path(truth["video"]), None, use_ai=False)
     m = match(truth, report, None)
     assert m["detected"] == m["events"] and m["false_alarms"] == 0
+
+
+# ── Analysis page ────────────────────────────────────────────────────────────
+
+def test_an_upload_keeps_only_its_file_name():
+    from eqi.webapp import safe_name
+    assert safe_name("..\\..\\clip.mp4") == "clip.mp4"
+    assert safe_name("C:/videos/a:b?.mov") == "a_b_.mov"
+    assert safe_name("  ") == "video"
+
+
+def test_the_page_queues_an_upload_and_serves_only_report_files(tmp_path):
+    import threading
+    import urllib.error
+    import urllib.request
+    from eqi.webapp import Jobs, Server
+    (tmp_path / "secret.txt").write_text("outside", encoding="utf-8")
+    jobs = Jobs(tmp_path / "app")
+    server = Server(0, jobs, "gemini-test", None)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        assert "Analyse" in urllib.request.urlopen(base + "/").read().decode("utf-8")
+        upload = urllib.request.Request(base + "/api/analyze?name=my%20clip.mp4&ai=1", data=b"x" * 3000, method="POST")
+        job_id = json.loads(urllib.request.urlopen(upload).read())["id"]
+        job = jobs.get(job_id)
+        assert job["status"] == "queued" and job["ai"] and jobs.waiting.get_nowait() == job_id
+        assert (jobs.folder(job_id) / "video" / "my clip.mp4").stat().st_size == 3000
+        (jobs.folder(job_id) / "report.html").write_text("<p>report</p>", encoding="utf-8")
+        assert urllib.request.urlopen(f"{base}/reports/{job_id}/report.html").read() == b"<p>report</p>"
+        for path in (f"/reports/{job_id}/video/my%20clip.mp4", "/reports/../secret.txt", f"/reports/{job_id}"):
+            with pytest.raises(urllib.error.HTTPError):
+                urllib.request.urlopen(base + path)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_the_worker_records_stages_results_and_failures(tmp_path, monkeypatch):
+    import threading
+    import time
+    from eqi import pipeline
+    from eqi.webapp import Jobs, work
+    stages = []
+
+    def fake_analyze(video, out_dir, use_ai, model, ai_repeats, progress):
+        if video.name == "broken.mp4":
+            raise ValueError(f"No video stream in {video.name} (audio only, damaged, or not a video file)")
+        for stage in pipeline.STAGES:
+            progress(stage)
+            stages.append(stage)
+        return {"eqi": {"full": 80.5, "signal_only": 78.0}, "ai_error": None, "video_type": {"label": "single take"}}
+
+    monkeypatch.setattr(pipeline, "analyze", fake_analyze)
+    jobs = Jobs(tmp_path)
+    for name in ("good.mp4", "broken.mp4"):
+        job = jobs.add(name, True, None)
+        (jobs.folder(job["id"]) / job["video"]).write_bytes(b"x")
+        jobs.update(job["id"], status="queued")
+        jobs.waiting.put(job["id"])
+    threading.Thread(target=work, args=(jobs,), daemon=True).start()
+    deadline = time.time() + 10
+    while time.time() < deadline and any(j["status"] not in ("done", "failed") for j in jobs.all()):
+        time.sleep(0.05)
+    by_name = {j["name"]: j for j in jobs.all()}
+    good, broken = by_name["good.mp4"], by_name["broken.mp4"]
+    assert stages == list(pipeline.STAGES)
+    assert good["status"] == "done" and good["eqi"] == 80.5 and good["stage"] is None and good["video_type"] == "single take"
+    assert broken["status"] == "failed" and broken["error"].startswith("No video stream in broken.mp4")
+    # a job a stopped server left running is marked failed on the next start, not run again
+    jobs.update(good["id"], status="running")
+    assert {j["name"]: j["status"] for j in Jobs(tmp_path).all()}["good.mp4"] == "failed"
+
+
+# ── Shot-transition network ──────────────────────────────────────────────────
+
+class _WindowEcho:
+    """Stands in for the ONNX session: each frame's 'probability' is a function of the
+    frame's content and its place in the window, so a misplaced window shows."""
+    def run(self, names, feeds):
+        x = feeds["frames"].astype(np.float32)
+        return [(x.mean(axis=(2, 3, 4)) / 255 + np.arange(x.shape[1]) / 1000)[..., None]]
+
+
+def test_the_network_is_asked_with_the_official_windows(monkeypatch):
+    from eqi import shotnet
+    monkeypatch.setattr(shotnet, "_session", lambda: _WindowEcho())
+    frames = np.random.default_rng(1).integers(0, 256, (237, 27, 48, 3), dtype=np.uint8)
+    # official predict_frames: pad 25 copies of the first frame and up to 74 of the last,
+    # windows of 100 every 50 frames, keep the middle 50 of each
+    end = 25 + 50 - (len(frames) % 50 if len(frames) % 50 != 0 else 50)
+    padded = np.concatenate([frames[:1]] * 25 + [frames] + [frames[-1:]] * end, 0)
+    official = np.concatenate([_WindowEcho().run(None, {"frames": padded[p:p + 100][None]})[0][0, 25:75, 0]
+                               for p in range(0, len(padded) - 99, 50)])[:len(frames)]
+    at = [-1, 0, 1, 49, 50, 99, 100, 180, 236, 240]
+    got = shotnet.transition_probability(frames, at)
+    assert all(got[f] == pytest.approx(official[min(max(f, 0), len(frames) - 1)]) for f in at)
+
+
+def test_a_quiet_cut_the_network_does_not_see_is_dropped(monkeypatch):
+    from eqi import features, shotnet
+    from eqi.media import VideoInfo
+    d = np.full(400, 0.4)
+    d[[100, 200, 300]] = [0.6, 0.7, 25.0]  # two quiet hits and a cut that changes the picture
+    seen = {98: 0.01, 99: 0.02, 100: 0.03, 101: 0.0, 198: 0.0, 199: 0.93, 200: 0.04, 201: 0.0}
+    asked = []
+
+    def probability(rgb, at):
+        asked.extend(at)
+        return {f: seen.get(f, 0.0) for f in at}
+
+    monkeypatch.setattr(shotnet, "available", lambda: True)
+    monkeypatch.setattr(shotnet, "transition_probability", probability)
+    info = VideoInfo(Path("v.mp4"), 25.0, 400, 64, 36, 16.0, True)
+    rgb = np.zeros((400, 27, 48, 3), np.uint8)
+    thumbs = [np.full((36, 64), 40.0, np.float32)] * 400  # a dim picture throughout
+    # 100: a keyframe redrawing the picture; 200: a cut between two dark shots, which the network sees
+    assert features._check_quiet_cuts([100, 200, 300], d, thumbs, rgb, info) == [200, 300]
+    assert not [f for f in asked if 290 <= f <= 310]  # a cut that changes the picture is not asked about
+    assert info.shot_check == {"model": "TransNetV2", "checked": 2, "removed_s": [4.0]}
+    # the same hit two frames after black (a fade from black, which the network does not mark) stays unasked
+    faded = list(thumbs)
+    faded[98] = np.zeros((36, 64), np.float32)
+    asked.clear()
+    assert features._check_quiet_cuts([100, 200, 300], d, faded, rgb, info) == [100, 200, 300]
+    assert not [f for f in asked if 95 <= f <= 105] and info.shot_check["checked"] == 1
+    monkeypatch.setattr(shotnet, "available", lambda: False)  # without the model: every cut stays, the report says so
+    assert features._check_quiet_cuts([100, 200, 300], d, thumbs, rgb, info) == [100, 200, 300] and info.shot_check is None

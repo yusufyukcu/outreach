@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 from scenedetect import AdaptiveDetector, detect
 
-from . import config
+from . import config, shotnet
 from .media import VideoInfo
 
 
@@ -88,9 +88,10 @@ class VisualFeatures:
 
 def detect_shots(info: VideoInfo) -> list[Shot]:
     scenes = detect(str(info.path), AdaptiveDetector(min_scene_len=config.SCENE_MIN_LEN), show_progress=False)
-    thumbs, hists, d = _frame_signals(info)
+    thumbs, hists, d, rgb = _frame_signals(info)
     reported = [s.frame_num for s, _ in scenes[1:]]
     hard = sorted({_snap(c, d, set(reported) - {c}) for c in reported} | _flash_ends(reported, thumbs, d))
+    hard = _check_quiet_cuts(hard, d, thumbs, rgb, info)
     gradual = set(gradual_transitions(thumbs, hists, d, hard)) - set(hard)
     if not hard and not gradual:
         gradual = set(slow_dissolves(hists, info.fps))
@@ -128,10 +129,36 @@ def _flash_ends(reported: list[int], thumbs: list, d: np.ndarray) -> set[int]:
     return added
 
 
+def _check_quiet_cuts(hard: list[int], d: np.ndarray, thumbs: list, rgb: np.ndarray, info: VideoInfo) -> list[int]:
+    """A hard cut that barely changes the picture is checked with the shot-transition
+    network (eqi/shotnet.py). Where the network sees no transition, the detector reacted
+    to an encoder keyframe redrawing a still picture: not a cut. Size alone cannot tell
+    such a hit from a cut in a dark scene, and lightness cannot either (an eclipse filmed
+    at night is darker than a fade); the network judges what the frames show. A hit beside
+    a frame with no picture is not checked: a fade to or from black is a transition the
+    network does not mark. The check and the hits it removed are kept in info.shot_check."""
+    if not shotnet.available():
+        info.shot_check = None
+        return hard
+    edge = max(1, round(config.FADE_EDGE_S * info.fps))
+
+    def beside_black(c: int) -> bool:
+        return any(np.percentile(thumbs[j], 99) <= config.NO_PICTURE_LEVEL
+                   for j in range(max(0, c - edge), min(len(thumbs), c + edge + 1)))
+
+    quiet = [c for c in hard if c < len(d) and d[c] < config.CUT_CHECK_MAX_DIFF and not beside_black(c)]
+    around = {c: range(c - 2, c + 2) for c in quiet}  # the network marks the last frame of the old shot
+    p = shotnet.transition_probability(rgb, sorted({k for r in around.values() for k in r}))
+    unseen = [c for c in quiet if max(p[k] for k in around[c]) < config.SHOTNET_THRESHOLD]
+    info.shot_check = {"model": "TransNetV2", "checked": len(quiet), "removed_s": [round(c / info.fps, 2) for c in unseen]}
+    return [c for c in hard if c not in unseen]
+
+
 def _frame_signals(info: VideoInfo):
-    """64×36 gray thumbnail, HSV histogram and difference to the previous frame, for every frame."""
+    """64×36 gray thumbnail, HSV histogram and difference to the previous frame, and the
+    48×27 RGB frame the shot-transition network reads, for every frame."""
     cap = cv2.VideoCapture(str(info.path))
-    thumbs, hists, diffs = [], [], []
+    thumbs, hists, diffs, rgb = [], [], [], []
     while True:
         ok, frame = cap.read()
         if not ok:
@@ -142,8 +169,9 @@ def _frame_signals(info: VideoInfo):
         diffs.append(float(np.mean(np.abs(gray - thumbs[-1]))) if thumbs else 0.0)
         thumbs.append(gray)
         hists.append(cv2.normalize(hist, hist).flatten())
+        rgb.append(cv2.cvtColor(cv2.resize(frame, shotnet.SIZE, interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB))
     cap.release()
-    return thumbs, hists, np.array(diffs)
+    return thumbs, hists, np.array(diffs), np.array(rgb, dtype=np.uint8).reshape(-1, shotnet.SIZE[1], shotnet.SIZE[0], 3)
 
 
 def gradual_transitions(thumbs: list, hists: list, d: np.ndarray, hard_cuts: list[int]) -> list[int]:

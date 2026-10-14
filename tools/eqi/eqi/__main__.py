@@ -146,6 +146,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--k6-repeats", type=int)
     p.add_argument("--extra", type=Path, help="folder of further videos whose K6 level is listed")
 
+    p = sub.add_parser("serve", help="analysis page in the browser: choose videos, analyse them, open their reports")
+    p.add_argument("--out", type=Path, default=Path("out/app"), help="folder for the analyses (default out/app)")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--no-browser", action="store_true", help="do not open the page in the browser")
+    ai_options(p)
+
     p = sub.add_parser("tier2", help="correlate tool scores with expert ratings")
     p.add_argument("scores", type=Path, help="scores.csv written by `batch`")
     p.add_argument("ratings", type=Path, help="long-format ratings: video, rater, overall[, per-criterion columns]")
@@ -221,6 +227,10 @@ def main(argv: list[str] | None = None) -> int:
         from .evaluate import ai_check
         ai_check(args.tier1_dirs, args.out, model=args.model, extra=args.extra, repeats=args.k6_repeats)
         print((args.out / "ai_check.md").read_text(encoding="utf-8"))
+
+    elif args.cmd == "serve":
+        from .webapp import serve
+        serve(args.out, args.port, model=args.model, repeats=args.k6_repeats, open_browser=not args.no_browser)
 
     elif args.cmd == "tier2":
         from .evaluate import tier2

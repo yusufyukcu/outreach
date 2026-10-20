@@ -291,6 +291,10 @@ python -m pytest -q tests                               # 94 tests
 `ratings.csv` (long format): `video, rater, overall[, cuts, pacing, color, audio, framing, narrative]`
 with ratings on the ITU-T P.910 five-point ACR scale.
 
+The scripts that re-score the tier sets and Tier 1 from cached features and compute the
+statistics under *Proof protocol* (bootstraps, ICC, K6 drift, re-encode stability) are in
+`eval/`; see `eval/README.md`.
+
 A file without a picture (audio only, damaged, not a video) stops `analyze` with a
 plain message; `batch` notes it in `scores.csv` (`error` column) and goes on with
 the next video. Portrait, rotated, variable-frame-rate, odd-sized, silent and

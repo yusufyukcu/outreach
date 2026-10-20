@@ -1,0 +1,1146 @@
+{
+ "tiers/v01": {
+  "tier": "broken",
+  "eqi": 55.6,
+  "sig": 50.8,
+  "scores": {
+   "cuts": 31.5,
+   "pacing": 39.8,
+   "color": 93.7,
+   "audio": 39.7,
+   "framing": 54.9
+  },
+  "k6": 75.0
+ },
+ "tiers/v02": {
+  "tier": "bad",
+  "eqi": 75.2,
+  "sig": 75.2,
+  "scores": {
+   "cuts": 63.0,
+   "pacing": 87.6,
+   "color": 97.3,
+   "audio": 64.0,
+   "framing": 56.6
+  },
+  "k6": 75.0
+ },
+ "tiers/v03": {
+  "tier": "bad",
+  "eqi": 75.7,
+  "sig": 82.3,
+  "scores": {
+   "cuts": 97.4,
+   "pacing": 100.0,
+   "color": 68.1,
+   "audio": 50.0,
+   "framing": 77.5
+  },
+  "k6": 50.0
+ },
+ "tiers/v04": {
+  "tier": "mid",
+  "eqi": 63.3,
+  "sig": 60.4,
+  "scores": {
+   "cuts": 69.8,
+   "pacing": 11.2,
+   "color": 68.2,
+   "audio": 77.8,
+   "framing": 99.0
+  },
+  "k6": 75.0
+ },
+ "tiers/v05": {
+  "tier": "pro",
+  "eqi": 87.8,
+  "sig": 91.1,
+  "scores": {
+   "cuts": 98.3,
+   "pacing": 81.4,
+   "color": 90.1,
+   "audio": 91.9,
+   "framing": 95.6
+  },
+  "k6": 75.0
+ },
+ "tiers/v06": {
+  "tier": "bad",
+  "eqi": 44.2,
+  "sig": 55.3,
+  "scores": {
+   "cuts": 50.0,
+   "pacing": 68.5,
+   "color": 50.0,
+   "audio": 30.0,
+   "framing": 74.3
+  },
+  "k6": 0.0
+ },
+ "tiers/v07": {
+  "tier": "bad",
+  "eqi": 88.5,
+  "sig": 91.9,
+  "scores": {
+   "cuts": 95.0,
+   "pacing": 90.1,
+   "color": 95.0,
+   "audio": 100.0,
+   "framing": 77.5
+  },
+  "k6": 75.0
+ },
+ "tiers/v08": {
+  "tier": "bad",
+  "eqi": 68.2,
+  "sig": 73.6,
+  "scores": {
+   "cuts": 93.8,
+   "pacing": 73.7,
+   "color": 50.0,
+   "audio": 71.3,
+   "framing": null
+  },
+  "k6": 50.0
+ },
+ "tiers/v09": {
+  "tier": "pro",
+  "eqi": 76.9,
+  "sig": 77.4,
+  "scores": {
+   "cuts": 58.0,
+   "pacing": 100.0,
+   "color": 90.4,
+   "audio": 59.8,
+   "framing": 76.5
+  },
+  "k6": 75.0
+ },
+ "tiers/v10": {
+  "tier": "bad",
+  "eqi": 81.6,
+  "sig": 83.2,
+  "scores": {
+   "cuts": 98.7,
+   "pacing": 88.6,
+   "color": 97.9,
+   "audio": 52.5,
+   "framing": 59.4
+  },
+  "k6": 75.0
+ },
+ "tiers/v11": {
+  "tier": "bad",
+  "eqi": 48.3,
+  "sig": 60.4,
+  "scores": {
+   "cuts": 50.0,
+   "pacing": 85.4,
+   "color": 50.0,
+   "audio": 50.0,
+   "framing": 60.0
+  },
+  "k6": 0.0
+ },
+ "tiers/v12": {
+  "tier": "mid",
+  "eqi": 83.2,
+  "sig": 91.5,
+  "scores": {
+   "cuts": 99.0,
+   "pacing": 100.0,
+   "color": 90.9,
+   "audio": 85.0,
+   "framing": 72.0
+  },
+  "k6": 50.0
+ },
+ "tiers/v13": {
+  "tier": "mid",
+  "eqi": 74.5,
+  "sig": 80.6,
+  "scores": {
+   "cuts": 95.0,
+   "pacing": 100.0,
+   "color": 73.1,
+   "audio": 59.7,
+   "framing": 55.0
+  },
+  "k6": 50.0
+ },
+ "tiers/v14": {
+  "tier": "pro",
+  "eqi": 80.3,
+  "sig": 81.6,
+  "scores": {
+   "cuts": 95.8,
+   "pacing": 100.0,
+   "color": 79.2,
+   "audio": 52.5,
+   "framing": 59.6
+  },
+  "k6": 75.0
+ },
+ "tiers/v15": {
+  "tier": "mid",
+  "eqi": 56.7,
+  "sig": 70.9,
+  "scores": {
+   "cuts": 83.3,
+   "pacing": 80.7,
+   "color": 50.0,
+   "audio": 52.5,
+   "framing": 80.0
+  },
+  "k6": 0.0
+ },
+ "tiers/v16": {
+  "tier": "mid",
+  "eqi": 74.9,
+  "sig": 74.9,
+  "scores": {
+   "cuts": 83.3,
+   "pacing": 58.6,
+   "color": null,
+   "audio": 87.9,
+   "framing": null
+  },
+  "k6": 75.0
+ },
+ "tiers/v17": {
+  "tier": "pro",
+  "eqi": 63.2,
+  "sig": 72.8,
+  "scores": {
+   "cuts": 95.0,
+   "pacing": 30.5,
+   "color": 71.1,
+   "audio": 81.2,
+   "framing": 100.0
+  },
+  "k6": 25.0
+ },
+ "tiers/v18": {
+  "tier": "pro",
+  "eqi": 83.1,
+  "sig": 85.7,
+  "scores": {
+   "cuts": 93.8,
+   "pacing": 91.8,
+   "color": 75.3,
+   "audio": 80.0,
+   "framing": 56.7
+  },
+  "k6": 75.0
+ },
+ "tiers/v19": {
+  "tier": "pro",
+  "eqi": 86.8,
+  "sig": 89.7,
+  "scores": {
+   "cuts": 97.6,
+   "pacing": 100.0,
+   "color": 93.4,
+   "audio": 60.0,
+   "framing": 84.3
+  },
+  "k6": 75.0
+ },
+ "tiers/v20": {
+  "tier": "bad",
+  "eqi": 52.8,
+  "sig": 59.8,
+  "scores": {
+   "cuts": 50.0,
+   "pacing": 86.0,
+   "color": 50.0,
+   "audio": 100.0,
+   "framing": 5.4
+  },
+  "k6": 25.0
+ },
+ "tiers/v21": {
+  "tier": "broken",
+  "eqi": 36.7,
+  "sig": 27.1,
+  "scores": {
+   "cuts": 0.0,
+   "pacing": 33.3,
+   "color": 26.5,
+   "audio": 45.0,
+   "framing": 44.9
+  },
+  "k6": 75.0
+ },
+ "tiers/v22": {
+  "tier": "mid",
+  "eqi": 70.9,
+  "sig": 69.8,
+  "scores": {
+   "cuts": 35.0,
+   "pacing": 84.9,
+   "color": 75.0,
+   "audio": 70.0,
+   "framing": 97.9
+  },
+  "k6": 75.0
+ },
+ "market/m01": {
+  "tier": "mid",
+  "eqi": 63.9,
+  "sig": 67.3,
+  "scores": {
+   "cuts": 75.0,
+   "pacing": 66.7,
+   "color": 50.0,
+   "audio": 75.0,
+   "framing": 71.0
+  },
+  "k6": 50.0
+ },
+ "market/m02": {
+  "tier": "mid",
+  "eqi": 78.8,
+  "sig": 79.8,
+  "scores": {
+   "cuts": 68.7,
+   "pacing": 100.0,
+   "color": 82.3,
+   "audio": 73.2,
+   "framing": 65.6
+  },
+  "k6": 75.0
+ },
+ "market/m03": {
+  "tier": "bad",
+  "eqi": 80.8,
+  "sig": 89.9,
+  "scores": {
+   "cuts": 93.8,
+   "pacing": 100.0,
+   "color": 87.0,
+   "audio": null,
+   "framing": 70.3
+  },
+  "k6": 50.0
+ },
+ "market/m04": {
+  "tier": "pro",
+  "eqi": 78.7,
+  "sig": 79.7,
+  "scores": {
+   "cuts": 67.5,
+   "pacing": 83.8,
+   "color": 79.2,
+   "audio": 85.0,
+   "framing": 88.4
+  },
+  "k6": 75.0
+ },
+ "market/m05": {
+  "tier": "bad",
+  "eqi": 74.9,
+  "sig": 74.9,
+  "scores": {
+   "cuts": 97.2,
+   "pacing": 100.0,
+   "color": 58.4,
+   "audio": 74.6,
+   "framing": 18.2
+  },
+  "k6": 75.0
+ },
+ "market/m06": {
+  "tier": "bad",
+  "eqi": 47.3,
+  "sig": 59.2,
+  "scores": {
+   "cuts": 50.0,
+   "pacing": 56.7,
+   "color": 27.5,
+   "audio": 80.0,
+   "framing": 100.0
+  },
+  "k6": 0.0
+ },
+ "market/m07": {
+  "tier": "mid",
+  "eqi": 84.4,
+  "sig": 86.8,
+  "scores": {
+   "cuts": 99.1,
+   "pacing": 100.0,
+   "color": 83.3,
+   "audio": 60.0,
+   "framing": 75.3
+  },
+  "k6": 75.0
+ },
+ "market/m08": {
+  "tier": "broken",
+  "eqi": 55.8,
+  "sig": 50.7,
+  "scores": {
+   "cuts": 18.7,
+   "pacing": 55.3,
+   "color": 60.6,
+   "audio": 92.4,
+   "framing": 42.1
+  },
+  "k6": 75.0
+ },
+ "market/m09": {
+  "tier": "bad",
+  "eqi": 79.2,
+  "sig": 92.8,
+  "scores": {
+   "cuts": 98.1,
+   "pacing": 100.0,
+   "color": 96.2,
+   "audio": 75.6,
+   "framing": 84.6
+  },
+  "k6": 25.0
+ },
+ "market/m10": {
+  "tier": "mid",
+  "eqi": 77.6,
+  "sig": 78.2,
+  "scores": {
+   "cuts": 69.1,
+   "pacing": 100.0,
+   "color": 78.3,
+   "audio": 75.0,
+   "framing": 60.2
+  },
+  "k6": 75.0
+ },
+ "market/m11": {
+  "tier": "pro",
+  "eqi": 82.5,
+  "sig": 84.3,
+  "scores": {
+   "cuts": 98.9,
+   "pacing": 100.0,
+   "color": 69.8,
+   "audio": 58.4,
+   "framing": 79.2
+  },
+  "k6": 75.0
+ },
+ "market/m12": {
+  "tier": "pro",
+  "eqi": 88.8,
+  "sig": 92.3,
+  "scores": {
+   "cuts": 97.4,
+   "pacing": 100.0,
+   "color": 97.4,
+   "audio": 60.0,
+   "framing": 96.4
+  },
+  "k6": 75.0
+ },
+ "market/m13": {
+  "tier": "broken",
+  "eqi": 59.3,
+  "sig": 55.3,
+  "scores": {
+   "cuts": 18.6,
+   "pacing": 55.9,
+   "color": 84.3,
+   "audio": 59.8,
+   "framing": 72.6
+  },
+  "k6": 75.0
+ },
+ "market/m14": {
+  "tier": "pro",
+  "eqi": 78.2,
+  "sig": 79.0,
+  "scores": {
+   "cuts": 98.6,
+   "pacing": 67.9,
+   "color": 76.2,
+   "audio": 70.0,
+   "framing": 77.7
+  },
+  "k6": 75.0
+ },
+ "market/m15": {
+  "tier": "pro",
+  "eqi": 82.3,
+  "sig": 84.1,
+  "scores": {
+   "cuts": 98.5,
+   "pacing": 83.7,
+   "color": 93.3,
+   "audio": 70.0,
+   "framing": 62.7
+  },
+  "k6": 75.0
+ },
+ "market/m16": {
+  "tier": "pro",
+  "eqi": 89.9,
+  "sig": 93.6,
+  "scores": {
+   "cuts": 98.9,
+   "pacing": 87.1,
+   "color": 95.3,
+   "audio": 100.0,
+   "framing": 87.0
+  },
+  "k6": 75.0
+ },
+ "market/m17": {
+  "tier": "broken",
+  "eqi": 63.6,
+  "sig": 60.7,
+  "scores": {
+   "cuts": 48.5,
+   "pacing": 55.4,
+   "color": 87.2,
+   "audio": 59.8,
+   "framing": 55.5
+  },
+  "k6": 75.0
+ },
+ "market/m18": {
+  "tier": "pro",
+  "eqi": 85.6,
+  "sig": 88.4,
+  "scores": {
+   "cuts": 99.1,
+   "pacing": 86.9,
+   "color": 94.7,
+   "audio": 83.0,
+   "framing": 67.7
+  },
+  "k6": 75.0
+ },
+ "market/m19": {
+  "tier": "bad",
+  "eqi": 77.5,
+  "sig": 84.4,
+  "scores": {
+   "cuts": 97.1,
+   "pacing": 87.8,
+   "color": 96.9,
+   "audio": 85.0,
+   "framing": 40.0
+  },
+  "k6": 50.0
+ },
+ "market/m20": {
+  "tier": "pro",
+  "eqi": 85.9,
+  "sig": 88.7,
+  "scores": {
+   "cuts": 98.0,
+   "pacing": 100.0,
+   "color": 88.0,
+   "audio": 85.0,
+   "framing": 58.8
+  },
+  "k6": 75.0
+ },
+ "market/m21": {
+  "tier": "bad",
+  "eqi": 71.0,
+  "sig": 77.2,
+  "scores": {
+   "cuts": 66.8,
+   "pacing": 92.5,
+   "color": 74.9,
+   "audio": null,
+   "framing": 72.0
+  },
+  "k6": 50.0
+ },
+ "market/m22": {
+  "tier": "mid",
+  "eqi": 77.5,
+  "sig": 78.1,
+  "scores": {
+   "cuts": 96.2,
+   "pacing": 82.4,
+   "color": 83.8,
+   "audio": 100.0,
+   "framing": 11.3
+  },
+  "k6": 75.0
+ },
+ "market/m23": {
+  "tier": "mid",
+  "eqi": 87.9,
+  "sig": 91.1,
+  "scores": {
+   "cuts": 98.2,
+   "pacing": 100.0,
+   "color": 98.9,
+   "audio": 60.0,
+   "framing": 85.0
+  },
+  "k6": 75.0
+ },
+ "market/m24": {
+  "tier": "mid",
+  "eqi": 81.6,
+  "sig": 83.3,
+  "scores": {
+   "cuts": 68.2,
+   "pacing": 90.1,
+   "color": 96.7,
+   "audio": 84.5,
+   "framing": 77.8
+  },
+  "k6": 75.0
+ },
+ "market/m25": {
+  "tier": "bad",
+  "eqi": 54.6,
+  "sig": 61.9,
+  "scores": {
+   "cuts": 75.0,
+   "pacing": 34.1,
+   "color": 41.3,
+   "audio": 99.6,
+   "framing": 76.5
+  },
+  "k6": 25.0
+ },
+ "market/m26": {
+  "tier": "pro",
+  "eqi": 74.0,
+  "sig": 73.8,
+  "scores": {
+   "cuts": 49.7,
+   "pacing": 100.0,
+   "color": 90.1,
+   "audio": null,
+   "framing": 48.3
+  },
+  "k6": 75.0
+ },
+ "market/m27": {
+  "tier": "pro",
+  "eqi": 75.9,
+  "sig": 76.2,
+  "scores": {
+   "cuts": 68.9,
+   "pacing": 100.0,
+   "color": 53.9,
+   "audio": 92.5,
+   "framing": 54.8
+  },
+  "k6": 75.0
+ },
+ "market/m28": {
+  "tier": "mid",
+  "eqi": 74.9,
+  "sig": 82.1,
+  "scores": {
+   "cuts": 99.1,
+   "pacing": 87.4,
+   "color": 57.3,
+   "audio": 85.0,
+   "framing": 47.4
+  },
+  "k6": 50.0
+ },
+ "market/m29": {
+  "tier": "bad",
+  "eqi": 72.0,
+  "sig": 83.8,
+  "scores": {
+   "cuts": 98.1,
+   "pacing": 74.5,
+   "color": 92.7,
+   "audio": 100.0,
+   "framing": 47.1
+  },
+  "k6": 25.0
+ },
+ "market/m30": {
+  "tier": "mid",
+  "eqi": 81.0,
+  "sig": 82.8,
+  "scores": {
+   "cuts": 64.1,
+   "pacing": 100.0,
+   "color": 74.3,
+   "audio": null,
+   "framing": 96.8
+  },
+  "k6": 75.0
+ },
+ "market/m31": {
+  "tier": "mid",
+  "eqi": 67.7,
+  "sig": 72.9,
+  "scores": {
+   "cuts": 48.1,
+   "pacing": 96.6,
+   "color": 79.1,
+   "audio": null,
+   "framing": 66.6
+  },
+  "k6": 50.0
+ },
+ "market/m32": {
+  "tier": "bad",
+  "eqi": 66.1,
+  "sig": 70.1,
+  "scores": {
+   "cuts": 66.8,
+   "pacing": 92.5,
+   "color": 75.0,
+   "audio": 50.0,
+   "framing": 51.5
+  },
+  "k6": 50.0
+ },
+ "market/m33": {
+  "tier": "bad",
+  "eqi": 72.7,
+  "sig": 78.3,
+  "scores": {
+   "cuts": 96.7,
+   "pacing": 94.2,
+   "color": 46.0,
+   "audio": 70.0,
+   "framing": 72.7
+  },
+  "k6": 50.0
+ },
+ "holdout/h01": {
+  "tier": "mid",
+  "eqi": 83.7,
+  "sig": 79.6,
+  "scores": {
+   "cuts": 76.3,
+   "pacing": 87.0,
+   "color": 91.4,
+   "audio": 63.8,
+   "framing": 72.7
+  },
+  "k6": 100.0
+ },
+ "holdout/h02": {
+  "tier": "bad",
+  "eqi": 81.9,
+  "sig": 83.8,
+  "scores": {
+   "cuts": 96.7,
+   "pacing": 96.6,
+   "color": 45.5,
+   "audio": 70.4,
+   "framing": 98.7
+  },
+  "k6": 75.0
+ },
+ "holdout/h03": {
+  "tier": "pro",
+  "eqi": 84.1,
+  "sig": 80.2,
+  "scores": {
+   "cuts": 57.2,
+   "pacing": 94.8,
+   "color": 87.8,
+   "audio": 100.0,
+   "framing": 64.1
+  },
+  "k6": 100.0
+ },
+ "holdout/h04": {
+  "tier": "bad",
+  "eqi": 81.2,
+  "sig": 76.5,
+  "scores": {
+   "cuts": 91.7,
+   "pacing": 68.0,
+   "color": 70.8,
+   "audio": 88.8,
+   "framing": 59.4
+  },
+  "k6": 100.0
+ },
+ "holdout/h05": {
+  "tier": "mid",
+  "eqi": 76.4,
+  "sig": 76.8,
+  "scores": {
+   "cuts": 68.9,
+   "pacing": 100.0,
+   "color": 77.1,
+   "audio": null,
+   "framing": 51.0
+  },
+  "k6": 75.0
+ },
+ "holdout/h06": {
+  "tier": "broken",
+  "eqi": 64.2,
+  "sig": 55.3,
+  "scores": {
+   "cuts": 26.2,
+   "pacing": 55.5,
+   "color": 86.6,
+   "audio": 59.8,
+   "framing": 57.7
+  },
+  "k6": 100.0
+ },
+ "holdout/h07": {
+  "tier": "bad",
+  "eqi": 60.7,
+  "sig": 69.6,
+  "scores": {
+   "cuts": 63.0,
+   "pacing": 73.6,
+   "color": 55.9,
+   "audio": 85.0,
+   "framing": 77.0
+  },
+  "k6": 25.0
+ },
+ "holdout/h08": {
+  "tier": "bad",
+  "eqi": 75.6,
+  "sig": 75.8,
+  "scores": {
+   "cuts": 92.9,
+   "pacing": 72.6,
+   "color": 60.9,
+   "audio": 67.5,
+   "framing": 80.6
+  },
+  "k6": 75.0
+ },
+ "holdout/h09": {
+  "tier": "bad",
+  "eqi": 78.5,
+  "sig": 79.4,
+  "scores": {
+   "cuts": 91.7,
+   "pacing": 66.7,
+   "color": 50.0,
+   "audio": 98.4,
+   "framing": 100.0
+  },
+  "k6": 75.0
+ },
+ "holdout/h10": {
+  "tier": "mid",
+  "eqi": 74.7,
+  "sig": 68.3,
+  "scores": {
+   "cuts": 66.1,
+   "pacing": 77.1,
+   "color": 68.1,
+   "audio": 60.0,
+   "framing": 66.1
+  },
+  "k6": 100.0
+ },
+ "holdout/h11": {
+  "tier": "bad",
+  "eqi": 83.4,
+  "sig": 91.8,
+  "scores": {
+   "cuts": 78.7,
+   "pacing": 100.0,
+   "color": 98.2,
+   "audio": 85.0,
+   "framing": 98.3
+  },
+  "k6": 50.0
+ },
+ "holdout/h12": {
+  "tier": "mid",
+  "eqi": 75.2,
+  "sig": 69.0,
+  "scores": {
+   "cuts": 51.2,
+   "pacing": 100.0,
+   "color": 64.5,
+   "audio": 76.0,
+   "framing": 45.9
+  },
+  "k6": 100.0
+ },
+ "holdout/h13": {
+  "tier": "bad",
+  "eqi": 74.4,
+  "sig": 74.2,
+  "scores": {
+   "cuts": 97.5,
+   "pacing": 43.3,
+   "color": 93.9,
+   "audio": 85.0,
+   "framing": 49.8
+  },
+  "k6": 75.0
+ },
+ "holdout/h14": {
+  "tier": "bad",
+  "eqi": 75.1,
+  "sig": 75.2,
+  "scores": {
+   "cuts": 94.4,
+   "pacing": 75.7,
+   "color": 67.2,
+   "audio": 35.0,
+   "framing": 93.0
+  },
+  "k6": 75.0
+ },
+ "holdout/h15": {
+  "tier": "pro",
+  "eqi": 92.9,
+  "sig": 91.1,
+  "scores": {
+   "cuts": 99.6,
+   "pacing": 86.6,
+   "color": 96.6,
+   "audio": 85.0,
+   "framing": 83.5
+  },
+  "k6": 100.0
+ },
+ "holdout/h16": {
+  "tier": "pro",
+  "eqi": 86.1,
+  "sig": 89.3,
+  "scores": {
+   "cuts": 98.2,
+   "pacing": 100.0,
+   "color": 90.2,
+   "audio": null,
+   "framing": 54.7
+  },
+  "k6": 75.0
+ },
+ "holdout/h17": {
+  "tier": "mid",
+  "eqi": 85.2,
+  "sig": 81.4,
+  "scores": {
+   "cuts": 95.8,
+   "pacing": 82.1,
+   "color": 60.2,
+   "audio": 85.0,
+   "framing": 77.7
+  },
+  "k6": 100.0
+ },
+ "holdout/h18": {
+  "tier": "mid",
+  "eqi": 86.7,
+  "sig": 83.4,
+  "scores": {
+   "cuts": 98.9,
+   "pacing": 85.5,
+   "color": 98.3,
+   "audio": 45.0,
+   "framing": 72.7
+  },
+  "k6": 100.0
+ },
+ "holdout/h19": {
+  "tier": "broken",
+  "eqi": 55.1,
+  "sig": 37.9,
+  "scores": {
+   "cuts": 16.4,
+   "pacing": 33.3,
+   "color": null,
+   "audio": 81.3,
+   "framing": null
+  },
+  "k6": 100.0
+ },
+ "holdout/h20": {
+  "tier": "bad",
+  "eqi": 55.3,
+  "sig": 69.2,
+  "scores": {
+   "cuts": 50.0,
+   "pacing": 66.7,
+   "color": 50.0,
+   "audio": 100.0,
+   "framing": 100.0
+  },
+  "k6": 0.0
+ },
+ "holdout/h21": {
+  "tier": "mid",
+  "eqi": 61.0,
+  "sig": 50.9,
+  "scores": {
+   "cuts": 90.0,
+   "pacing": 17.2,
+   "color": 33.1,
+   "audio": 60.0,
+   "framing": 54.8
+  },
+  "k6": 100.0
+ },
+ "holdout/h22": {
+  "tier": "pro",
+  "eqi": 84.1,
+  "sig": 80.2,
+  "scores": {
+   "cuts": 69.3,
+   "pacing": 91.5,
+   "color": 91.4,
+   "audio": 75.0,
+   "framing": 69.6
+  },
+  "k6": 100.0
+ },
+ "holdout/h23": {
+  "tier": "pro",
+  "eqi": 91.0,
+  "sig": 87.5,
+  "scores": {
+   "cuts": 97.1,
+   "pacing": 100.0,
+   "color": null,
+   "audio": 50.6,
+   "framing": null
+  },
+  "k6": 100.0
+ },
+ "holdout/h24": {
+  "tier": "pro",
+  "eqi": 80.5,
+  "sig": 82.0,
+  "scores": {
+   "cuts": 66.8,
+   "pacing": 87.7,
+   "color": 75.0,
+   "audio": 99.0,
+   "framing": 90.0
+  },
+  "k6": 75.0
+ },
+ "holdout/h25": {
+  "tier": "pro",
+  "eqi": 95.5,
+  "sig": 93.8,
+  "scores": {
+   "cuts": 96.2,
+   "pacing": 96.6,
+   "color": null,
+   "audio": 85.0,
+   "framing": null
+  },
+  "k6": 100.0
+ },
+ "holdout/h26": {
+  "tier": "mid",
+  "eqi": 81.1,
+  "sig": 82.6,
+  "scores": {
+   "cuts": 96.9,
+   "pacing": 67.1,
+   "color": 85.3,
+   "audio": 85.0,
+   "framing": 78.8
+  },
+  "k6": 75.0
+ },
+ "holdout/h27": {
+  "tier": "pro",
+  "eqi": 84.5,
+  "sig": 80.6,
+  "scores": {
+   "cuts": 69.8,
+   "pacing": 78.0,
+   "color": 98.3,
+   "audio": 100.0,
+   "framing": 60.2
+  },
+  "k6": 100.0
+ },
+ "holdout/h28": {
+  "tier": "mid",
+  "eqi": 83.0,
+  "sig": 86.0,
+  "scores": {
+   "cuts": 95.8,
+   "pacing": 74.6,
+   "color": null,
+   "audio": 88.8,
+   "framing": null
+  },
+  "k6": 75.0
+ },
+ "holdout/h29": {
+  "tier": "pro",
+  "eqi": 83.7,
+  "sig": 79.6,
+  "scores": {
+   "cuts": 83.6,
+   "pacing": 100.0,
+   "color": 81.7,
+   "audio": 60.0,
+   "framing": 55.6
+  },
+  "k6": 100.0
+ },
+ "holdout/h30": {
+  "tier": "bad",
+  "eqi": 46.6,
+  "sig": 58.2,
+  "scores": {
+   "cuts": 50.0,
+   "pacing": 66.7,
+   "color": 36.5,
+   "audio": 45.0,
+   "framing": 100.0
+  },
+  "k6": 0.0
+ },
+ "holdout/h31": {
+  "tier": "pro",
+  "eqi": 90.7,
+  "sig": 88.0,
+  "scores": {
+   "cuts": 82.7,
+   "pacing": 100.0,
+   "color": 86.5,
+   "audio": 100.0,
+   "framing": 53.6
+  },
+  "k6": 100.0
+ },
+ "holdout/h32": {
+  "tier": "broken",
+  "eqi": 63.1,
+  "sig": 53.2,
+  "scores": {
+   "cuts": 18.3,
+   "pacing": 48.7,
+   "color": 69.7,
+   "audio": 99.7,
+   "framing": 54.7
+  },
+  "k6": 100.0
+ },
+ "holdout/h33": {
+  "tier": "mid",
+  "eqi": 88.0,
+  "sig": 91.8,
+  "scores": {
+   "cuts": 95.8,
+   "pacing": 94.6,
+   "color": 95.5,
+   "audio": null,
+   "framing": 75.5
+  },
+  "k6": 75.0
+ }
+}

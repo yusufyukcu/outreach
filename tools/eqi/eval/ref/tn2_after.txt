@@ -1,0 +1,16 @@
+tiers     med 87.2/74.6/66.8/51.2 | pro>mid=0.83 mid>bad=0.54 pro>bad=0.77 bad>broken=0.75 | rho=0.52 clean=0.41  n=22
+ signal   med 83.7/72.9/67.8/39.0 | pro>mid=0.75 mid>bad=0.57 pro>bad=0.73 bad>broken=1.00 | rho=0.52 clean=0.35
+market    med 86.0/83.3/66.5/61.0 | pro>mid=0.60 mid>bad=0.88 pro>bad=0.99 bad>broken=0.78 | rho=0.75 clean=0.69  n=33
+ signal   med 84.2/80.9/77.8/55.3 | pro>mid=0.66 mid>bad=0.56 pro>bad=0.68 bad>broken=0.97 | rho=0.46 clean=0.27
+holdout   med 85.3/83.3/72.3/55.1 | pro>mid=0.75 mid>bad=0.80 pro>bad=0.96 bad>broken=0.80 | rho=0.75 clean=0.69  n=33
+ signal   med 84.7/80.5/75.5/53.2 | pro>mid=0.71 mid>bad=0.61 pro>bad=0.86 bad>broken=1.00 | rho=0.61 clean=0.50
+ALL       med 86.0/82.2/69.4/57.9 | pro>mid=0.74 mid>bad=0.75 pro>bad=0.90 bad>broken=0.73 | rho=0.68 clean=0.61
+ signal   med 84.2/79.3/75.5/52.0 | pro>mid=0.71 mid>bad=0.58 pro>bad=0.76 bad>broken=0.96 | rho=0.53 clean=0.38
+  tier1 synth     clean EQI_signal  97.2 issues 0
+  tier1 sintel    clean EQI_signal  82.4 issues 13
+  tier1 tos       clean EQI_signal  89.7 issues 10
+  tier1 nasa_vo   clean EQI_signal  85.5 issues 7
+  tier1 nasa_talk clean EQI_signal  72.8 issues 7
+  TIER1 strongest 31/40 all 64/115 | same-kind FA 3 | new away 13 (1.52) lost away 22 (5.27) | monotonic 30/35
+  by kind (strongest / all / FA): bad_framing=2/5,6/15,0 color_jump=8/10,12/30,2 dead_air=5/5,15/15,0 flash_frame=5/5,10/10,0 jump_cut=2/5,4/15,0 loudness_jump=4/5,5/15,1 shake=5/5,12/15,0
+  mean EQI_signal drop at strongest (real): bad_framing=0.4 color_jump=1.4 dead_air=12.2 flash_frame=19.3 jump_cut=2.2 loudness_jump=1.3 shake=4.2

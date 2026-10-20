@@ -1,0 +1,72 @@
+88 videos; 41 with 12 Oct runs, 47 with 13 Oct runs; models ['gemini-3.1-pro-preview']
+runs per video: {1: 1, 2: 4, 3: 83}
+
+== tiers (n=22)
+  10 Oct rules + earlier K6      80.6/67.2/72.6/45.3 ρ 0.46 clean 0.29 | pro>mid 0.81 mid>bad 0.50 pro>bad 0.69 bad>broken 0.81
+  12 Oct rules + earlier K6      81.7/72.7/71.7/46.2 ρ 0.51 clean 0.36 | pro>mid 0.78 mid>bad 0.52 pro>bad 0.75 bad>broken 0.81
+  12 Oct rules + structured K6   87.2/75.2/74.2/51.2 ρ 0.49 clean 0.36 | pro>mid 0.83 mid>bad 0.50 pro>bad 0.75 bad>broken 0.81
+  K1–K5 only (EQI_signal)        83.7/72.9/74.4/39.0 ρ 0.48 clean 0.30 | pro>mid 0.75 mid>bad 0.51 pro>bad 0.71 bad>broken 1.00
+  K6 alone, earlier              75.0/62.5/50.0/75.0 ρ 0.17 clean 0.37 | pro>mid 0.65 mid>bad 0.59 pro>bad 0.73 bad>broken 0.19
+  K6 alone, structured           100.0/62.5/62.5/100.0 ρ 0.11 clean 0.31 | pro>mid 0.69 mid>bad 0.54 pro>bad 0.70 bad>broken 0.19
+  Δρ       vs 10 Oct                      +0.03 (95% CI -0.13 to +0.24)
+  Δρ       vs 12 Oct rules + earlier K6   -0.02 (95% CI -0.12 to +0.06)
+  Δρ clean vs 10 Oct                      +0.07 (95% CI -0.11 to +0.34)
+  Δρ clean vs 12 Oct rules + earlier K6   +0.01 (95% CI -0.08 to +0.09)
+  Δρ clean K6 alone structured vs earlier   -0.06 (95% CI -0.20 to +0.05)
+
+== market (n=33)
+  10 Oct rules + earlier K6      80.6/77.2/69.4/59.3 ρ 0.69 clean 0.60 | pro>mid 0.68 mid>bad 0.81 pro>bad 0.90 bad>broken 0.70
+  12 Oct rules + earlier K6      82.4/78.2/72.3/59.3 ρ 0.67 clean 0.58 | pro>mid 0.69 mid>bad 0.75 pro>bad 0.89 bad>broken 0.80
+  12 Oct rules + structured K6   85.8/83.3/66.5/61.0 ρ 0.75 clean 0.69 | pro>mid 0.60 mid>bad 0.88 pro>bad 0.99 bad>broken 0.78
+  K1–K5 only (EQI_signal)        84.2/80.9/77.8/55.3 ρ 0.46 clean 0.27 | pro>mid 0.66 mid>bad 0.56 pro>bad 0.68 bad>broken 0.97
+  K6 alone, earlier              75.0/75.0/50.0/75.0 ρ 0.51 clean 0.76 | pro>mid 0.65 mid>bad 0.86 pro>bad 0.95 bad>broken 0.05
+  K6 alone, structured           100.0/100.0/25.0/75.0 ρ 0.58 clean 0.71 | pro>mid 0.47 mid>bad 0.94 pro>bad 1.00 bad>broken 0.03
+  Δρ       vs 10 Oct                      +0.06 (95% CI -0.07 to +0.24)
+  Δρ       vs 12 Oct rules + earlier K6   +0.08 (95% CI -0.04 to +0.23)
+  Δρ clean vs 10 Oct                      +0.08 (95% CI -0.09 to +0.32)
+  Δρ clean vs 12 Oct rules + earlier K6   +0.11 (95% CI -0.04 to +0.31)
+  Δρ clean K6 alone structured vs earlier   -0.05 (95% CI -0.20 to +0.14)
+
+== holdout (n=33)
+  10 Oct rules + earlier K6      80.8/77.3/74.2/60.0 ρ 0.42 clean 0.25 | pro>mid 0.59 mid>bad 0.61 pro>bad 0.66 bad>broken 0.77
+  12 Oct rules + earlier K6      85.3/82.0/75.3/63.1 ρ 0.75 clean 0.70 | pro>mid 0.80 mid>bad 0.74 pro>bad 0.97 bad>broken 0.77
+  12 Oct rules + structured K6   85.3/83.3/72.3/55.1 ρ 0.75 clean 0.69 | pro>mid 0.74 mid>bad 0.79 pro>bad 0.96 bad>broken 0.83
+  K1–K5 only (EQI_signal)        84.8/80.5/75.5/53.2 ρ 0.61 clean 0.49 | pro>mid 0.71 mid>bad 0.59 pro>bad 0.86 bad>broken 1.00
+  K6 alone, earlier              100.0/100.0/75.0/100.0 ρ 0.37 clean 0.63 | pro>mid 0.60 mid>bad 0.83 pro>bad 0.89 bad>broken 0.05
+  K6 alone, structured           100.0/100.0/37.5/100.0 ρ 0.45 clean 0.59 | pro>mid 0.55 mid>bad 0.85 pro>bad 0.86 bad>broken 0.18
+  Δρ       vs 10 Oct                      +0.33 (95% CI +0.09 to +0.61)
+  Δρ       vs 12 Oct rules + earlier K6   +0.00 (95% CI -0.07 to +0.07)
+  Δρ clean vs 10 Oct                      +0.44 (95% CI +0.12 to +0.81)
+  Δρ clean vs 12 Oct rules + earlier K6   -0.01 (95% CI -0.11 to +0.08)
+  Δρ clean K6 alone structured vs earlier   -0.04 (95% CI -0.30 to +0.23)
+
+== ALL 88 (n=88)
+  10 Oct rules + earlier K6      80.6/75.3/71.7/58.5 ρ 0.51 clean 0.38 | pro>mid 0.67 mid>bad 0.65 pro>bad 0.74 bad>broken 0.76
+  12 Oct rules + earlier K6      84.1/77.5/74.7/57.5 ρ 0.63 clean 0.54 | pro>mid 0.74 mid>bad 0.67 pro>bad 0.87 bad>broken 0.77
+  12 Oct rules + structured K6   85.8/82.2/69.7/57.9 ρ 0.68 clean 0.60 | pro>mid 0.73 mid>bad 0.75 pro>bad 0.90 bad>broken 0.78
+  K1–K5 only (EQI_signal)        84.2/79.7/75.5/52.0 ρ 0.52 clean 0.36 | pro>mid 0.70 mid>bad 0.56 pro>bad 0.75 bad>broken 0.97
+  K6 alone, earlier              75.0/75.0/50.0/75.0 ρ 0.33 clean 0.53 | pro>mid 0.60 mid>bad 0.76 pro>bad 0.84 bad>broken 0.13
+  K6 alone, structured           100.0/100.0/25.0/100.0 ρ 0.40 clean 0.55 | pro>mid 0.57 mid>bad 0.81 pro>bad 0.85 bad>broken 0.16
+  Δρ       vs 10 Oct                      +0.17 (95% CI +0.05 to +0.30)
+  Δρ       vs 12 Oct rules + earlier K6   +0.04 (95% CI -0.02 to +0.12)
+  Δρ clean vs 10 Oct                      +0.22 (95% CI +0.07 to +0.39)
+  Δρ clean vs 12 Oct rules + earlier K6   +0.06 (95% CI -0.03 to +0.16)
+  Δρ clean K6 alone structured vs earlier   +0.02 (95% CI -0.12 to +0.17)
+
+== K6 run-to-run reliability, ICC(1,1) / ICC(1,3) over three runs
+  tiers    structured n=20 ICC(1,1) 0.90 ICC(1,3) 0.96 | runs ≥1 level apart 25%, ≥2 10%
+  tiers    earlier    n=22 ICC(1,1) 0.75 ICC(1,3) 0.90 | runs ≥1 level apart 77%, ≥2 14%
+  market   structured n=32 ICC(1,1) 0.80 ICC(1,3) 0.92 | runs ≥1 level apart 38%, ≥2 12%
+  market   earlier    n=33 ICC(1,1) 0.61 ICC(1,3) 0.82 | runs ≥1 level apart 79%, ≥2 15%
+  holdout  structured n=31 ICC(1,1) 0.89 ICC(1,3) 0.96 | runs ≥1 level apart 35%, ≥2 6%
+  holdout  earlier    n=33 ICC(1,1) 0.82 ICC(1,3) 0.93 | runs ≥1 level apart 27%, ≥2 9%
+  ALL      structured n=83 ICC(1,1) 0.86 ICC(1,3) 0.95 | runs ≥1 level apart 34%, ≥2 10%
+  ALL      earlier    n=88 ICC(1,1) 0.75 ICC(1,3) 0.90 | runs ≥1 level apart 59%, ≥2 12%
+  runs of 12 Oct: n=38 ICC(1,1) 0.82
+  runs of 13 Oct: n=45 ICC(1,1) 0.89
+
+== K6 level medians by tier (structured / earlier)
+  pro    n=26 structured median level 5.0 | earlier 4.0
+  mid    n=26 structured median level 5.0 | earlier 4.0
+  bad    n=28 structured median level 2.0 | earlier 3.0
+  broken n= 8 structured median level 5.0 | earlier 4.0
